@@ -1,0 +1,34 @@
+{
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "check": "deno fmt --check . && deno lint . && deno check",
+    "dev": "deno run -A --watch=static/,routes/ dev.ts",
+    "build": "deno run -A dev.ts build",
+    "start": "deno serve -A _fresh/server.js",
+    "update": "deno run -A -r jsr:@fresh/update ."
+  },
+  "lint": {
+    "rules": {
+      "tags": ["fresh", "recommended"]
+    }
+  },
+  "exclude": ["**/_fresh/*"],
+  "imports": {
+    "@/": "./",
+    "fresh": "jsr:@fresh/core@^2.3.3",
+    "@fresh/plugin-tailwind": "jsr:@fresh/plugin-tailwind@^1.0.0",
+    "preact": "npm:preact@^10.29.1",
+    "@preact/signals": "npm:@preact/signals@^2.3.1",
+    "tailwindcss": "npm:tailwindcss@^4.1.10",
+    "@tailwindcss/postcss": "npm:@tailwindcss/postcss@^4.1.10",
+    "daisyui": "npm:daisyui@^5.0.43"
+  },
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "lib": ["dom", "dom.asynciterable", "dom.iterable", "deno.ns"]
+  },
+  "fmt": {
+    "exclude": ["_fresh/", "static/styles.css"]
+  }
+}
