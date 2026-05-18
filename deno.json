@@ -6,6 +6,8 @@
     "build": "deno run -A dev.ts build",
     "start": "deno serve -A _fresh/server.js",
     "seed": "deno run -A scripts/seed.ts",
+    "translate": "uv run scripts/translate.py",
+    "translate:test": "sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'",
     "update": "deno run -A -r jsr:@fresh/update ."
   },
   "lint": {

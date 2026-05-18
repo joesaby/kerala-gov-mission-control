@@ -15,3 +15,6 @@ deno.lock
 # Env
 .env
 .env.local
+
+# Translation work-in-progress files
+data/transcripts/*.partial
