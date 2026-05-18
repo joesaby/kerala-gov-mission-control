@@ -42,6 +42,42 @@ On first run Deno will fetch Fresh from JSR and Preact/Tailwind/daisyUI from
 npm. If you're behind a restrictive network, you may need to allow `jsr.io`,
 `deno.land` and the npm registry.
 
+## Translate a Malayalam transcript to English
+
+After you have a `data/transcripts/<id>.ml.txt` file (produced by the upcoming
+`deno task transcript` pipeline on a separate branch), translate it to English
+locally with NLLB-200:
+
+```bash
+deno task translate data/transcripts/<id>.ml.txt
+```
+
+Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run
+downloads the NLLB-200 distilled-600M model (~2.4 GB) from Hugging Face and
+caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
+
+**One-time setup:**
+
+```bash
+brew install uv          # or: curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+`uv` manages a Python ≥3.10 interpreter, an isolated virtual environment, and
+the Python dependencies declared inline in `scripts/translate.py`. You do not
+need to manage Python or pip yourself.
+
+**Flags:**
+
+- `--out <dir>` writes the output elsewhere (default: same directory as input).
+- `--force` overwrites an existing `.en.txt` or ignores a stale `.partial`.
+
+**Resume:** The script writes a `.partial` file as it goes. If you Ctrl+C or the
+process dies, re-run the same command and it picks up from the last completed
+paragraph.
+
+**Tests:** `deno task translate:test` runs the pytest suite for the pure helpers
+(transcript parsing, chunking, header building, paragraph collapse).
+
 ## Deploying to Deno Deploy
 
 Deploys are handled by the **Deno Deploy GitHub App** (Git Integration). The app
