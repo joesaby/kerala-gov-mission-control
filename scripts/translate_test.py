@@ -16,6 +16,7 @@ from translate import (
     parse_transcript,
     split_paragraphs,
     split_speaker_prefix,
+    translate_paragraph,
 )
 
 SAMPLE_ML_TXT = """Source: https://www.youtube.com/watch?v=5MVkCqd2U10
@@ -160,3 +161,37 @@ def test_build_output_header_omits_missing_optionals():
 
 def test_model_label_identifies_nllb():
     assert "nllb" in MODEL_LABEL.lower()
+
+
+class FakeTranslator:
+    def __init__(self, output: str):
+        self._output = output
+        self.calls: list[str] = []
+
+    def translate(self, text: str) -> str:
+        self.calls.append(text)
+        return self._output
+
+
+def test_translate_paragraph_strips_whitespace():
+    fake = FakeTranslator(output="  Hello.\n")
+    assert translate_paragraph("hello", fake) == "Hello."
+
+
+def test_translate_paragraph_collapses_internal_blank_lines():
+    # Critical for resume math: every translated paragraph must remain
+    # exactly ONE paragraph when re-split by split_paragraphs.
+    fake = FakeTranslator(output="Line one.\n\nLine two.\n\n\nLine three.")
+    assert translate_paragraph("x", fake) == "Line one.\nLine two.\nLine three."
+
+
+def test_translate_paragraph_raises_on_empty_output():
+    fake = FakeTranslator(output="   \n\t")
+    with pytest.raises(ValueError, match="empty translation"):
+        translate_paragraph("hello", fake)
+
+
+def test_translate_paragraph_passes_input_through_to_translator():
+    fake = FakeTranslator(output="english")
+    translate_paragraph("malayalam input", fake)
+    assert fake.calls == ["malayalam input"]

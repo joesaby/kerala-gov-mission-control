@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import sys
 from dataclasses import dataclass, field
+from typing import Protocol
 
 
 @dataclass
@@ -114,6 +115,67 @@ def build_output_header(header: TranscriptHeader, translated_at: str) -> str:
     lines.append(f"Translation: {MODEL_LABEL}")
     lines.append(f"Translated: {translated_at}")
     return "\n".join(lines)
+
+
+MODEL_ID = "facebook/nllb-200-distilled-600M"
+SRC_LANG = "mal_Mlym"  # FLORES-200: Malayalam in Malayalam script
+TGT_LANG = "eng_Latn"  # FLORES-200: English in Latin script
+_BLANK_LINE_RE = re.compile(r"\n\s*\n+")
+
+
+class _TranslatorProtocol(Protocol):
+    def translate(self, text: str) -> str: ...
+
+
+class Translator:
+    """Lazy wrapper around NLLB-200 (loaded on first .load() call)."""
+
+    def __init__(self) -> None:
+        self._loaded = False
+        self._tokenizer = None
+        self._model = None
+        self._forced_bos_id: int | None = None
+
+    def load(self) -> None:
+        if self._loaded:
+            return
+        # Imports are deferred so importing this module from tests does not
+        # require transformers/torch to be installed.
+        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+        self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+        self._model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID)
+        self._tokenizer.src_lang = SRC_LANG
+        self._forced_bos_id = self._tokenizer.convert_tokens_to_ids(TGT_LANG)
+        self._loaded = True
+
+    def translate(self, text: str) -> str:
+        if not self._loaded:
+            raise RuntimeError("Translator.load() must be called before translate()")
+        import torch
+
+        inputs = self._tokenizer(
+            text, return_tensors="pt", truncation=True, max_length=512
+        )
+        with torch.no_grad():
+            out = self._model.generate(
+                **inputs,
+                forced_bos_token_id=self._forced_bos_id,
+                max_length=512,
+                num_beams=5,
+            )
+        return self._tokenizer.batch_decode(out, skip_special_tokens=True)[0]
+
+
+def translate_paragraph(text: str, translator: _TranslatorProtocol) -> str:
+    raw = translator.translate(text)
+    # Collapse any internal blank lines so the result is always exactly ONE
+    # paragraph in the output file. This keeps count_completed_paragraphs in
+    # sync with the translation loop's position when resuming.
+    collapsed = _BLANK_LINE_RE.sub("\n", raw.strip())
+    if not collapsed:
+        raise ValueError("empty translation")
+    return collapsed
 
 
 def main() -> int:
