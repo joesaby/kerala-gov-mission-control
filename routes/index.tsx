@@ -1,10 +1,11 @@
+import { page } from "fresh";
 import { define } from "../utils.ts";
-import { HEADLINE_KPIS } from "../data/kpis.ts";
+import { listDepartments, listKpis } from "../data/db.ts";
 import { KpiCard } from "../components/KpiCard.tsx";
 import { Header } from "../components/Header.tsx";
 import { Footer } from "../components/Footer.tsx";
 import { StatusBadge } from "../components/StatusBadge.tsx";
-import type { KpiStatus } from "../data/types.ts";
+import type { Department, Kpi, KpiStatus } from "../data/types.ts";
 
 const STATUS_ORDER: KpiStatus[] = [
   "off-track",
@@ -13,9 +14,24 @@ const STATUS_ORDER: KpiStatus[] = [
   "on-track",
 ];
 
-export default define.page(function Home({ state }) {
+interface Data {
+  kpis: Kpi[];
+  depts: Department[];
+}
+
+export const handler = define.handlers<Data>({
+  async GET() {
+    const [kpis, depts] = await Promise.all([listKpis(), listDepartments()]);
+    return page({ kpis, depts });
+  },
+});
+
+export default define.page<typeof handler>(function Home({ data, state }) {
   const lang = state.lang;
-  const counts = HEADLINE_KPIS.reduce<Record<KpiStatus, number>>(
+  const { kpis, depts } = data;
+  const deptById = new Map(depts.map((d) => [d.id, d]));
+
+  const counts = kpis.reduce<Record<KpiStatus, number>>(
     (acc, k) => {
       acc[k.status] = (acc[k.status] ?? 0) + 1;
       return acc;
@@ -76,8 +92,13 @@ export default define.page(function Home({ state }) {
           aria-label="Headline indicators"
           class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
-          {HEADLINE_KPIS.map((kpi) => (
-            <KpiCard key={kpi.id} kpi={kpi} lang={lang} />
+          {kpis.map((kpi) => (
+            <KpiCard
+              key={kpi.id}
+              kpi={kpi}
+              lang={lang}
+              dept={kpi.ownerDeptId ? deptById.get(kpi.ownerDeptId) : null}
+            />
           ))}
         </section>
 
