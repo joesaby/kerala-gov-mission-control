@@ -7,8 +7,10 @@ import type {
   Minister,
   Party,
   Person,
+  PublicSpeech,
   Secretary,
   Speaker,
+  SpeechType,
 } from "./types.ts";
 import { HEADLINE_KPIS } from "./kpis.ts";
 import { DEPARTMENTS } from "./departments.ts";
@@ -17,6 +19,7 @@ import { GOVERNMENTS } from "./governments.ts";
 import { COALITION_MEMBERSHIPS, PARTIES } from "./parties.ts";
 import { PERSONS } from "./persons.ts";
 import { SPEAKERS } from "./speakers.ts";
+import { PUBLIC_SPEECHES } from "./public-speeches.ts";
 
 /**
  * Deno KV layout.
@@ -31,6 +34,7 @@ import { SPEAKERS } from "./speakers.ts";
  *   ["party", id]              -> Party
  *   ["coalition", id]          -> CoalitionMembership
  *   ["speaker", id]            -> Speaker
+ *   ["speech", id]             -> PublicSpeech
  *
  * Secondary indexes (write under transaction with the primary):
  *   ["kpi_by_dept", deptId, kpiId]                -> null
@@ -41,12 +45,14 @@ import { SPEAKERS } from "./speakers.ts";
  *   ["minister_by_person", personId, ministerId]  -> null
  *   ["coalition_by_party", partyId, coalitionId]  -> null
  *   ["speaker_by_term", assemblyTerm, speakerId]  -> null
+ *   ["speech_by_person", personId, speechId]      -> null
+ *   ["speech_by_type",   type, speechId]          -> null
  *
  * Bookkeeping:
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 8;
+const SEED_VERSION = 9;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -81,29 +87,27 @@ export async function getKpi(id: string): Promise<Kpi | null> {
 export async function listKpisByDept(deptId: string): Promise<Kpi[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: Kpi[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({ prefix: ["kpi_by_dept", deptId] })
   ) {
-    const kpiId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<Kpi>(["kpi", kpiId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out;
+  const results = await Promise.all(ids.map((id) => k.get<Kpi>(["kpi", id])));
+  return results.map((r) => r.value).filter(Boolean) as Kpi[];
 }
 
 export async function listKpisByDomain(domain: CivicDomain): Promise<Kpi[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: Kpi[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({ prefix: ["kpi_by_domain", domain] })
   ) {
-    const kpiId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<Kpi>(["kpi", kpiId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out;
+  const results = await Promise.all(ids.map((id) => k.get<Kpi>(["kpi", id])));
+  return results.map((r) => r.value).filter(Boolean) as Kpi[];
 }
 
 // ----- Department --------------------------------------------------------
@@ -181,17 +185,18 @@ export async function listMinistersByGovernment(
 ): Promise<Minister[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: Minister[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({
       prefix: ["minister_by_govt", governmentId],
     })
   ) {
-    const mId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<Minister>(["minister", mId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out;
+  const results = await Promise.all(
+    ids.map((id) => k.get<Minister>(["minister", id])),
+  );
+  return results.map((r) => r.value).filter(Boolean) as Minister[];
 }
 
 // ----- Person -------------------------------------------------------------
@@ -218,17 +223,18 @@ export async function listMinistersByPerson(
 ): Promise<Minister[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: Minister[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({
       prefix: ["minister_by_person", personId],
     })
   ) {
-    const mId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<Minister>(["minister", mId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out;
+  const results = await Promise.all(
+    ids.map((id) => k.get<Minister>(["minister", id])),
+  );
+  return results.map((r) => r.value).filter(Boolean) as Minister[];
 }
 
 // ----- Party / Coalition --------------------------------------------------
@@ -257,17 +263,19 @@ export async function listCoalitionsByParty(
 ): Promise<CoalitionMembership[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: CoalitionMembership[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({
       prefix: ["coalition_by_party", partyId],
     })
   ) {
-    const cId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<CoalitionMembership>(["coalition", cId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out.sort((a, b) => a.termStart.localeCompare(b.termStart));
+  const results = await Promise.all(
+    ids.map((id) => k.get<CoalitionMembership>(["coalition", id])),
+  );
+  return (results.map((r) => r.value).filter(Boolean) as CoalitionMembership[])
+    .sort((a, b) => a.termStart.localeCompare(b.termStart));
 }
 
 // ----- Speaker ------------------------------------------------------------
@@ -288,17 +296,18 @@ export async function listSpeakersByTerm(
 ): Promise<Speaker[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: Speaker[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({
       prefix: ["speaker_by_term", assemblyTerm],
     })
   ) {
-    const sId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<Speaker>(["speaker", sId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out;
+  const results = await Promise.all(
+    ids.map((id) => k.get<Speaker>(["speaker", id])),
+  );
+  return results.map((r) => r.value).filter(Boolean) as Speaker[];
 }
 
 export async function getCurrentSpeaker(): Promise<Speaker | null> {
@@ -306,6 +315,53 @@ export async function getCurrentSpeaker(): Promise<Speaker | null> {
   return (
     all.find((s) => s.rank === "Speaker" && !s.termEnd) ?? null
   );
+}
+
+// ----- Public Speech ------------------------------------------------------
+
+export async function listSpeeches(): Promise<PublicSpeech[]> {
+  await ensureSeeded();
+  return await listAll<PublicSpeech>(["speech"]);
+}
+
+export async function getSpeech(id: string): Promise<PublicSpeech | null> {
+  await ensureSeeded();
+  const res = await (await kv()).get<PublicSpeech>(["speech", id]);
+  return res.value;
+}
+
+export async function listSpeechesByPerson(
+  personId: string,
+): Promise<PublicSpeech[]> {
+  await ensureSeeded();
+  const k = await kv();
+  const out: PublicSpeech[] = [];
+  for await (
+    const entry of k.list<unknown>({
+      prefix: ["speech_by_person", personId],
+    })
+  ) {
+    const sId = entry.key[entry.key.length - 1] as string;
+    const got = await k.get<PublicSpeech>(["speech", sId]);
+    if (got.value) out.push(got.value);
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function listSpeechesByType(
+  type: SpeechType,
+): Promise<PublicSpeech[]> {
+  await ensureSeeded();
+  const k = await kv();
+  const out: PublicSpeech[] = [];
+  for await (
+    const entry of k.list<unknown>({ prefix: ["speech_by_type", type] })
+  ) {
+    const sId = entry.key[entry.key.length - 1] as string;
+    const got = await k.get<PublicSpeech>(["speech", sId]);
+    if (got.value) out.push(got.value);
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ----- Write helpers (used by seed + admin endpoints) --------------------
@@ -385,6 +441,16 @@ export async function putSpeaker(s: Speaker): Promise<void> {
   if (!res.ok) throw new Error(`Failed to put speaker ${s.id}`);
 }
 
+export async function putSpeech(sp: PublicSpeech): Promise<void> {
+  const k = await kv();
+  const res = await k.atomic()
+    .set(["speech", sp.id], sp)
+    .set(["speech_by_person", sp.personId, sp.id], null)
+    .set(["speech_by_type", sp.type, sp.id], null)
+    .commit();
+  if (!res.ok) throw new Error(`Failed to put speech ${sp.id}`);
+}
+
 // ----- Seeding -----------------------------------------------------------
 
 export function ensureSeeded(): Promise<void> {
@@ -420,6 +486,9 @@ export async function seed(): Promise<void> {
       ["coalition_by_party"],
       ["speaker"],
       ["speaker_by_term"],
+      ["speech"],
+      ["speech_by_person"],
+      ["speech_by_type"],
     ] satisfies Deno.KvKey[]
   ) {
     for await (const entry of k.list({ prefix })) {
@@ -434,4 +503,5 @@ export async function seed(): Promise<void> {
   for (const s of SPEAKERS) await putSpeaker(s);
   for (const d of DEPARTMENTS) await putDepartment(d);
   for (const kpi of HEADLINE_KPIS) await putKpi(kpi);
+  for (const sp of PUBLIC_SPEECHES) await putSpeech(sp);
 }

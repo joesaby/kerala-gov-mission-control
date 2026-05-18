@@ -1,7 +1,6 @@
 import { page } from "fresh";
 import { define } from "../../utils.ts";
 import {
-  getCurrentGovernment,
   listDepartments,
   listGovernments,
   listMinistersByGovernment,
@@ -22,13 +21,17 @@ export const handler = define.handlers<Data>({
   async GET(ctx) {
     const url = new URL(ctx.req.url);
     const slug = url.searchParams.get("g");
+    // Fetch governments + departments in parallel.
+    // Resolve the target government from the already-fetched list so we
+    // never call listGovernments() twice (getCurrentGovernment() would do so).
     const [governments, depts] = await Promise.all([
       listGovernments(),
       listDepartments(),
     ]);
-    let govt: Government | null = null;
-    if (slug) govt = governments.find((g) => g.slug === slug) ?? null;
-    if (!govt) govt = await getCurrentGovernment();
+    const govt: Government | null = slug
+      ? (governments.find((g) => g.slug === slug) ?? null)
+      : (governments.find((g) => !g.termEnd) ?? null);
+    // Fetch ministers in parallel with the already-resolved govt ID.
     const ministers = govt ? await listMinistersByGovernment(govt.id) : [];
     return page({ govt, governments, ministers, depts });
   },
