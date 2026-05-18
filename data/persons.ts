@@ -5,7 +5,10 @@ import type { Person } from "./types.ts";
  * and Legislative Assembly Speakers / Deputy Speakers (12th–15th KLA).
  *
  * One Person record per human. Minister and Speaker records reference
- * these via `personId`. Photos are direct upload.wikimedia.org originals.
+ * these via `personId`. Photos use the Wikimedia thumbnail CDN path
+ * (`/thumb/<hash>/<file>/120px-<file>`) to avoid CORS OpaqueResponseBlocking
+ * in Firefox. Raw upload.wikimedia.org URLs for PNG/JPG without /thumb/
+ * are blocked by Cross-Origin-Resource-Policy: private.
  *
  * Sources: individual Wikipedia articles for each person.
  */
@@ -850,7 +853,7 @@ export const PERSONS: Person[] = [
     name: "V. D. Satheesan",
     nameMl: "വി.ഡി. സതീശൻ",
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/0/06/V-d-satheesan.png",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/V-d-satheesan.png/120px-V-d-satheesan.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._D._Satheesan",
     dataStatus: "verified",
@@ -911,7 +914,7 @@ export const PERSONS: Person[] = [
     name: "Bindhu Krishna",
     nameMl: "ബിന്ദു കൃഷ്ണ",
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/6/6c/BinduKrishnaMLA.png",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/BinduKrishnaMLA.png/120px-BinduKrishnaMLA.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Bindhu_Krishna",
     dataStatus: "verified",
@@ -1011,7 +1014,7 @@ export const PERSONS: Person[] = [
     name: "V. E. Abdul Gafoor",
     nameMl: "വി.ഇ. അബ്ദുൽ ഗഫൂർ",
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/ce/VE_Abdul_Gafoor.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/VE_Abdul_Gafoor.jpg/120px-VE_Abdul_Gafoor.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     dataStatus: "verified",
   },
