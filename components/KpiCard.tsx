@@ -1,16 +1,19 @@
-import type { Kpi } from "../data/types.ts";
+import type { CivicDomain, Department, Kpi } from "../data/types.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 import { TrendArrow } from "./TrendArrow.tsx";
 
-const CATEGORY_LABEL: Record<Kpi["category"], string> = {
+const DOMAIN_LABEL: Record<CivicDomain, string> = {
   fiscal: "Fiscal",
   health: "Health",
   education: "Education",
   livelihood: "Livelihood",
   safety: "Safety",
-  trust: "Trust",
+  transport: "Transport",
   environment: "Environment",
+  sustainability: "Sustainability",
+  trust: "Trust",
   delivery: "Delivery",
+  other: "Other",
 };
 
 function formatNumber(n: number): string {
@@ -33,11 +36,21 @@ function formatRefreshed(iso: string): string {
   });
 }
 
-export function KpiCard({ kpi, lang }: { kpi: Kpi; lang: "en" | "ml" }) {
+interface KpiCardProps {
+  kpi: Kpi;
+  lang: "en" | "ml";
+  /** Owning department, if known. Renders dept chip and link. */
+  dept?: Department | null;
+}
+
+export function KpiCard({ kpi, lang, dept }: KpiCardProps) {
   const title = lang === "ml" ? kpi.titleMl : kpi.title;
   const definition = lang === "ml" && kpi.meta.definitionMl
     ? kpi.meta.definitionMl
     : kpi.meta.definition;
+  const deptName = dept
+    ? (lang === "ml" ? dept.nameMl ?? dept.name : dept.name)
+    : null;
 
   return (
     <article class="kpi-tile">
@@ -45,7 +58,7 @@ export function KpiCard({ kpi, lang }: { kpi: Kpi; lang: "en" | "ml" }) {
         <header class="flex items-start justify-between gap-2">
           <div class="min-w-0">
             <p class="text-[11px] uppercase tracking-wider text-base-content/60 font-medium">
-              {CATEGORY_LABEL[kpi.category]}
+              {DOMAIN_LABEL[kpi.domain]}
             </p>
             <h3
               class={`text-base font-semibold leading-tight mt-0.5 ${
@@ -106,7 +119,18 @@ export function KpiCard({ kpi, lang }: { kpi: Kpi; lang: "en" | "ml" }) {
               <dt class="text-base-content/50">Source</dt>
               <dd>{kpi.meta.source}</dd>
               <dt class="text-base-content/50">Owner</dt>
-              <dd>{kpi.meta.owner}</dd>
+              <dd>
+                {dept
+                  ? (
+                    <a
+                      href={`/gov/departments/${dept.slug}`}
+                      class="link link-hover"
+                    >
+                      {deptName}
+                    </a>
+                  )
+                  : kpi.meta.owner}
+              </dd>
               <dt class="text-base-content/50">Updated</dt>
               <dd class="capitalize">{kpi.meta.updateFrequency}</dd>
               <dt class="text-base-content/50">Last refresh</dt>

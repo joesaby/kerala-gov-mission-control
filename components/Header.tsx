@@ -27,10 +27,10 @@ export function Header({ lang }: { lang: Lang }) {
         <nav class="hidden md:flex items-center gap-1 text-sm">
           {[
             { href: "/", en: "Kerala Today", ml: "ഇന്നത്തെ കേരളം" },
-            { href: "/promises", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
+            { href: "/gov", en: "Government", ml: "സർക്കാർ" },
             { href: "/money", en: "Money", ml: "പണം" },
+            { href: "/promises", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
             { href: "/panchayat", en: "My Panchayat", ml: "എന്റെ പഞ്ചായത്ത്" },
-            { href: "/services", en: "Service Clock", ml: "സേവന സമയം" },
           ].map((item) => (
             <a
               href={item.href}

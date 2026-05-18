@@ -1,18 +1,18 @@
 import { define } from "../../utils.ts";
-import { listKpis } from "../../data/db.ts";
+import { listDepartments } from "../../data/db.ts";
 
 export const handler = define.handlers({
   async GET() {
-    const kpis = await listKpis();
+    const depts = await listDepartments();
     return Response.json(
       {
         generatedAt: new Date().toISOString(),
-        count: kpis.length,
-        kpis,
+        count: depts.length,
+        departments: depts,
       },
       {
         headers: {
-          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+          "Cache-Control": "public, max-age=300, stale-while-revalidate=600",
         },
       },
     );
