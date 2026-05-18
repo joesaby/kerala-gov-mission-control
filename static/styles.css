@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-feature-settings: "cv11", "ss01";
+    font-variation-settings: "opsz" 32;
+  }
+  :lang(ml) body,
+  :lang(ml) .ml {
+    font-family: theme("fontFamily.malayalam");
+  }
+}
+
+@layer components {
+  .kpi-tile {
+    @apply card bg-base-100 border border-base-300 shadow-sm transition-shadow hover:shadow-md;
+  }
+  .status-dot {
+    @apply inline-block w-2.5 h-2.5 rounded-full;
+  }
+  .metric-value {
+    @apply text-3xl md:text-4xl font-semibold tracking-tight tabular-nums;
+  }
+}

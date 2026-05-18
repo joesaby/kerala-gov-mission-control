@@ -1,0 +1,17 @@
+# Fresh build output
+_fresh/
+fresh.gen.ts
+
+# Deno
+.deno/
+node_modules/
+deno.lock
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+
+# Env
+.env
+.env.local
