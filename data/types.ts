@@ -338,6 +338,46 @@ export interface Secretary {
   dataStatus: "verified" | "unverified" | "tbd";
 }
 
+// ── Public Speeches ──────────────────────────────────────────────────────────
+
+export type SpeechType =
+  | "press-meet"
+  | "interview"
+  | "assembly-speech"
+  | "public-address"
+  | "inauguration"
+  | "debate";
+
+export interface TranscriptSegment {
+  /** Offset from video/audio start, in whole seconds. */
+  timeSecs: number;
+  text: string;
+}
+
+/**
+ * A recorded public speech by a Person — press meets, interviews, assembly
+ * floor speeches, public addresses, etc.
+ * `personId` is the FK; one Person may accumulate many speeches across tenures.
+ */
+export interface PublicSpeech {
+  id: string; // speech.<person-slug>-<YYYY-MM-DD>[-seq]
+  personId: string; // FK → Person.id
+  type: SpeechType;
+  title: string;
+  titleMl?: string;
+  date: string; // ISO date
+  videoUrl?: string;
+  videoId?: string; // YouTube video ID for embedding
+  channelName?: string;
+  description?: string;
+  descriptionMl?: string;
+  tags?: string[];
+  transcript?: TranscriptSegment[];
+  source?: string;
+  sourceUrl?: string;
+  dataStatus: "verified" | "unverified" | "tbd";
+}
+
 // ── Government Orders ────────────────────────────────────────────────────────
 
 /**

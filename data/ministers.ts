@@ -58,7 +58,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.cmo", "dept.finance", "dept.law", "dept.ports"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/0/06/V-d-satheesan.png",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/V-d-satheesan.png/120px-V-d-satheesan.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._D._Satheesan",
     source: SRCS,
@@ -78,7 +78,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.power", "dept.devaswom"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/6/66/Muraleedharan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Muraleedharan.jpg/120px-Muraleedharan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._Muraleedharan",
     source: SRCS,
@@ -178,7 +178,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.women-child-development"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/6/6c/BinduKrishnaMLA.png",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/BinduKrishnaMLA.png/120px-BinduKrishnaMLA.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Bindhu_Krishna",
     source: SRCS,
@@ -198,7 +198,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.general-education"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/3/3d/N_Shamsudheen.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/N_Shamsudheen.jpg/120px-N_Shamsudheen.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -233,7 +233,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.water-resources"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/3/39/Mons_Joseph.jpeg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Mons_Joseph.jpeg/120px-Mons_Joseph.jpeg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Mons_Joseph",
     source: SRCS,
@@ -269,7 +269,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.labour-skills"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/19/C.P.John.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/C.P.John.jpg/120px-C.P.John.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/C._P._John",
     source: SRCS,
@@ -288,7 +288,8 @@ const SATHEESAN: Minister[] = [
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
     departmentIds: ["dept.cooperation", "dept.cultural-affairs"],
-    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/4/4f/APJPCV.jpg",
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/APJPCV.jpg/120px-APJPCV.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -339,7 +340,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.transport"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/5/50/Roji_M_John_at_Kodussery_IMG_20260326_160534972_%28cropped%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Roji_M_John_at_Kodussery_IMG_20260326_160534972_%28cropped%29.jpg/120px-Roji_M_John_at_Kodussery_IMG_20260326_160534972_%28cropped%29.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -374,7 +375,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.minority-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/ce/VE_Abdul_Gafoor.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/VE_Abdul_Gafoor.jpg/120px-VE_Abdul_Gafoor.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -409,7 +410,7 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.revenue"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/4/49/SUNNYJOSEPHMLA.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/SUNNYJOSEPHMLA.jpg/120px-SUNNYJOSEPHMLA.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -443,7 +444,7 @@ const PINARAYI_II: Minister[] = [
       "dept.environment-climate-change",
     ],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/e/ec/Chief_Minister_Pinarayi_Vijayan_2023.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Chief_Minister_Pinarayi_Vijayan_2023.jpg/120px-Chief_Minister_Pinarayi_Vijayan_2023.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Pinarayi_Vijayan",
     source: SRC2,
@@ -464,7 +465,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.finance"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/a/a2/Budget_reading_K_N_Balagopal.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Budget_reading_K_N_Balagopal.jpg/120px-Budget_reading_K_N_Balagopal.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._N._Balagopal",
     source: SRC2,
@@ -484,7 +485,8 @@ const PINARAYI_II: Minister[] = [
     termStart: "2021-05-20",
     termEnd: "2026-05-18",
     departmentIds: ["dept.revenue"],
-    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/b/ba/K.Rajan.jpg",
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/K.Rajan.jpg/120px-K.Rajan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._Rajan_(politician)",
     source: SRC2,
@@ -505,7 +507,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.water-resources"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/4/45/Roshy_Augustine_minister.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Roshy_Augustine_minister.jpg/120px-Roshy_Augustine_minister.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Roshy_Augustine",
     source: SRC2,
@@ -526,7 +528,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.power"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/ce/K._Krishnankutty.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/K._Krishnankutty.jpg/120px-K._Krishnankutty.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._Krishnankutty",
     source: SRC2,
@@ -547,7 +549,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.forest-wildlife"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d1/A.K._Saseendran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/A.K._Saseendran.jpg/120px-A.K._Saseendran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/A._K._Saseendran",
     source: SRC2,
@@ -568,7 +570,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: [],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/c1/Kadannappally_Ramachandran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Kadannappally_Ramachandran.jpg/120px-Kadannappally_Ramachandran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Kadannappalli_Ramachandran",
     source: SRC2,
@@ -589,7 +591,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.transport"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/c2/Mukesh_and_Ganeshkumar_%28cropped%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Mukesh_and_Ganeshkumar_%28cropped%29.jpg/120px-Mukesh_and_Ganeshkumar_%28cropped%29.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._B._Ganesh_Kumar",
     source: SRC2,
@@ -610,7 +612,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.youth-welfare", "dept.minority-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/88/Abdurahman.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Abdurahman.jpg/120px-Abdurahman.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._Abdurahiman",
     source: SRC2,
@@ -631,7 +633,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.food-civil-supplies"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/9/92/Minister_GR_Anil.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Minister_GR_Anil.jpg/120px-Minister_GR_Anil.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/G._R._Anil",
     source: SRC2,
@@ -652,7 +654,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.higher-education"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/f/fe/R._Bindu_is_an_Indian_politician_of_CPI%28M%29%2C.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/R._Bindu_is_an_Indian_politician_of_CPI%28M%29%2C.jpg/120px-R._Bindu_is_an_Indian_politician_of_CPI%28M%29%2C.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/R._Bindu",
     source: SRC2,
@@ -673,7 +675,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: [],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d6/Chinchu-rani-82406049-removebg-preview.png",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Chinchu-rani-82406049-removebg-preview.png/120px-Chinchu-rani-82406049-removebg-preview.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/J._Chinchu_Rani",
     source: SRC2,
@@ -694,7 +696,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.local-self-government", "dept.excise"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/4/4a/M_B_Rajesh.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/M_B_Rajesh.JPG/120px-M_B_Rajesh.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/M._B._Rajesh",
     source: SRC2,
@@ -715,7 +717,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.public-works", "dept.tourism"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/4/4e/Riyas.CPI%28M%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Riyas.CPI%28M%29.jpg/120px-Riyas.CPI%28M%29.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._A._Mohammed_Riyas",
     source: SRC2,
@@ -754,7 +756,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.scheduled-castes-tribes-bcd"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/0/07/O.R._Kelu.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/O.R._Kelu.jpg/120px-O.R._Kelu.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/O._R._Kelu",
     source: SRC2,
@@ -796,7 +798,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.general-education", "dept.labour-skills"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/13/V_Sivankutty_2024_at_Grandhapura_tvm_centre.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/V_Sivankutty_2024_at_Grandhapura_tvm_centre.jpg/120px-V_Sivankutty_2024_at_Grandhapura_tvm_centre.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._Sivankutty",
     source: SRC2,
@@ -817,7 +819,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.cooperation", "dept.ports", "dept.devaswom"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/6/69/Vasavanmla.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Vasavanmla.jpg/120px-Vasavanmla.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._N._Vasavan",
     source: SRC2,
@@ -841,7 +843,7 @@ const PINARAYI_II: Minister[] = [
       "dept.women-child-development",
     ],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/1c/Minister_Veena_George.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Minister_Veena_George.jpg/120px-Minister_Veena_George.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Veena_George",
     source: SRC2,
@@ -862,7 +864,7 @@ const PINARAYI_II: Minister[] = [
     termEnd: "2026-05-18",
     departmentIds: ["dept.fisheries-harbour", "dept.cultural-affairs"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/1d/Saji_Cheriyan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Saji_Cheriyan.jpg/120px-Saji_Cheriyan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Saji_Cherian",
     source: SRC2,
@@ -896,7 +898,7 @@ const PINARAYI_I: Minister[] = [
       "dept.electronics-it",
     ],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/e/ec/Chief_Minister_Pinarayi_Vijayan_2023.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Chief_Minister_Pinarayi_Vijayan_2023.jpg/120px-Chief_Minister_Pinarayi_Vijayan_2023.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Pinarayi_Vijayan",
     source: SRC1,
@@ -917,7 +919,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.finance"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/86/T._M._Thomas_Isaac.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/T._M._Thomas_Isaac.jpg/120px-T._M._Thomas_Isaac.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/T._M._Thomas_Isaac",
     source: SRC1,
@@ -938,7 +940,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.revenue"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/9/94/E._Chandrasekharan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/E._Chandrasekharan.jpg/120px-E._Chandrasekharan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/E._Chandrasekharan",
     source: SRC1,
@@ -959,7 +961,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.industries-commerce", "dept.youth-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/dc/EP_Jayarajan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/EP_Jayarajan.jpg/120px-EP_Jayarajan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/E._P._Jayarajan",
     source: SRC1,
@@ -984,7 +986,7 @@ const PINARAYI_I: Minister[] = [
       "dept.cultural-affairs",
     ],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/17/A.K._Balan%2C_Minister.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/A.K._Balan%2C_Minister.jpg/120px-A.K._Balan%2C_Minister.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/A._K._Balan",
     source: SRC1,
@@ -1005,7 +1007,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.general-education", "dept.higher-education"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/f/f9/C_Raveendranadh_at_Kerala_Varma_College_Thrissur_2024_DSC_5110_%28cropped%29.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/C_Raveendranadh_at_Kerala_Varma_College_Thrissur_2024_DSC_5110_%28cropped%29.JPG/120px-C_Raveendranadh_at_Kerala_Varma_College_Thrissur_2024_DSC_5110_%28cropped%29.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/C._Raveendranath",
     source: SRC1,
@@ -1026,7 +1028,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.devaswom", "dept.cooperation", "dept.tourism"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/2/2f/Kadakampally_Surendran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Kadakampally_Surendran.jpg/120px-Kadakampally_Surendran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Kadakampally_Surendran",
     source: SRC1,
@@ -1047,7 +1049,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.power"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/7/7c/M.M._Mani.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/M.M._Mani.jpg/120px-M.M._Mani.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/M._M._Mani",
     source: SRC1,
@@ -1068,7 +1070,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.excise", "dept.labour-skills"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/2/2a/T.P._Ramakrishnan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/T.P._Ramakrishnan.jpg/120px-T.P._Ramakrishnan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/T._P._Ramakrishnan",
     source: SRC1,
@@ -1089,7 +1091,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.fisheries-harbour"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/2/22/Mercy_kutty_Amma_Closeup_5.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Mercy_kutty_Amma_Closeup_5.jpg/120px-Mercy_kutty_Amma_Closeup_5.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/J._Mercykutty_Amma",
     source: SRC1,
@@ -1110,7 +1112,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.public-works"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/9/99/G_sudhakaran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/G_sudhakaran.jpg/120px-G_sudhakaran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/G._Sudhakaran",
     source: SRC1,
@@ -1134,7 +1136,7 @@ const PINARAYI_I: Minister[] = [
       "dept.women-child-development",
     ],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/c6/K._K._Shailaja.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/K._K._Shailaja.jpg/120px-K._K._Shailaja.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._K._Shailaja",
     source: SRC1,
@@ -1155,7 +1157,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.local-self-government"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/3/30/A.C._Moideen.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/A.C._Moideen.jpg/120px-A.C._Moideen.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/A._C._Moideen",
     source: SRC1,
@@ -1176,7 +1178,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-04-07",
     departmentIds: ["dept.higher-education", "dept.minority-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/1e/KT_Jaleel.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/KT_Jaleel.jpg/120px-KT_Jaleel.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._T._Jaleel",
     source: SRC1,
@@ -1197,7 +1199,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.agriculture-farmers-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/5/59/VS_SunilkumarDSC_0575.resized.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/VS_SunilkumarDSC_0575.resized.JPG/120px-VS_SunilkumarDSC_0575.resized.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._S._Sunil_Kumar",
     source: SRC1,
@@ -1218,7 +1220,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.food-civil-supplies"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/e/e3/P_Thilothaman.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/P_Thilothaman.jpg/120px-P_Thilothaman.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._Thilothaman",
     source: SRC1,
@@ -1238,7 +1240,8 @@ const PINARAYI_I: Minister[] = [
     termStart: "2016-05-25",
     termEnd: "2021-05-20",
     departmentIds: ["dept.forest-wildlife"],
-    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/0c/KRaju2.jpg",
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/KRaju2.jpg/120px-KRaju2.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._Raju",
     source: SRC1,
@@ -1259,7 +1262,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.water-resources"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/ce/K._Krishnankutty.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/K._Krishnankutty.jpg/120px-K._Krishnankutty.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._Krishnankutty",
     source: SRC1,
@@ -1280,7 +1283,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.transport"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d1/A.K._Saseendran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/A.K._Saseendran.jpg/120px-A.K._Saseendran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/A._K._Saseendran",
     source: SRC1,
@@ -1301,7 +1304,7 @@ const PINARAYI_I: Minister[] = [
     termEnd: "2021-05-20",
     departmentIds: ["dept.ports"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/c1/Kadannappally_Ramachandran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Kadannappally_Ramachandran.jpg/120px-Kadannappally_Ramachandran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Kadannappalli_Ramachandran",
     source: SRC1,
@@ -1333,7 +1336,7 @@ const CHANDY_II: Minister[] = [
       "dept.planning-economic-affairs",
     ],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/6/6e/The_Chief_Minister_of_Kerala%2C_Shri_Oommen_Chandy_calling_on_the_Union_Minister_for_Housing_and_Urban_Poverty_Alleviation_and_Culture%2C_Kum._Selja%2C_in_New_Delhi_on_September_23%2C_2011_%28cropped%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/The_Chief_Minister_of_Kerala%2C_Shri_Oommen_Chandy_calling_on_the_Union_Minister_for_Housing_and_Urban_Poverty_Alleviation_and_Culture%2C_Kum._Selja%2C_in_New_Delhi_on_September_23%2C_2011_%28cropped%29.jpg/120px-The_Chief_Minister_of_Kerala%2C_Shri_Oommen_Chandy_calling_on_the_Union_Minister_for_Housing_and_Urban_Poverty_Alleviation_and_Culture%2C_Kum._Selja%2C_in_New_Delhi_on_September_23%2C_2011_%28cropped%29.jpg",
     photoCredit: "Wikimedia Commons / Government of India / GODL",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Oommen_Chandy",
     source: SRCC,
@@ -1354,7 +1357,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.home", "dept.vigilance"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/8b/Ramesh_chennithala_Feb26.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Ramesh_chennithala_Feb26.jpg/120px-Ramesh_chennithala_Feb26.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Ramesh_Chennithala",
     source: SRCC,
@@ -1375,7 +1378,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.industries-commerce", "dept.electronics-it"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/b/b5/P._K._Kunhalikutty.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/P._K._Kunhalikutty.jpg/120px-P._K._Kunhalikutty.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._K._Kunhalikutty",
     source: SRCC,
@@ -1396,7 +1399,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.forest-wildlife", "dept.transport"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/8e/Thiruvanchoor_Radhakrishnan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Thiruvanchoor_Radhakrishnan.jpg/120px-Thiruvanchoor_Radhakrishnan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Thiruvanchoor_Radhakrishnan",
     source: SRCC,
@@ -1417,7 +1420,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.power"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/5/58/Aryadan_muhammad.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Aryadan_muhammad.jpg/120px-Aryadan_muhammad.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Aryadan_Muhammed",
     source: SRCC,
@@ -1438,7 +1441,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.labour-skills"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/0/03/Shibu-Baby-John.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Shibu-Baby-John.jpg/120px-Shibu-Baby-John.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Shibu_Baby_John",
     source: SRCC,
@@ -1459,7 +1462,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.health-family-welfare", "dept.devaswom"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/4/4e/V._S._Sivakumar_portrait.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/V._S._Sivakumar_portrait.jpg/120px-V._S._Sivakumar_portrait.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._S._Sivakumar",
     source: SRCC,
@@ -1480,7 +1483,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.public-works"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/5/51/V._K._Ebrahimkunju%2C_Minister.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/V._K._Ebrahimkunju%2C_Minister.jpg/120px-V._K._Ebrahimkunju%2C_Minister.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._K._Ebrahimkunju",
     source: SRCC,
@@ -1501,7 +1504,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.agriculture-farmers-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/87/Kerala_Agriculture_Minister_KP_Mohanan_presenting_the_Kerala_Green_Drive_Award_to_INS_Zamorin_representatives.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Kerala_Agriculture_Minister_KP_Mohanan_presenting_the_Kerala_Green_Drive_Award_to_INS_Zamorin_representatives.jpg/120px-Kerala_Agriculture_Minister_KP_Mohanan_presenting_the_Kerala_Green_Drive_Award_to_INS_Zamorin_representatives.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._P._Mohanan",
     source: SRCC,
@@ -1522,7 +1525,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.water-resources"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/a/ab/P.J_Joseph.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/P.J_Joseph.jpg/120px-P.J_Joseph.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._J._Joseph",
     source: SRCC,
@@ -1543,7 +1546,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.local-self-government"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/19/MK_Muneer.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/MK_Muneer.jpg/120px-MK_Muneer.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/M._K._Muneer",
     source: SRCC,
@@ -1564,7 +1567,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.tourism", "dept.scheduled-castes-tribes-bcd"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/2/26/A.P._Anil_Kumar.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/A.P._Anil_Kumar.JPG/120px-A.P._Anil_Kumar.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/A._P._Anil_Kumar",
     source: SRCC,
@@ -1602,7 +1605,8 @@ const CHANDY_II: Minister[] = [
     termStart: "2011-05-18",
     termEnd: "2016-05-25",
     departmentIds: ["dept.cooperation"],
-    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/4/41/CNB1.jpg",
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/CNB1.jpg/120px-CNB1.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/C._N._Balakrishnan",
     source: SRCC,
@@ -1623,7 +1627,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.youth-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d4/%E0%B4%AA%E0%B4%BF._%E0%B4%95%E0%B5%86._%E0%B4%9C%E0%B4%AF%E0%B4%B2%E0%B4%95%E0%B5%8D%E0%B4%B7%E0%B5%8D%E0%B4%AE%E0%B4%BF.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/%E0%B4%AA%E0%B4%BF._%E0%B4%95%E0%B5%86._%E0%B4%9C%E0%B4%AF%E0%B4%B2%E0%B4%95%E0%B5%8D%E0%B4%B7%E0%B5%8D%E0%B4%AE%E0%B4%BF.jpg/120px-%E0%B4%AA%E0%B4%BF._%E0%B4%95%E0%B5%86._%E0%B4%9C%E0%B4%AF%E0%B4%B2%E0%B4%95%E0%B5%8D%E0%B4%B7%E0%B5%8D%E0%B4%AE%E0%B4%BF.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._K._Jayalakshmi",
     source: SRCC,
@@ -1644,7 +1648,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.food-civil-supplies"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/0/08/Anoop_jacob.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Anoop_jacob.JPG/120px-Anoop_jacob.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Anoop_Jacob",
     source: SRCC,
@@ -1665,7 +1669,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.general-education"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/dd/P.K._Abdurabb.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/P.K._Abdurabb.jpg/120px-P.K._Abdurabb.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._K._Abdu_Rabb",
     source: SRCC,
@@ -1686,7 +1690,7 @@ const CHANDY_II: Minister[] = [
     termEnd: "2016-05-25",
     departmentIds: ["dept.excise", "dept.fisheries-harbour", "dept.ports"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/3/30/K._Babu%2C_Minister.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/K._Babu%2C_Minister.jpg/120px-K._Babu%2C_Minister.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._Babu",
     source: SRCC,
@@ -1732,7 +1736,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.cmo"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/a/ae/V._S._Achuthanandan_2016.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/V._S._Achuthanandan_2016.jpg/120px-V._S._Achuthanandan_2016.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._S._Achuthanandan",
     source: SRCA,
@@ -1753,7 +1757,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.home", "dept.tourism"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d9/KodiyeriBalakrishnan.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/KodiyeriBalakrishnan.jpg/120px-KodiyeriBalakrishnan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Kodiyeri_Balakrishnan",
     source: SRCA,
@@ -1774,7 +1778,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.finance"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/86/T._M._Thomas_Isaac.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/T._M._Thomas_Isaac.jpg/120px-T._M._Thomas_Isaac.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/T._M._Thomas_Isaac",
     source: SRCA,
@@ -1795,7 +1799,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.revenue"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/e/e6/KP_RAJENDRAN_DSC_0661.JPG",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/KP_RAJENDRAN_DSC_0661.JPG/120px-KP_RAJENDRAN_DSC_0661.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/K._P._Rajendran",
     source: SRCA,
@@ -1816,7 +1820,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.industries-commerce"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/c5/Elamaram_Kareem.png",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Elamaram_Kareem.png/120px-Elamaram_Kareem.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Elamaram_Kareem",
     source: SRCA,
@@ -1837,7 +1841,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.agriculture-farmers-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/f/fd/Mullakkara_Retnakaran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Mullakkara_Retnakaran.jpg/120px-Mullakkara_Retnakaran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Mullakkara_Retnakaran",
     source: SRCA,
@@ -1858,7 +1862,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.cooperation", "dept.power"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/9/99/G_sudhakaran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/G_sudhakaran.jpg/120px-G_sudhakaran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/G._Sudhakaran",
     source: SRCA,
@@ -1879,7 +1883,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.devaswom"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/c1/Kadannappally_Ramachandran.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Kadannappally_Ramachandran.jpg/120px-Kadannappally_Ramachandran.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Kadannappalli_Ramachandran",
     source: SRCA,
@@ -1899,7 +1903,8 @@ const ACHUTHANANDAN: Minister[] = [
     termStart: "2006-05-18",
     termEnd: "2011-05-18",
     departmentIds: ["dept.labour-skills", "dept.excise"],
-    photoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Pkg.jpg",
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Pkg.jpg/120px-Pkg.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._K._Gurudasan",
     source: SRCA,
@@ -1920,7 +1925,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.water-resources"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/f/f0/NK_PREMACHANDRAN.rotated.rotated.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/NK_PREMACHANDRAN.rotated.rotated.jpg/120px-NK_PREMACHANDRAN.rotated.rotated.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/N._K._Premachandran",
     source: SRCA,
@@ -1941,7 +1946,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.transport"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/3/3d/Jose_Thettayil.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Jose_Thettayil.jpg/120px-Jose_Thettayil.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Jose_Thettayil",
     source: SRCA,
@@ -1962,7 +1967,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.food-civil-supplies"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/c/cb/C.Divakaran_MLA.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/C.Divakaran_MLA.jpg/120px-C.Divakaran_MLA.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/C._Divakaran",
     source: SRCA,
@@ -1983,7 +1988,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.scheduled-castes-tribes-bcd"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/1/17/A.K._Balan%2C_Minister.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/A.K._Balan%2C_Minister.jpg/120px-A.K._Balan%2C_Minister.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/A._K._Balan",
     source: SRCA,
@@ -2004,7 +2009,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.forest-wildlife"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/2/2b/Binoy_vishwam.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Binoy_vishwam.jpg/120px-Binoy_vishwam.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Binoy_Viswam",
     source: SRCA,
@@ -2025,7 +2030,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.general-education", "dept.cultural-affairs"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/3/32/MA_Baby_2022_%28cropped%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/MA_Baby_2022_%28cropped%29.jpg/120px-MA_Baby_2022_%28cropped%29.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/M._A._Baby",
     source: SRCA,
@@ -2046,7 +2051,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.local-self-government"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/a/a6/Paloli_Mohammed_Kutty.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Paloli_Mohammed_Kutty.jpg/120px-Paloli_Mohammed_Kutty.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/Paloli_Mohammed_Kutty",
     source: SRCA,
@@ -2067,7 +2072,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.law", "dept.public-works"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/f/fd/M_Vijayakumar.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/M_Vijayakumar.jpg/120px-M_Vijayakumar.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/M._Vijayakumar",
     source: SRCA,
@@ -2088,7 +2093,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.fisheries-harbour"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/8/89/S_Sharma.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/S_Sharma.jpg/120px-S_Sharma.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/S._Sharma",
     source: SRCA,
@@ -2109,7 +2114,7 @@ const ACHUTHANANDAN: Minister[] = [
     termEnd: "2011-05-18",
     departmentIds: ["dept.health-family-welfare"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/4/4c/Sreemathy_Teacher_close-up.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Sreemathy_Teacher_close-up.jpg/120px-Sreemathy_Teacher_close-up.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     wikipediaUrl: "https://en.wikipedia.org/wiki/P._K._Sreemathy",
     source: SRCA,
