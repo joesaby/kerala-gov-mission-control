@@ -248,15 +248,7 @@ def test_parse_transcript_language_line_missing():
         parse_transcript(no_lang)
 ```
 
-To make `from translate import ...` work, pytest needs to find `scripts/translate.py` on `sys.path`. We will run tests with the working directory set to `scripts/` — the `translate:test` task in `deno.json` from Task 1 should be updated now:
-
-In `deno.json`, change the `translate:test` line to:
-
-```jsonc
-    "translate:test": "sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'",
-```
-
-(Bare `pytest` from the repo root would still find the test file but the `from translate import` would fail because `scripts/` isn't on `sys.path`. `cd scripts` is the simplest fix and matches the convention of "tests live next to the code they test".)
+To make `from translate import ...` work, pytest needs to find `scripts/translate.py` on `sys.path`. The `translate:test` task in `deno.json` was already set to `sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'` in Task 1 — no `deno.json` edit needed for this task. (Bare `pytest` from the repo root would still find the test file but the `from translate import` would fail because `scripts/` isn't on `sys.path`. `cd scripts` is the simplest fix and matches the convention of "tests live next to the code they test".)
 
 - [ ] **Step 2: Run tests, verify they fail**
 
@@ -364,7 +356,7 @@ Expected: all four PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add deno.json scripts/translate.py scripts/translate_test.py
+git add scripts/translate.py scripts/translate_test.py
 git commit -m "Add parse_transcript with header/body extraction and language guard"
 ```
 
