@@ -95,6 +95,27 @@ def count_completed_paragraphs(partial_content: str) -> int:
     return len(split_paragraphs(body))
 
 
+MODEL_LABEL = "facebook/nllb-200-distilled-600M (local CPU)"
+
+
+def build_output_header(header: TranscriptHeader, translated_at: str) -> str:
+    lines: list[str] = []
+    if header.source:
+        lines.append(f"Source: {header.source}")
+    if header.video_id:
+        lines.append(f"Video ID: {header.video_id}")
+    if header.title:
+        lines.append(f"Title: {header.title}")
+    lines.append("Language: en (translated from ml)")
+    if header.fetched:
+        lines.append(f"Fetched: {header.fetched}")
+    if header.method:
+        lines.append(f"Source method: {header.method}")
+    lines.append(f"Translation: {MODEL_LABEL}")
+    lines.append(f"Translated: {translated_at}")
+    return "\n".join(lines)
+
+
 def main() -> int:
     print("scripts/translate.py: not implemented yet", file=sys.stderr)
     return 1

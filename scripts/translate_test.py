@@ -125,3 +125,42 @@ def test_count_completed_paragraphs_empty_body():
 
 def test_count_completed_paragraphs_no_separator():
     assert count_completed_paragraphs("just some text no separator") == 0
+
+
+from translate import build_output_header, TranscriptHeader, MODEL_LABEL
+
+
+def test_build_output_header_preserves_source_fields():
+    header = TranscriptHeader(
+        source="https://www.youtube.com/watch?v=5MVkCqd2U10",
+        video_id="5MVkCqd2U10",
+        title="Kerala CM press meet",
+        language="ml (Malayalam)",
+        fetched="2026-05-18T12:34:56Z",
+        method="timedtext",
+    )
+    out = build_output_header(header, translated_at="2026-05-19T09:12:34Z")
+    assert out == (
+        "Source: https://www.youtube.com/watch?v=5MVkCqd2U10\n"
+        "Video ID: 5MVkCqd2U10\n"
+        "Title: Kerala CM press meet\n"
+        "Language: en (translated from ml)\n"
+        "Fetched: 2026-05-18T12:34:56Z\n"
+        "Source method: timedtext\n"
+        f"Translation: {MODEL_LABEL}\n"
+        "Translated: 2026-05-19T09:12:34Z"
+    )
+
+
+def test_build_output_header_omits_missing_optionals():
+    header = TranscriptHeader(language="ml (Malayalam)")
+    out = build_output_header(header, translated_at="2026-05-19T09:12:34Z")
+    assert out == (
+        "Language: en (translated from ml)\n"
+        f"Translation: {MODEL_LABEL}\n"
+        "Translated: 2026-05-19T09:12:34Z"
+    )
+
+
+def test_model_label_identifies_nllb():
+    assert "nllb" in MODEL_LABEL.lower()
