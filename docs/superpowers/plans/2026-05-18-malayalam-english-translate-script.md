@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Python CLI (`scripts/translate.py`) that translates Malayalam transcript files produced by `scripts/transcript.ts` into English, locally on CPU, using AI4Bharat's IndicTrans2 distilled-200M model loaded in-process via Hugging Face `transformers`. Paragraph-level progress, crash-resume via a `.partial` file, single-file Python script managed by `uv` (PEP 723 inline dependency metadata).
+**Goal:** Build a Python CLI (`scripts/translate.py`) that translates Malayalam transcript files produced by `scripts/transcript.ts` into English, locally on CPU, using Meta's NLLB-200 distilled-600M model loaded in-process via Hugging Face `transformers`. Paragraph-level progress, crash-resume via a `.partial` file, single-file Python script managed by `uv` (PEP 723 inline dependency metadata).
 
-**Architecture:** One Python file owns the whole job. Pure helper functions (parse, chunk, format, resume math) are unit-tested with `pytest`. The IndicTrans2 model is wrapped behind a small `Translator` class so the per-paragraph code path can be unit-tested with a fake translator; the real model is only loaded by the orchestrator and exercised in the end-to-end smoke test.
+**Architecture:** One Python file owns the whole job. Pure helper functions (parse, chunk, format, resume math) are unit-tested with `pytest`. The NLLB model is wrapped behind a small `Translator` class so the per-paragraph code path can be unit-tested with a fake translator; the real model is only loaded by the orchestrator and exercised in the end-to-end smoke test.
 
-**Tech Stack:** Python ≥3.10 (auto-installed by `uv`), `transformers`, `torch` (CPU), `IndicTransToolkit`, `sentencepiece`. Test framework: `pytest`. The Deno side is a single `deno.json` task entry (`uv run scripts/translate.py`).
+**Tech Stack:** Python ≥3.10 (auto-installed by `uv`), `transformers>=4.46.0,<5.0`, `torch` (CPU), `sentencepiece`. Test framework: `pytest`. The Deno side is a single `deno.json` task entry (`uv run scripts/translate.py`).
 
 **Source spec:** `docs/superpowers/specs/2026-05-18-malayalam-english-translate-script-design.md`
 
-> **Note on prior revision:** This plan was originally written for Ollama + Aya Expanse 8B and discarded after discovering Aya does not officially support Malayalam (sanity check passed on a trivial greeting but real transcripts would have degraded). The current plan is the IndicTrans2 redo.
+> **Note on prior revisions:** This plan was first written for Ollama + Aya Expanse 8B (discarded — Aya doesn't officially support Malayalam), then rewritten for IndicTrans2 (discarded — the weights are gated and a probe couldn't complete the click-through). The current plan is the NLLB-200 redo. The NLLB probe ran cleanly and produced fluent translations of real government Malayalam during the discarded Task 0 attempts.
 
 ---
 
@@ -18,7 +18,7 @@
 
 | Path | Responsibility | Status |
 | --- | --- | --- |
-| `scripts/translate.py` | Single-file Python CLI: PEP 723 deps header, arg parsing, transcript parsing, paragraph chunking, IndicTrans2 model load, translation loop with resume, output writing | Create |
+| `scripts/translate.py` | Single-file Python CLI: PEP 723 deps header, arg parsing, transcript parsing, paragraph chunking, NLLB-200 model load, translation loop with resume, output writing | Create |
 | `scripts/translate_test.py` | Unit tests for all pure functions + a `FakeTranslator`-backed test for the per-paragraph code path | Create |
 | `deno.json` | Add `translate` and `translate:test` tasks | Modify |
 | `.gitignore` | Ignore `*.partial` files under `data/transcripts/` | Modify |
@@ -26,99 +26,63 @@
 
 ---
 
-## Task 0: Install uv + verify IndicTrans2 imports and runs on real Malayalam
+## Task 0: ~~Install uv + verify IndicTrans2 imports~~ — DONE via NLLB-200 probe
 
-**Why first:** `IndicTransToolkit` has had API churn (the package on PyPI has been renamed between versions, and the processor module path has shifted). Verifying the actual API on this machine before writing 200 lines of code that assume one shape is much cheaper than discovering an `ImportError` in Task 5. We also need to confirm that CPU `torch` resolves cleanly via `uv` on this Mac.
+**Status:** Completed during the earlier IndicTrans2 attempt. Findings carried forward:
 
-**Files (probe-only, deleted at end of task):**
-- Create: `/tmp/translate_probe.py`
+- `uv` 0.11.14 installed via Homebrew. `uv --version` works.
+- `transformers>=4.46.0` with no upper bound resolves to 5.8.1 which removed `PreTrainedTokenizerBase` and breaks NLLB and many other models. **Pin `transformers>=4.46.0,<5.0` (resolves to 4.57.6).**
+- `torch>=2.4` resolves cleanly on macOS via `uv` (no index hint needed).
+- `facebook/nllb-200-distilled-600M` is ungated, downloads ~2.4 GB on first run, and produced fluent Kerala-government Malayalam → English on the probe samples.
+- Python 3.12 was chosen by `uv`.
 
-- [ ] **Step 1: Install uv if not present**
+No further action in this task. Move directly to Task 1.
+
+**Original probe text (kept for reproducibility if the toolchain regresses):**
 
 ```bash
 command -v uv >/dev/null 2>&1 || brew install uv
 uv --version
 ```
 
-Expected: prints a version string (e.g. `uv 0.4.x`). If `brew` isn't available, fall back to `curl -LsSf https://astral.sh/uv/install.sh | sh` and re-source shell.
-
-- [ ] **Step 2: Write a one-off probe script**
-
-Create `/tmp/translate_probe.py` (this file is throwaway — it will be deleted in Step 5):
-
 ```python
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "transformers>=4.46.0",
+#     "transformers>=4.46.0,<5.0",
 #     "torch>=2.4",
 #     "sentencepiece>=0.2.0",
-#     "IndicTransToolkit>=1.0.3",
 # ]
 # ///
-import time
-import torch
+import time, torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from IndicTransToolkit.processor import IndicProcessor
 
-MODEL_ID = "ai4bharat/indictrans2-indic-en-dist-200M"
-
+MODEL_ID = "facebook/nllb-200-distilled-600M"
 t0 = time.time()
-print(f"Loading {MODEL_ID}...", flush=True)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
-model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, trust_remote_code=True)
-ip = IndicProcessor(inference=True)
-print(f"Loaded in {time.time() - t0:.1f}s", flush=True)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID)
+print(f"Loaded in {time.time() - t0:.1f}s")
 
 samples = [
     "നമസ്കാരം, എങ്ങനെയുണ്ട്?",
-    "ഇന്ന് കേരളത്തിലെ കാലാവസ്ഥ വളരെ നല്ലതാണ്. പുതിയ വർഷം എല്ലാവർക്കും ഭാവുകങ്ങൾ.",
-    "സർക്കാർ പുതിയ പദ്ധതി പ്രഖ്യാപിച്ചു. അത് കർഷകർക്ക് വളരെ പ്രയോജനപ്രദമാകും.",
+    "ഇന്ന് കേരളത്തിലെ കാലാവസ്ഥ വളരെ നല്ലതാണ്.",
+    "സർക്കാർ പുതിയ പദ്ധതി പ്രഖ്യാപിച്ചു.",
 ]
 
 for s in samples:
-    batch = ip.preprocess_batch([s], src_lang="mal_Mlym", tgt_lang="eng_Latn")
-    enc = tokenizer(batch, return_tensors="pt", padding="longest", truncation=True, max_length=256)
+    tokenizer.src_lang = "mal_Mlym"
+    inputs = tokenizer(s, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
-        out = model.generate(**enc, num_beams=5, max_length=256)
-    decoded = tokenizer.batch_decode(out, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    english = ip.postprocess_batch(decoded, lang="eng_Latn")[0]
-    print(f"\nML: {s}")
-    print(f"EN: {english}")
+        out = model.generate(
+            **inputs,
+            forced_bos_token_id=tokenizer.convert_tokens_to_ids("eng_Latn"),
+            max_length=512,
+            num_beams=5,
+        )
+    print(f"ML: {s}\nEN: {tokenizer.batch_decode(out, skip_special_tokens=True)[0]}\n")
 ```
 
-- [ ] **Step 3: Run the probe (will download ~800 MB of model on first run + install deps)**
-
-```bash
-uv run /tmp/translate_probe.py
-```
-
-Expected:
-- `uv` resolves and installs `transformers`, `torch`, `sentencepiece`, `IndicTransToolkit` into an isolated env (may take a few minutes the first time).
-- Model loads in 10–30 s.
-- Three English translations print, each a reasonable rendering of the Malayalam input.
-
-If any of the following happen, **STOP** and report back:
-- `ImportError` on `from IndicTransToolkit.processor import IndicProcessor` — the module path may have changed. Inspect the installed package (`uv run python -c "import IndicTransToolkit; print(IndicTransToolkit.__file__)"`) and adjust the import in this plan + spec before continuing.
-- `torch` install fails on macOS — note the exact error; we may need to add a torch index hint to the PEP 723 metadata.
-- English output is gibberish — the model choice needs revisiting.
-
-- [ ] **Step 4: Record what worked**
-
-In your report back, paste:
-- The exact `uv` version, Python version uv chose, and the resolved versions of `transformers`, `torch`, `IndicTransToolkit`.
-- All three English translations.
-- Total wall-clock time for the run.
-
-These values will be referenced when writing Tasks 1 and 5.
-
-- [ ] **Step 5: Clean up the probe**
-
-```bash
-rm /tmp/translate_probe.py
-```
-
-- [ ] **Step 6: No commit** — this task produced no project files.
+- [x] **Step 1–6:** Already complete via the NLLB probe described above. No further work in this task.
 
 ---
 
@@ -162,13 +126,12 @@ Create `scripts/translate.py`:
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "transformers>=4.46.0",
+#     "transformers>=4.46.0,<5.0",
 #     "torch>=2.4",
 #     "sentencepiece>=0.2.0",
-#     "IndicTransToolkit>=1.0.3",
 # ]
 # ///
-"""Translate Malayalam transcript files to English using IndicTrans2."""
+"""Translate Malayalam transcript files to English using NLLB-200."""
 
 from __future__ import annotations
 
@@ -184,7 +147,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-If Task 0 found different version pins for any of the dependencies, use those exact versions here instead.
+The `<5.0` cap on `transformers` is load-bearing: transformers 5.x removed `PreTrainedTokenizerBase` from `transformers.tokenization_utils`, which NLLB's tokenizer path still references on certain code paths.
 
 - [ ] **Step 3: Ignore `.partial` files in git**
 
@@ -311,13 +274,12 @@ Replace the contents of `scripts/translate.py` with:
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "transformers>=4.46.0",
+#     "transformers>=4.46.0,<5.0",
 #     "torch>=2.4",
 #     "sentencepiece>=0.2.0",
-#     "IndicTransToolkit>=1.0.3",
 # ]
 # ///
-"""Translate Malayalam transcript files to English using IndicTrans2."""
+"""Translate Malayalam transcript files to English using NLLB-200."""
 
 from __future__ import annotations
 
@@ -586,8 +548,8 @@ def test_build_output_header_omits_missing_optionals():
     )
 
 
-def test_model_label_identifies_indictrans2():
-    assert "indictrans2" in MODEL_LABEL.lower()
+def test_model_label_identifies_nllb():
+    assert "nllb" in MODEL_LABEL.lower()
 ```
 
 - [ ] **Step 2: Run tests, verify they fail**
@@ -603,7 +565,7 @@ Expected: the three new tests FAIL.
 Add to `scripts/translate.py`, above `def main()`:
 
 ```python
-MODEL_LABEL = "ai4bharat/indictrans2-indic-en-dist-200M (local CPU)"
+MODEL_LABEL = "facebook/nllb-200-distilled-600M (local CPU)"
 
 
 def build_output_header(header: TranscriptHeader, translated_at: str) -> str:
@@ -647,7 +609,7 @@ git commit -m "Add build_output_header for English transcript header"
 - Modify: `scripts/translate.py` (add `Translator` class and `translate_paragraph` function)
 - Modify: `scripts/translate_test.py` (append tests using a `FakeTranslator`)
 
-This task introduces the IndicTrans2 wrapper. The class is structured so the heavy model load is deferred to `load()`, and the per-paragraph translation logic (including the blank-line collapse fix) is a separate pure-ish function that takes any object with a `.translate(str) -> str` method — so it can be unit-tested with a fake.
+This task introduces the NLLB-200 wrapper. The class is structured so the heavy model load is deferred to `load()`, and the per-paragraph translation logic (including the blank-line collapse fix) is a separate pure-ish function that takes any object with a `.translate(str) -> str` method — so it can be unit-tested with a fake.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -715,7 +677,9 @@ from typing import Protocol
 Then add to `scripts/translate.py`, above `def main()`:
 
 ```python
-MODEL_ID = "ai4bharat/indictrans2-indic-en-dist-200M"
+MODEL_ID = "facebook/nllb-200-distilled-600M"
+SRC_LANG = "mal_Mlym"  # FLORES-200: Malayalam in Malayalam script
+TGT_LANG = "eng_Latn"  # FLORES-200: English in Latin script
 _BLANK_LINE_RE = re.compile(r"\n\s*\n+")
 
 
@@ -724,13 +688,13 @@ class _TranslatorProtocol(Protocol):
 
 
 class Translator:
-    """Lazy wrapper around IndicTrans2 (loaded on first .load() call)."""
+    """Lazy wrapper around NLLB-200 (loaded on first .load() call)."""
 
     def __init__(self) -> None:
         self._loaded = False
         self._tokenizer = None
         self._model = None
-        self._processor = None
+        self._forced_bos_id: int | None = None
 
     def load(self) -> None:
         if self._loaded:
@@ -738,11 +702,11 @@ class Translator:
         # Imports are deferred so importing this module from tests does not
         # require transformers/torch to be installed.
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-        from IndicTransToolkit.processor import IndicProcessor
 
-        self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
-        self._model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, trust_remote_code=True)
-        self._processor = IndicProcessor(inference=True)
+        self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+        self._model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID)
+        self._tokenizer.src_lang = SRC_LANG
+        self._forced_bos_id = self._tokenizer.convert_tokens_to_ids(TGT_LANG)
         self._loaded = True
 
     def translate(self, text: str) -> str:
@@ -750,22 +714,17 @@ class Translator:
             raise RuntimeError("Translator.load() must be called before translate()")
         import torch
 
-        batch = self._processor.preprocess_batch(
-            [text], src_lang="mal_Mlym", tgt_lang="eng_Latn"
-        )
-        enc = self._tokenizer(
-            batch,
-            return_tensors="pt",
-            padding="longest",
-            truncation=True,
-            max_length=256,
+        inputs = self._tokenizer(
+            text, return_tensors="pt", truncation=True, max_length=512
         )
         with torch.no_grad():
-            out = self._model.generate(**enc, num_beams=5, max_length=256)
-        decoded = self._tokenizer.batch_decode(
-            out, skip_special_tokens=True, clean_up_tokenization_spaces=True
-        )
-        return self._processor.postprocess_batch(decoded, lang="eng_Latn")[0]
+            out = self._model.generate(
+                **inputs,
+                forced_bos_token_id=self._forced_bos_id,
+                max_length=512,
+                num_beams=5,
+            )
+        return self._tokenizer.batch_decode(out, skip_special_tokens=True)[0]
 
 
 def translate_paragraph(text: str, translator: _TranslatorProtocol) -> str:
@@ -923,7 +882,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # Load the model.
-    print(f"Loading IndicTrans2 ({MODEL_ID})...", flush=True)
+    print(f"Loading NLLB-200 ({MODEL_ID})...", flush=True)
     t0 = time.time()
     translator = Translator()
     try:
@@ -931,7 +890,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:  # noqa: BLE001
         return _die(
             4,
-            f"first-run model download (~800 MB) failed: {e}\n"
+            f"first-run model download (~2.4 GB) failed: {e}\n"
             "Check network connectivity and retry. Model weights cache under "
             "~/.cache/huggingface/.",
         )
@@ -1021,7 +980,7 @@ git commit -m "Wire translate.py CLI: parsing, model load, loop, resume"
 
 ## Task 7: End-to-end smoke test against the real model
 
-**Why this task is manual:** the unit tests cover every pure function and the per-paragraph translation logic with a fake translator. The remaining risk is integration — that the script actually loads IndicTrans2, processes a real file, produces an English output, and resumes correctly after a kill. This walks through that by hand.
+**Why this task is manual:** the unit tests cover every pure function and the per-paragraph translation logic with a fake translator. The remaining risk is integration — that the script actually loads NLLB-200, processes a real file, produces an English output, and resumes correctly after a kill. This walks through that by hand.
 
 **Files:**
 - Create (temporary, then delete): `data/transcripts/_smoke.ml.txt`
@@ -1057,7 +1016,7 @@ deno task translate data/transcripts/_smoke.ml.txt
 ```
 
 Expected:
-- `Loading IndicTrans2 (...)...` followed by `done in <N>s`.
+- `Loading NLLB-200 (...)...` followed by `done in <N>s` (likely 20–60 s on first run, faster on subsequent cached runs).
 - Progress: `[1/4] ✓` through `[4/4] ✓`.
 - Final: `Done. Wrote data/transcripts/_smoke.en.txt (4 paragraphs, ...)`.
 - No `.partial` file remains.
@@ -1069,7 +1028,7 @@ cat data/transcripts/_smoke.en.txt
 ```
 
 Verify by eye:
-- Header has `Language: en (translated from ml)`, `Source method: smoke`, `Translation: ai4bharat/indictrans2-indic-en-dist-200M (local CPU)`, and a `Translated:` timestamp.
+- Header has `Language: en (translated from ml)`, `Source method: smoke`, `Translation: facebook/nllb-200-distilled-600M (local CPU)`, and a `Translated:` timestamp.
 - Body has four paragraphs in English.
 - The last two paragraphs preserve the `[Speaker 1]:` / `[Speaker 2]:` prefixes verbatim.
 - Translations are coherent English (not gibberish, not Malayalam left over, not preambles).
@@ -1160,13 +1119,13 @@ Add a subsection right after the `transcript` documentation:
 ```markdown
 ### Translate a Malayalam transcript to English
 
-After `deno task transcript <url>` produces a `data/transcripts/<id>.ml.txt`, translate it to English locally with IndicTrans2:
+After `deno task transcript <url>` produces a `data/transcripts/<id>.ml.txt`, translate it to English locally with NLLB-200:
 
 ```bash
 deno task translate data/transcripts/<id>.ml.txt
 ```
 
-Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run downloads the IndicTrans2 distilled-200M model (~800 MB) from Hugging Face and caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
+Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run downloads the NLLB-200 distilled-600M model (~2.4 GB) from Hugging Face and caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
 
 **One-time setup:**
 
@@ -1197,7 +1156,7 @@ If it reports diffs, run `deno fmt README.md` and re-check.
 
 ```bash
 git add README.md
-git commit -m "Document deno task translate (IndicTrans2 + uv) in README"
+git commit -m "Document deno task translate (NLLB-200 + uv) in README"
 ```
 
 ---
