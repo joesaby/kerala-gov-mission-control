@@ -11,9 +11,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import time
+import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -124,7 +126,8 @@ def build_output_header(header: TranscriptHeader, translated_at: str) -> str:
 MODEL_ID = "facebook/nllb-200-distilled-600M"
 SRC_LANG = "mal_Mlym"  # FLORES-200: Malayalam in Malayalam script
 TGT_LANG = "eng_Latn"  # FLORES-200: English in Latin script
-_BLANK_LINE_RE = re.compile(r"\n\s*\n+")
+# Same blank-line semantics as _PARAGRAPH_SEP_RE — keep these in sync if either changes.
+_BLANK_LINE_RE = re.compile(r"(?:\r?\n)\s*(?:\r?\n)+")
 
 
 class _TranslatorProtocol(Protocol):
@@ -265,11 +268,17 @@ def main(argv: list[str] | None = None) -> int:
     try:
         translator.load()
     except Exception as e:  # noqa: BLE001
+        hf_cache = os.environ.get(
+            "HF_HOME",
+            os.environ.get(
+                "HUGGINGFACE_HUB_CACHE",
+                os.path.expanduser("~/.cache/huggingface"),
+            ),
+        )
         return _die(
             4,
             f"first-run model download (~2.4 GB) failed: {e}\n"
-            "Check network connectivity and retry. Model weights cache under "
-            "~/.cache/huggingface/.",
+            f"Check network connectivity and retry. Model weights cache under {hf_cache}/.",
         )
     print(f"  done in {time.time() - t0:.1f}s", flush=True)
 
@@ -288,9 +297,10 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 6
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             print(
-                f"Paragraph {i + 1}/{len(paragraphs)} failed with model error: {e}\n"
+                f"Paragraph {i + 1}/{len(paragraphs)} failed with model error:\n"
+                f"{traceback.format_exc()}"
                 f"  input: {text[:200]}{'…' if len(text) > 200 else ''}\n"
                 f"Partial file preserved at: {partial_path}",
                 file=sys.stderr,
@@ -304,7 +314,15 @@ def main(argv: list[str] | None = None) -> int:
     partial_path.rename(out_path)
     elapsed = int(time.time() - started)
     mins, secs = divmod(elapsed, 60)
-    print(f"Done. Wrote {out_path} ({len(paragraphs)} paragraphs, {mins}m{secs}s).")
+    translated_this_run = len(paragraphs) - resume_from
+    if resume_from > 0:
+        print(
+            f"Done. Wrote {out_path} "
+            f"({translated_this_run} paragraphs this run / {len(paragraphs)} total, "
+            f"{mins}m{secs}s)."
+        )
+    else:
+        print(f"Done. Wrote {out_path} ({len(paragraphs)} paragraphs, {mins}m{secs}s).")
     return 0
 
 
