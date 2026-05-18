@@ -44,27 +44,16 @@ npm. If you're behind a restrictive network, you may need to allow `jsr.io`,
 
 ## Deploying to Deno Deploy
 
-Two options:
+Deploys are handled by the **Deno Deploy GitHub App** (Git Integration). The app
+watches the repo, auto-detects Fresh, runs `deno task build`, and serves
+`_fresh/server.js`. No deploy step in CI.
 
-### A. Deno Deploy git integration (simplest)
+The live URL is set on the project in the
+[Deno Deploy dashboard](https://dash.deno.com/).
 
-1. In the Deno Deploy dashboard, create a project called
-   `kerala-mission-control` and link this GitHub repo.
-2. Set:
-   - **Entrypoint**: `_fresh/server.js`
-   - **Install step**: _(empty)_
-   - **Build step**: `deno task build`
-   - **Root directory**: _(empty)_
-3. Push to the configured production branch and Deno Deploy builds and serves
-   automatically. The URL will be `https://kerala-mission-control.deno.dev`.
-
-### B. GitHub Actions (already wired up)
-
-`.github/workflows/deploy.yml` is included. To enable it:
-
-1. In your Deno Deploy project settings, link it to this GitHub repo under
-   **GitHub Actions** mode (not git integration mode).
-2. Push. The workflow runs `deno task build` and uploads via `deployctl`.
+`.github/workflows/ci.yml` is for verification only — it runs `deno fmt`,
+`deno lint`, `deno check`, and `deno task build` on every PR and push to `main`.
+It does not deploy.
 
 ## KPI taxonomy
 

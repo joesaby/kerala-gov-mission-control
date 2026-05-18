@@ -16,12 +16,12 @@ export default define.page(function App({ Component, state }) {
         <link
           rel="preconnect"
           href="https://fonts.googleapis.com"
-          crossorigin=""
+          crossorigin="anonymous"
         />
         <link
           rel="preconnect"
           href="https://fonts.gstatic.com"
-          crossorigin=""
+          crossorigin="anonymous"
         />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap"
