@@ -10,21 +10,20 @@ teacher density, infrastructure, higher-ed indicators.
 - **URL:** https://udiseplus.gov.in
 - **Owner:** Department of School Education & Literacy, MoE, GoI.
 - **What it provides:** Annual school-by-school census — enrolment by
-  grade/gender/social-category, teacher count, infrastructure (toilets,
-  drinking water, electricity, library, computers), dropout rates,
-  transition rates.
+  grade/gender/social-category, teacher count, infrastructure (toilets, drinking
+  water, electricity, library, computers), dropout rates, transition rates.
 - **Feeds:** `education.gross-enrolment`, `education.pupil-teacher-ratio`,
-  `education.school-infra-index`, `education.dropout-rate`. The single
-  most important schooling dataset for the dashboard.
-- **Format:** Web dashboard + state-wise / district-wise downloadable
-  Excel and PDF report cards.
+  `education.school-infra-index`, `education.dropout-rate`. The single most
+  important schooling dataset for the dashboard.
+- **Format:** Web dashboard + state-wise / district-wise downloadable Excel and
+  PDF report cards.
 - **API auth:** None for public reports; school-level micro-data needs
   research-access registration.
-- **Update cadence:** Annual academic-year cycle (report cards released
-  ~12 months after fieldwork).
+- **Update cadence:** Annual academic-year cycle (report cards released ~12
+  months after fieldwork).
 - **Licence:** Government Open Data.
-- **Sync notes:** Use the state Report Card PDF as the headline ingest;
-  use the district CSVs for geographic drilldowns.
+- **Sync notes:** Use the state Report Card PDF as the headline ingest; use the
+  district CSVs for geographic drilldowns.
 
 ## PGI — Performance Grading Index for States (school education)
 
@@ -46,8 +45,8 @@ teacher density, infrastructure, higher-ed indicators.
 
 - **URL:** https://nas.gov.in
 - **Owner:** NCERT.
-- **What it provides:** State-level grade 3/5/8/10 learning outcomes —
-  language, maths, EVS, science, social science.
+- **What it provides:** State-level grade 3/5/8/10 learning outcomes — language,
+  maths, EVS, science, social science.
 - **Feeds:** `education.foundational-literacy`,
   `education.foundational-numeracy`.
 - **Format:** PDF state report cards.
@@ -60,8 +59,8 @@ teacher density, infrastructure, higher-ed indicators.
 - **Owner:** Pratham (independent NGO).
 - **What it provides:** Rural household-survey-based literacy/numeracy
   assessments, by state.
-- **Feeds:** Independent comparator KPI for FLN; useful as a
-  citizen-facing "what an outside survey says".
+- **Feeds:** Independent comparator KPI for FLN; useful as a citizen-facing
+  "what an outside survey says".
 - **Format:** PDF + Excel state factsheets.
 - **Update cadence:** Annual.
 - **Licence:** CC BY-NC (attribution, non-commercial). Acceptable for a
@@ -97,33 +96,33 @@ teacher density, infrastructure, higher-ed indicators.
 ## KITE — Kerala Infrastructure & Technology for Education
 
 - **URL:** https://kite.kerala.gov.in
-- **What it provides:** Hi-tech school programme stats — computers
-  deployed, classrooms with projectors, teacher training.
+- **What it provides:** Hi-tech school programme stats — computers deployed,
+  classrooms with projectors, teacher training.
 - **Feeds:** `education.digital-classroom-coverage`.
 
 ## Kerala SCERT
 
 - **URL:** https://scert.kerala.gov.in
-- **What it provides:** Curriculum framework, learning outcome
-  publications, training calendars.
+- **What it provides:** Curriculum framework, learning outcome publications,
+  training calendars.
 - **Sync notes:** **Correction (verified 2026-05-18):** SCERT does **not**
   publish a regular machine-readable State Achievement Survey at the
-  foundational-literacy level. The KPI `education.foundational-literacy`
-  should **not** cite SCERT as its source. Use PARAKH Rashtriya Sarvekshan
-  + ASER (below) instead. Genuine SCERT micro-data is only available via
-  RTI or partnership.
+  foundational-literacy level. The KPI `education.foundational-literacy` should
+  **not** cite SCERT as its source. Use PARAKH Rashtriya Sarvekshan
+  - ASER (below) instead. Genuine SCERT micro-data is only available via RTI or
+    partnership.
 - **Last verified:** 2026-05-18
 
 ## PARAKH Rashtriya Sarvekshan — NCERT
 
 - **URL:** https://ncert.nic.in/
-- **Owner:** PARAKH (Performance Assessment, Review, and Analysis of
-  Knowledge for Holistic Development), NCERT.
-- **What it provides:** State-disaggregated grade 3/6/9 learning-outcome
-  survey results (2024 results published). National replacement for NAS.
+- **Owner:** PARAKH (Performance Assessment, Review, and Analysis of Knowledge
+  for Holistic Development), NCERT.
+- **What it provides:** State-disaggregated grade 3/6/9 learning-outcome survey
+  results (2024 results published). National replacement for NAS.
 - **Feeds:** `education.foundational-literacy`,
-  `education.foundational-numeracy` — recommended replacement for the
-  SCERT citation on those KPIs.
+  `education.foundational-numeracy` — recommended replacement for the SCERT
+  citation on those KPIs.
 - **Format:** PDF state report cards.
 - **API auth:** None.
 - **Update cadence:** ~Triennial (2024 latest cycle).
@@ -143,8 +142,8 @@ teacher density, infrastructure, higher-ed indicators.
 - **Update cadence:** Continuous.
 - **Licence:** Government of India.
 - **Sync notes:** AMBER — Kerala participates but **state-level granular
-  publication is uneven**, do not depend on it for KPI values until a
-  stable state-level export is confirmed.
+  publication is uneven**, do not depend on it for KPI values until a stable
+  state-level export is confirmed.
 - **Last verified:** 2026-05-18
 
 ## SSA Kerala — School-level dashboards

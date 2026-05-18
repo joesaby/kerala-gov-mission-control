@@ -1,53 +1,54 @@
 # Livelihood sources
 
-Feeds the `livelihood` civic domain — employment, unemployment, wages,
-poverty, social-security pensions, industry growth, tourism, agriculture
-incomes, schemes.
+Feeds the `livelihood` civic domain — employment, unemployment, wages, poverty,
+social-security pensions, industry growth, tourism, agriculture incomes,
+schemes.
 
 ---
 
 ## PLFS — Periodic Labour Force Survey
 
-- **URL:** https://www.mospi.gov.in/sites/default/files/publication_reports/AnnualReport_PLFS2022-23N.pdf
+- **URL:**
+  https://www.mospi.gov.in/sites/default/files/publication_reports/AnnualReport_PLFS2022-23N.pdf
 - **Also:** https://mospi.gov.in (current PLFS report listing)
 - **Owner:** Ministry of Statistics and Programme Implementation.
 - **What it provides:** Labour force participation rate (LFPR), worker
-  population ratio, unemployment rate (UR) — by state, rural/urban,
-  gender, age group. Both annual and quarterly (urban-only) bulletins.
-- **Feeds:** `livelihood.unemployment-rate`,
-  `livelihood.female-lfpr`, plus a chain of contributing indicators.
-- **Format:** PDF + downloadable unit-level micro-data via the MoSPI
-  data portal.
-- **Update cadence:** Quarterly (urban only, Current Weekly Status) +
-  annual rural+urban (the latter comes with a ~one-year lag).
+  population ratio, unemployment rate (UR) — by state, rural/urban, gender, age
+  group. Both annual and quarterly (urban-only) bulletins.
+- **Feeds:** `livelihood.unemployment-rate`, `livelihood.female-lfpr`, plus a
+  chain of contributing indicators.
+- **Format:** PDF + downloadable unit-level micro-data via the MoSPI data
+  portal.
+- **Update cadence:** Quarterly (urban only, Current Weekly Status) + annual
+  rural+urban (the latter comes with a ~one-year lag).
 - **Licence:** Public document; micro-data has a citation requirement.
-- **Sync notes:** PLFS state estimates appear in Annex tables in the
-  annual PDF; quarterly UR is in PIB press release. **The quarterly
-  bulletin covers urban areas only on CWS — annual rural+urban Kerala
-  numbers lag by ~1 year.**
+- **Sync notes:** PLFS state estimates appear in Annex tables in the annual PDF;
+  quarterly UR is in PIB press release. **The quarterly bulletin covers urban
+  areas only on CWS — annual rural+urban Kerala numbers lag by ~1 year.**
 
 ## PLFS Microdata — NADA
 
 - **URL:** https://microdata.gov.in/NADA/index.php/catalog/PLFS
 - **Owner:** MoSPI, hosted on the NADA microdata catalog.
-- **What it provides:** Unit-level PLFS micro-data (households + workers)
-  for every survey round, with full schedules.
+- **What it provides:** Unit-level PLFS micro-data (households + workers) for
+  every survey round, with full schedules.
 - **Feeds:** Custom Kerala cuts for `livelihood.unemployment-rate`,
   `livelihood.female-lfpr`, gender-split analytics.
 - **Format:** CSV / Stata (`.dta`) / DBF.
-- **API auth:** Free NADA registration required; data-licence agreement
-  before download.
+- **API auth:** Free NADA registration required; data-licence agreement before
+  download.
 - **Update cadence:** Aligned to PLFS quarterly + annual releases.
 - **Licence:** GoI; microdata licence requires registration and a re-use
   agreement.
-- **Sync notes:** GREEN-ish for our purposes: this is the only way to
-  compute Kerala-specific custom cuts beyond what the published PDF tables
-  expose. Verified 2026-05-18.
+- **Sync notes:** GREEN-ish for our purposes: this is the only way to compute
+  Kerala-specific custom cuts beyond what the published PDF tables expose.
+  Verified 2026-05-18.
 - **Last verified:** 2026-05-18
 
 ## PLFS Quarterly Bulletin — example
 
-- **URL:** https://www.mospi.gov.in/sites/default/files/publication_reports/QuarterlyBulletinPLFS_July_September_2024.pdf
+- **URL:**
+  https://www.mospi.gov.in/sites/default/files/publication_reports/QuarterlyBulletinPLFS_July_September_2024.pdf
 - **Owner:** MoSPI.
 - **What it provides:** Concrete example of the quarterly bulletin format
   (Jul-Sep 2024 issue) — urban CWS labour force indicators by state.
@@ -55,15 +56,15 @@ incomes, schemes.
 - **Format:** PDF.
 - **Update cadence:** Quarterly.
 - **Licence:** Government of India.
-- **Sync notes:** URL pattern is stable per quarter — substitute the
-  date range for newer issues. Verified 2026-05-18.
+- **Sync notes:** URL pattern is stable per quarter — substitute the date range
+  for newer issues. Verified 2026-05-18.
 - **Last verified:** 2026-05-18
 
 ## MGNREGA MIS
 
 - **URL:** https://nrega.nic.in/Netnrega/HomeStciti.aspx
-- **What it provides:** Person-days generated, average wage, women's
-  share, scheme works completed by district/panchayat.
+- **What it provides:** Person-days generated, average wage, women's share,
+  scheme works completed by district/panchayat.
 - **Feeds:** `livelihood.mgnrega-persondays`, rural livelihoods KPIs.
 - **Format:** HTML dashboards with CSV download per report.
 - **Update cadence:** Real-time / daily.
@@ -97,8 +98,7 @@ incomes, schemes.
 ## K-SWIFT — Single-window investor approvals
 
 - **URL:** https://kswift.kerala.gov.in
-- **What it provides:** Application volumes, time-to-approval, sectoral
-  split.
+- **What it provides:** Application volumes, time-to-approval, sectoral split.
 - **Feeds:** `delivery.investment-approval-tat` KPI.
 
 ## Kerala Tourism Statistics
@@ -131,10 +131,9 @@ incomes, schemes.
 ## State Social Welfare — Pension MIS
 
 - **URL:** https://welfarepension.lsgkerala.gov.in
-- **What it provides:** Beneficiary counts and disbursement status for
-  old-age, widow, disability, and agricultural-worker pensions.
-- **Feeds:** `livelihood.pension-coverage`,
-  `delivery.pension-arrears-days`.
+- **What it provides:** Beneficiary counts and disbursement status for old-age,
+  widow, disability, and agricultural-worker pensions.
+- **Feeds:** `livelihood.pension-coverage`, `delivery.pension-arrears-days`.
 
 ## Kudumbashree NRO — micro-enterprise dashboard
 
@@ -143,6 +142,6 @@ incomes, schemes.
 
 ## SBM / Jal Jeevan Mission dashboards (livelihood-adjacent)
 
-- **URL:** https://sbm.gov.in (urban + rural), https://ejalshakti.gov.in/jjmreport
-- **Feeds:** `delivery.tap-connection-coverage`,
-  `sustainability.ods-status`.
+- **URL:** https://sbm.gov.in (urban + rural),
+  https://ejalshakti.gov.in/jjmreport
+- **Feeds:** `delivery.tap-connection-coverage`, `sustainability.ods-status`.
