@@ -51,7 +51,7 @@ Two options:
 1. In the Deno Deploy dashboard, create a project called
    `kerala-mission-control` and link this GitHub repo.
 2. Set:
-   - **Entrypoint**: `main.ts`
+   - **Entrypoint**: `_fresh/server.js`
    - **Install step**: _(empty)_
    - **Build step**: `deno task build`
    - **Root directory**: _(empty)_
