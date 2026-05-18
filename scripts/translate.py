@@ -71,6 +71,30 @@ def parse_transcript(text: str) -> ParsedTranscript:
     return ParsedTranscript(raw_header=raw_header, body=body, header=header)
 
 
+_PARAGRAPH_SEP_RE = re.compile(r"(?:\r?\n)\s*(?:\r?\n)+")
+_SPEAKER_PREFIX_RE = re.compile(r"^(\[Speaker \d+\]: )(.*)$", re.DOTALL)
+
+
+def split_paragraphs(body: str) -> list[str]:
+    parts = _PARAGRAPH_SEP_RE.split(body)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def split_speaker_prefix(paragraph: str) -> tuple[str, str]:
+    m = _SPEAKER_PREFIX_RE.match(paragraph)
+    if not m:
+        return ("", paragraph)
+    return (m.group(1), m.group(2))
+
+
+def count_completed_paragraphs(partial_content: str) -> int:
+    sep = _SEPARATOR_RE.search(partial_content)
+    if sep is None:
+        return 0
+    body = partial_content[sep.end():]
+    return len(split_paragraphs(body))
+
+
 def main() -> int:
     print("scripts/translate.py: not implemented yet", file=sys.stderr)
     return 1
