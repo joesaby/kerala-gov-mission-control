@@ -335,17 +335,19 @@ export async function listSpeechesByPerson(
 ): Promise<PublicSpeech[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: PublicSpeech[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({
       prefix: ["speech_by_person", personId],
     })
   ) {
-    const sId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<PublicSpeech>(["speech", sId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out.sort((a, b) => b.date.localeCompare(a.date));
+  const results = await Promise.all(
+    ids.map((id) => k.get<PublicSpeech>(["speech", id])),
+  );
+  return (results.map((r) => r.value).filter(Boolean) as PublicSpeech[])
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function listSpeechesByType(
@@ -353,15 +355,17 @@ export async function listSpeechesByType(
 ): Promise<PublicSpeech[]> {
   await ensureSeeded();
   const k = await kv();
-  const out: PublicSpeech[] = [];
+  const ids: string[] = [];
   for await (
     const entry of k.list<unknown>({ prefix: ["speech_by_type", type] })
   ) {
-    const sId = entry.key[entry.key.length - 1] as string;
-    const got = await k.get<PublicSpeech>(["speech", sId]);
-    if (got.value) out.push(got.value);
+    ids.push(entry.key[entry.key.length - 1] as string);
   }
-  return out.sort((a, b) => b.date.localeCompare(a.date));
+  const results = await Promise.all(
+    ids.map((id) => k.get<PublicSpeech>(["speech", id])),
+  );
+  return (results.map((r) => r.value).filter(Boolean) as PublicSpeech[])
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ----- Write helpers (used by seed + admin endpoints) --------------------
