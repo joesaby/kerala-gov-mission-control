@@ -49,7 +49,8 @@ export type DashboardSlug =
   | "fiscal-health"
   | "crisis"
   | "grievance-rti"
-  | "hr-capacity";
+  | "hr-capacity"
+  | "government-orders";
 
 export interface DataSource {
   /** Stable id, e.g. "src.cpcb-caaqms". */
@@ -661,5 +662,66 @@ export const DATA_SOURCES: DataSource[] = [
     status: "blocked",
     notes:
       "Aggregated state stats. Avoid unless paid subscription is in scope.",
+  },
+
+  // -------------------------------------------------------------------------
+  // Government Orders & Bills
+  // -------------------------------------------------------------------------
+  {
+    id: "src.go-portal-kerala",
+    name: "Document Portal — Government of Kerala",
+    publisher: "IT Mission / C-DIT, Government of Kerala",
+    url: "https://document.kerala.gov.in",
+    format: "html-scrape",
+    licence: "Government of Kerala",
+    cadence: "daily",
+    dashboards: ["government-orders", "department-scorecards"],
+    accessFriction:
+      "HTML search + PDF download; default view is last 30 days; advanced search by dept, date, GO type",
+    status: "verified",
+    notes:
+      "Primary hub for all GOs, Circulars, Cabinet Decisions. GO numbers follow G.O.(P|Ms|Rt) No.<n>/<year>/<DeptCode>. Search by GO number for direct lookup.",
+  },
+  {
+    id: "src.go-lsg-kerala",
+    name: "LSG Department — Government Orders portal",
+    publisher: "Local Self Government Department, GoK",
+    url: "https://go.lsgkerala.gov.in",
+    format: "html-scrape",
+    licence: "Government of Kerala",
+    cadence: "daily",
+    dashboards: ["government-orders"],
+    accessFriction: "HTML; PDF downloads; dept-specific GOs only",
+    status: "verified",
+    notes:
+      "Covers LSG orders, circulars, gazette notifications. Use when the document portal misses an LSG GO.",
+  },
+  {
+    id: "src.niyamasabha-bills",
+    name: "Kerala Niyamasabha — Bills Passed",
+    publisher: "Kerala Legislative Assembly Secretariat",
+    url: "https://niyamasabha.nic.in/index.php/business/index/bills_passed",
+    format: "html-scrape",
+    licence: "Government of Kerala",
+    cadence: "ad-hoc",
+    dashboards: ["government-orders", "promises-tracker"],
+    accessFriction: "HTML; PDFs of bill text; no API",
+    status: "verified",
+    notes:
+      "Authoritative list of bills passed by the Kerala Legislative Assembly. Also see klaproceedings.niyamasabha.org for digitised archives and kerala.neva.gov.in for session info.",
+  },
+  {
+    id: "src.go-wcd-kerala",
+    name: "Women & Child Development — Government Orders",
+    publisher: "Women & Child Development Department, GoK",
+    url: "https://wcd.kerala.gov.in/gov_orders.php",
+    format: "html-scrape",
+    licence: "Government of Kerala",
+    cadence: "ad-hoc",
+    dashboards: ["government-orders"],
+    accessFriction: "HTML; PDF download per order",
+    status: "verified",
+    notes:
+      "Department-specific portal for WCD orders. Use as fallback when the main document portal is missing WCD entries.",
   },
 ];

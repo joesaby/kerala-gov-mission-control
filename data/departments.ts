@@ -4,10 +4,8 @@ import type { Department } from "./types.ts";
  * Standard Government of Kerala departments. The structure is largely stable
  * across elected governments — Minister/Secretary assignments rotate.
  *
- * `ministerId` is set where the V D Satheesan UDF cabinet (sworn in 18 May
- * 2026) has a publicly announced assignment per The New Indian Express. The
- * full GO with all portfolio allocations may add or change assignments;
- * fields are left unset where no public announcement is on record.
+ * `ministerId` reflects the Satheesan ministry (UDF, sworn in 18 May 2026).
+ * Source: The New Indian Express, 18 May 2026.
  */
 export const DEPARTMENTS: Department[] = [
   {

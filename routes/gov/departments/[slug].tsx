@@ -63,10 +63,15 @@ export default define.page<typeof handler>(function DeptPage(
                   href={`/gov/ministers/${minister.slug}`}
                   class="link link-hover font-medium"
                 >
-                  {minister.name}
+                  {lang === "ml" && minister.nameMl
+                    ? minister.nameMl
+                    : minister.name}
                 </a>
               )
               : <span class="italic text-base-content/60">Pending</span>}
+            {minister && lang === "ml" && minister.nameMl && (
+              <div class="text-xs text-base-content/50">{minister.name}</div>
+            )}
             {minister?.constituency && (
               <div class="text-xs text-base-content/60 mt-0.5">
                 {minister.constituency}

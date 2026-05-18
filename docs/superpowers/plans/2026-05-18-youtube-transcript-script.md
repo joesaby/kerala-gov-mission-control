@@ -1,45 +1,64 @@
 # YouTube Transcript Script Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Deno CLI that downloads a Malayalam/English transcript for any YouTube URL — pulling YouTube's own captions when available, falling back to Sarvam AI batch STT (with speaker diarization) on audio extracted via `yt-dlp` + `ffmpeg`.
+**Goal:** Build a Deno CLI that downloads a Malayalam/English transcript for any
+YouTube URL — pulling YouTube's own captions when available, falling back to
+Sarvam AI batch STT (with speaker diarization) on audio extracted via `yt-dlp` +
+`ffmpeg`.
 
-**Architecture:** Three-stage fallback chain (timedtext → audio extract → Sarvam batch) orchestrated by `scripts/transcript.ts`. Four supporting modules under `scripts/transcript/`, each with one responsibility (URL/HTTP, subprocess, REST client, output formatting). Pure-logic pieces are unit-tested with `Deno.test`; HTTP/subprocess layers are verified by end-to-end smoke runs.
+**Architecture:** Three-stage fallback chain (timedtext → audio extract → Sarvam
+batch) orchestrated by `scripts/transcript.ts`. Four supporting modules under
+`scripts/transcript/`, each with one responsibility (URL/HTTP, subprocess, REST
+client, output formatting). Pure-logic pieces are unit-tested with `Deno.test`;
+HTTP/subprocess layers are verified by end-to-end smoke runs.
 
-**Tech Stack:** Deno 2.x, TypeScript, `jsr:@std/cli` for arg parsing, `jsr:@std/dotenv`-free (uses `--env-file=.env` flag), system `yt-dlp` + `ffmpeg`, Sarvam Speech-to-Text Batch REST API.
+**Tech Stack:** Deno 2.x, TypeScript, `jsr:@std/cli` for arg parsing,
+`jsr:@std/dotenv`-free (uses `--env-file=.env` flag), system `yt-dlp` +
+`ffmpeg`, Sarvam Speech-to-Text Batch REST API.
 
-**Source spec:** `docs/superpowers/specs/2026-05-18-youtube-transcript-script-design.md`
+**Source spec:**
+`docs/superpowers/specs/2026-05-18-youtube-transcript-script-design.md`
 
 ---
 
 ## File Map
 
-| Path | Responsibility | Status |
-| --- | --- | --- |
-| `scripts/transcript.ts` | CLI entry, arg parsing, three-stage orchestration, exit codes, cost prompt | Create |
-| `scripts/transcript/youtube-captions.ts` | Extract video ID from URL, fetch watch HTML, parse `ytInitialPlayerResponse`, fetch + parse VTT | Create |
-| `scripts/transcript/audio.ts` | Pre-flight check for `yt-dlp`/`ffmpeg`, download + transcode audio, probe duration | Create |
-| `scripts/transcript/sarvam.ts` | Sarvam batch REST client: init → upload → start → poll → download, parse output JSON | Create |
-| `scripts/transcript/format.ts` | Render header block, render diarized body with speaker renumbering, write to disk | Create |
-| `scripts/transcript/youtube-captions_test.ts` | Tests for URL extraction + VTT parsing | Create |
-| `scripts/transcript/format_test.ts` | Tests for header rendering + speaker renumbering | Create |
-| `scripts/transcript/sarvam_test.ts` | Tests for polling state machine (with mocked status fn) | Create |
-| `deno.json` | Add `transcript` task | Modify |
-| `README.md` | Document the new task, env requirement, system deps | Modify |
-| `data/transcripts/.gitkeep` | Ensure output dir exists in git | Create |
+| Path                                          | Responsibility                                                                                  | Status |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------ |
+| `scripts/transcript.ts`                       | CLI entry, arg parsing, three-stage orchestration, exit codes, cost prompt                      | Create |
+| `scripts/transcript/youtube-captions.ts`      | Extract video ID from URL, fetch watch HTML, parse `ytInitialPlayerResponse`, fetch + parse VTT | Create |
+| `scripts/transcript/audio.ts`                 | Pre-flight check for `yt-dlp`/`ffmpeg`, download + transcode audio, probe duration              | Create |
+| `scripts/transcript/sarvam.ts`                | Sarvam batch REST client: init → upload → start → poll → download, parse output JSON            | Create |
+| `scripts/transcript/format.ts`                | Render header block, render diarized body with speaker renumbering, write to disk               | Create |
+| `scripts/transcript/youtube-captions_test.ts` | Tests for URL extraction + VTT parsing                                                          | Create |
+| `scripts/transcript/format_test.ts`           | Tests for header rendering + speaker renumbering                                                | Create |
+| `scripts/transcript/sarvam_test.ts`           | Tests for polling state machine (with mocked status fn)                                         | Create |
+| `deno.json`                                   | Add `transcript` task                                                                           | Modify |
+| `README.md`                                   | Document the new task, env requirement, system deps                                             | Modify |
+| `data/transcripts/.gitkeep`                   | Ensure output dir exists in git                                                                 | Create |
 
 ---
 
 ## Task 0: Verify Sarvam REST endpoint shapes
 
-**Why first:** The spec sketched Sarvam batch endpoints from the Python SDK, but the actual REST surface needs to be confirmed before we build the polling state machine. Wrong endpoint paths or payload shapes will silently waste hours of debugging.
+**Why first:** The spec sketched Sarvam batch endpoints from the Python SDK, but
+the actual REST surface needs to be confirmed before we build the polling state
+machine. Wrong endpoint paths or payload shapes will silently waste hours of
+debugging.
 
 **Files:**
+
 - Create: `scripts/transcript/sarvam.ts` (header comment block only)
 
 - [ ] **Step 1: Read Sarvam's batch API docs**
 
-Open <https://docs.sarvam.ai/api-reference-docs/speech-to-text/batch> in a browser. Confirm the actual paths, request bodies, and response shapes for:
+Open <https://docs.sarvam.ai/api-reference-docs/speech-to-text/batch> in a
+browser. Confirm the actual paths, request bodies, and response shapes for:
+
 - `POST` init job
 - File upload (presigned URL? multipart? direct?)
 - `POST` start job
@@ -54,7 +73,8 @@ Create a 5-second silent WAV for testing:
 ffmpeg -f lavfi -i anullsrc=channel_layout=mono:sample_rate=16000 -t 5 /tmp/silence.wav
 ```
 
-Then walk the batch flow manually with `curl` (substituting your real key from `.env`):
+Then walk the batch flow manually with `curl` (substituting your real key from
+`.env`):
 
 ```bash
 export SARVAM_API_KEY="$(grep ^SARVAM_API_KEY .env | cut -d= -f2-)"
@@ -69,7 +89,8 @@ curl -X POST https://api.sarvam.ai/speech-to-text/job/init \
 # fetch outputs
 ```
 
-- [ ] **Step 3: Record actual shapes in a comment block at the top of `scripts/transcript/sarvam.ts`**
+- [ ] **Step 3: Record actual shapes in a comment block at the top of
+      `scripts/transcript/sarvam.ts`**
 
 Create the file with only a top comment that documents what you found:
 
@@ -97,7 +118,8 @@ Create the file with only a top comment that documents what you found:
 // 6. Output JSON shape: { segments: [{ start: number, end: number, speaker?: string, text: string }], ... }
 ```
 
-If anything in the spec contradicts what you found, STOP and update the spec before continuing — the rest of the plan assumes these shapes.
+If anything in the spec contradicts what you found, STOP and update the spec
+before continuing — the rest of the plan assumes these shapes.
 
 - [ ] **Step 4: Commit**
 
@@ -111,6 +133,7 @@ git commit -m "Document Sarvam batch REST surface verified against live API"
 ## Task 1: Wire the `transcript` task + create directory skeleton
 
 **Files:**
+
 - Modify: `deno.json` (tasks block)
 - Create: `scripts/transcript.ts` (stub)
 - Create: `data/transcripts/.gitkeep` (empty file)
@@ -120,21 +143,21 @@ git commit -m "Document Sarvam batch REST surface verified against live API"
 Read `deno.json`. In the `tasks` block, after the `seed` line, add:
 
 ```jsonc
-    "transcript": "deno run -A --env-file=.env scripts/transcript.ts",
+"transcript": "deno run -A --env-file=.env scripts/transcript.ts",
 ```
 
 So the block looks like:
 
 ```jsonc
-  "tasks": {
-    "check": "deno fmt --check . && deno lint . && deno check",
-    "dev": "deno run -A --watch=static/,routes/ dev.ts",
-    "build": "deno run -A dev.ts build",
-    "start": "deno serve -A _fresh/server.js",
-    "seed": "deno run -A scripts/seed.ts",
-    "transcript": "deno run -A --env-file=.env scripts/transcript.ts",
-    "update": "deno run -A -r jsr:@fresh/update ."
-  },
+"tasks": {
+  "check": "deno fmt --check . && deno lint . && deno check",
+  "dev": "deno run -A --watch=static/,routes/ dev.ts",
+  "build": "deno run -A dev.ts build",
+  "start": "deno serve -A _fresh/server.js",
+  "seed": "deno run -A scripts/seed.ts",
+  "transcript": "deno run -A --env-file=.env scripts/transcript.ts",
+  "update": "deno run -A -r jsr:@fresh/update ."
+},
 ```
 
 - [ ] **Step 2: Create the CLI stub**
@@ -175,7 +198,9 @@ git commit -m "Scaffold transcript CLI task and output directory"
 ## Task 2: URL parser + tests
 
 **Files:**
-- Create: `scripts/transcript/youtube-captions.ts` (add `extractVideoId` export — append, do not overwrite Task 0's comment block)
+
+- Create: `scripts/transcript/youtube-captions.ts` (add `extractVideoId` export
+  — append, do not overwrite Task 0's comment block)
 - Create: `scripts/transcript/youtube-captions_test.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -195,7 +220,9 @@ Deno.test("extractVideoId: standard watch URL", () => {
 
 Deno.test("extractVideoId: watch URL with extra params", () => {
   assertEquals(
-    extractVideoId("https://www.youtube.com/watch?v=5MVkCqd2U10&t=42s&list=PLfoo"),
+    extractVideoId(
+      "https://www.youtube.com/watch?v=5MVkCqd2U10&t=42s&list=PLfoo",
+    ),
     "5MVkCqd2U10",
   );
 });
@@ -237,7 +264,8 @@ Expected: all six tests FAIL (`extractVideoId` not exported).
 
 - [ ] **Step 3: Implement `extractVideoId`**
 
-Append to `scripts/transcript/youtube-captions.ts` (keep the existing Task 0 comment block at the top):
+Append to `scripts/transcript/youtube-captions.ts` (keep the existing Task 0
+comment block at the top):
 
 ```typescript
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
@@ -294,12 +322,14 @@ git commit -m "Add YouTube URL parser with extractVideoId"
 ## Task 3: VTT parser + tests
 
 **Files:**
+
 - Modify: `scripts/transcript/youtube-captions.ts` (add `parseVtt`)
 - Modify: `scripts/transcript/youtube-captions_test.ts` (add tests)
 
 - [ ] **Step 1: Write the failing tests**
 
-In `scripts/transcript/youtube-captions_test.ts`, **add `parseVtt` to the existing import line** at the top:
+In `scripts/transcript/youtube-captions_test.ts`, **add `parseVtt` to the
+existing import line** at the top:
 
 ```typescript
 import { extractVideoId, parseVtt } from "./youtube-captions.ts";
@@ -367,7 +397,8 @@ line two
 deno test scripts/transcript/youtube-captions_test.ts
 ```
 
-Expected: the 5 new tests fail (`parseVtt` not exported); the 6 from Task 2 still pass.
+Expected: the 5 new tests fail (`parseVtt` not exported); the 6 from Task 2
+still pass.
 
 - [ ] **Step 3: Implement `parseVtt`**
 
@@ -412,7 +443,9 @@ export function parseVtt(vtt: string): string {
       continue;
     }
     const gap = cues[j].start - cues[j - 1].end;
-    parts.push(gap > PARAGRAPH_GAP_SECONDS ? "\n\n" + cues[j].text : " " + cues[j].text);
+    parts.push(
+      gap > PARAGRAPH_GAP_SECONDS ? "\n\n" + cues[j].text : " " + cues[j].text,
+    );
   }
   return parts.join("").replace(/[ ]+/g, " ").trim();
 }
@@ -438,9 +471,12 @@ git commit -m "Add VTT parser with paragraph-break heuristic"
 ## Task 4: YouTube captions fetcher (HTTP layer)
 
 **Files:**
-- Modify: `scripts/transcript/youtube-captions.ts` (add `fetchYoutubeCaptions` + helpers)
 
-This task does NOT add unit tests for the network call — it's verified by smoke test in Task 9.
+- Modify: `scripts/transcript/youtube-captions.ts` (add `fetchYoutubeCaptions` +
+  helpers)
+
+This task does NOT add unit tests for the network call — it's verified by smoke
+test in Task 9.
 
 - [ ] **Step 1: Add types and the fetcher**
 
@@ -539,7 +575,9 @@ console.log(r.tracks[0]?.text.slice(0, 200));
 "
 ```
 
-Expected: prints the video title plus at least one track (Malayalam likely auto-generated). If `tracks` is `[]`, the video has no `ml`/`en` captions and Task 9 will exercise the Sarvam path instead.
+Expected: prints the video title plus at least one track (Malayalam likely
+auto-generated). If `tracks` is `[]`, the video has no `ml`/`en` captions and
+Task 9 will exercise the Sarvam path instead.
 
 - [ ] **Step 3: Commit**
 
@@ -553,6 +591,7 @@ git commit -m "Add YouTube caption fetcher with timedtext probe"
 ## Task 5: Format module + tests
 
 **Files:**
+
 - Create: `scripts/transcript/format.ts`
 - Create: `scripts/transcript/format_test.ts`
 
@@ -742,6 +781,7 @@ git commit -m "Add transcript output formatter with diarization rendering"
 ## Task 6: Audio extraction module
 
 **Files:**
+
 - Create: `scripts/transcript/audio.ts`
 
 Subprocess code; verified by running, not unit tests.
@@ -759,7 +799,11 @@ export interface AudioResult {
 
 async function which(bin: string): Promise<boolean> {
   try {
-    const cmd = new Deno.Command("which", { args: [bin], stdout: "null", stderr: "null" });
+    const cmd = new Deno.Command("which", {
+      args: [bin],
+      stdout: "null",
+      stderr: "null",
+    });
     const { code } = await cmd.output();
     return code === 0;
   } catch {
@@ -774,7 +818,9 @@ export async function ensureBinaries(): Promise<void> {
   if (!(await which("ffprobe"))) missing.push("ffprobe");
   if (missing.length > 0) {
     throw new Error(
-      `Missing required tools: ${missing.join(", ")}. Install with: brew install ${missing.join(" ")}`,
+      `Missing required tools: ${
+        missing.join(", ")
+      }. Install with: brew install ${missing.join(" ")}`,
     );
   }
 }
@@ -782,10 +828,14 @@ export async function ensureBinaries(): Promise<void> {
 async function probeDuration(wavPath: string): Promise<number> {
   const cmd = new Deno.Command("ffprobe", {
     args: [
-      "-i", wavPath,
-      "-show_entries", "format=duration",
-      "-of", "csv=p=0",
-      "-v", "error",
+      "-i",
+      wavPath,
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "csv=p=0",
+      "-v",
+      "error",
     ],
     stdout: "piped",
     stderr: "piped",
@@ -796,7 +846,9 @@ async function probeDuration(wavPath: string): Promise<number> {
   }
   const s = new TextDecoder().decode(stdout).trim();
   const n = Number(s);
-  if (!Number.isFinite(n)) throw new Error(`ffprobe returned invalid duration: ${s}`);
+  if (!Number.isFinite(n)) {
+    throw new Error(`ffprobe returned invalid duration: ${s}`);
+  }
   return n;
 }
 
@@ -811,10 +863,14 @@ export async function extractAudio(
   const cmd = new Deno.Command("yt-dlp", {
     args: [
       "-x",
-      "--audio-format", "wav",
-      "--audio-quality", "0",
-      "--postprocessor-args", "ffmpeg:-ac 1 -ar 16000",
-      "-o", `${tmpDir}/${videoId}.%(ext)s`,
+      "--audio-format",
+      "wav",
+      "--audio-quality",
+      "0",
+      "--postprocessor-args",
+      "ffmpeg:-ac 1 -ar 16000",
+      "-o",
+      `${tmpDir}/${videoId}.%(ext)s`,
       "--no-progress",
       url,
     ],
@@ -858,9 +914,11 @@ console.log('cleaned up');
 "
 ```
 
-Expected: prints a `/var/folders/.../transcript-XXX/<id>.wav` path and a positive duration; tmpdir is removed.
+Expected: prints a `/var/folders/.../transcript-XXX/<id>.wav` path and a
+positive duration; tmpdir is removed.
 
-If `yt-dlp` or `ffmpeg` is missing, expect the install-hint error from `ensureBinaries`.
+If `yt-dlp` or `ffmpeg` is missing, expect the install-hint error from
+`ensureBinaries`.
 
 - [ ] **Step 3: Commit**
 
@@ -874,22 +932,30 @@ git commit -m "Add yt-dlp + ffmpeg audio extraction wrapper"
 ## Task 7: Sarvam batch client
 
 **Files:**
-- Modify: `scripts/transcript/sarvam.ts` (the file currently holds only the Task 0 comment block — append everything below it)
+
+- Modify: `scripts/transcript/sarvam.ts` (the file currently holds only the Task
+  0 comment block — append everything below it)
 - Create: `scripts/transcript/sarvam_test.ts`
 
-**Note:** The exact endpoint paths, payload shapes, and upload mechanism MUST match what you verified in Task 0. If they differ from what's coded below, update the code to match — the Task 0 comment block is the source of truth.
+**Note:** The exact endpoint paths, payload shapes, and upload mechanism MUST
+match what you verified in Task 0. If they differ from what's coded below,
+update the code to match — the Task 0 comment block is the source of truth.
 
 - [ ] **Step 1: Write failing tests for the polling state machine**
 
-The state machine is the part most likely to break (the I/O wrappers are thin). Create `scripts/transcript/sarvam_test.ts`:
+The state machine is the part most likely to break (the I/O wrappers are thin).
+Create `scripts/transcript/sarvam_test.ts`:
 
 ```typescript
 import { assertEquals, assertRejects } from "jsr:@std/assert@^1";
-import { pollUntilDone, type JobStatus } from "./sarvam.ts";
+import { type JobStatus, pollUntilDone } from "./sarvam.ts";
 
 Deno.test("pollUntilDone: returns immediately if already completed", async () => {
   const fetcher = () => Promise.resolve({ status: "completed" } as JobStatus);
-  const result = await pollUntilDone(fetcher, { intervalMs: 1, timeoutMs: 100 });
+  const result = await pollUntilDone(fetcher, {
+    intervalMs: 1,
+    timeoutMs: 100,
+  });
   assertEquals(result.status, "completed");
 });
 
@@ -898,10 +964,15 @@ Deno.test("pollUntilDone: polls until completed", async () => {
   const fetcher = () => {
     calls++;
     return Promise.resolve(
-      calls < 3 ? { status: "running" } as JobStatus : { status: "completed" } as JobStatus,
+      calls < 3
+        ? { status: "running" } as JobStatus
+        : { status: "completed" } as JobStatus,
     );
   };
-  const result = await pollUntilDone(fetcher, { intervalMs: 1, timeoutMs: 100 });
+  const result = await pollUntilDone(fetcher, {
+    intervalMs: 1,
+    timeoutMs: 100,
+  });
   assertEquals(result.status, "completed");
   assertEquals(calls, 3);
 });
@@ -960,7 +1031,9 @@ export async function pollUntilDone(
   while (true) {
     if (status.status === "completed") return status;
     if (status.status === "failed") {
-      throw new Error(`Sarvam job failed: ${status.error ?? "(no error message)"}`);
+      throw new Error(
+        `Sarvam job failed: ${status.error ?? "(no error message)"}`,
+      );
     }
     if (Date.now() >= deadline) {
       throw new Error(`Sarvam job polling timed out after ${opts.timeoutMs}ms`);
@@ -989,7 +1062,8 @@ git commit -m "Add Sarvam polling state machine with tests"
 
 - [ ] **Step 6: Implement the rest of the Sarvam client**
 
-Append to `scripts/transcript/sarvam.ts`. **Adjust paths/bodies to match the Task 0 verified surface — the code below uses the spec's sketch:**
+Append to `scripts/transcript/sarvam.ts`. **Adjust paths/bodies to match the
+Task 0 verified surface — the code below uses the spec's sketch:**
 
 ```typescript
 import type { SarvamSegment } from "./format.ts";
@@ -998,7 +1072,7 @@ const SARVAM_BASE = "https://api.sarvam.ai";
 
 export interface SarvamOptions {
   wavPath: string;
-  languageCode: string;   // e.g. "ml-IN"
+  languageCode: string; // e.g. "ml-IN"
   numSpeakers: number;
   onProgress?: (msg: string) => void;
 }
@@ -1071,7 +1145,9 @@ export async function transcribeWithSarvam(
   // ADJUST: Task 0 may show this is a PUT to a presigned URL,
   // a multipart POST, or something else.
   const wav = await Deno.readFile(opts.wavPath);
-  const uploadUrl = `${init.input_storage_path}/${opts.wavPath.split("/").pop()}`;
+  const uploadUrl = `${init.input_storage_path}/${
+    opts.wavPath.split("/").pop()
+  }`;
   const uploadRes = await fetch(uploadUrl, {
     method: "PUT",
     body: wav,
@@ -1153,6 +1229,7 @@ git commit -m "Add Sarvam batch client (init/upload/start/poll/download)"
 ## Task 8: CLI orchestrator
 
 **Files:**
+
 - Modify: `scripts/transcript.ts` (replace the stub)
 
 - [ ] **Step 1: Replace the stub with the full CLI**
@@ -1161,10 +1238,17 @@ Overwrite `scripts/transcript.ts`:
 
 ```typescript
 import { parseArgs } from "jsr:@std/cli@^1/parse-args";
-import { extractVideoId, fetchYoutubeCaptions } from "./transcript/youtube-captions.ts";
+import {
+  extractVideoId,
+  fetchYoutubeCaptions,
+} from "./transcript/youtube-captions.ts";
 import { extractAudio } from "./transcript/audio.ts";
 import { transcribeWithSarvam } from "./transcript/sarvam.ts";
-import { renderDiarizedBody, renderHeader, type TranscriptMeta } from "./transcript/format.ts";
+import {
+  renderDiarizedBody,
+  renderHeader,
+  type TranscriptMeta,
+} from "./transcript/format.ts";
 
 const LANG_NAME: Record<string, string> = {
   ml: "Malayalam",
@@ -1184,19 +1268,26 @@ Options:
   Deno.exit(2);
 }
 
-async function confirmCost(durationSeconds: number, autoYes: boolean): Promise<void> {
+async function confirmCost(
+  durationSeconds: number,
+  autoYes: boolean,
+): Promise<void> {
   if (autoYes) return;
   if (durationSeconds <= 15 * 60) return;
   const mins = Math.floor(durationSeconds / 60);
   const secs = Math.round(durationSeconds % 60);
   await Deno.stdout.write(
     new TextEncoder().encode(
-      `Audio is ${mins}m${String(secs).padStart(2, "0")}s. Sarvam batch will take ~5-10 min. Proceed? [y/N] `,
+      `Audio is ${mins}m${
+        String(secs).padStart(2, "0")
+      }s. Sarvam batch will take ~5-10 min. Proceed? [y/N] `,
     ),
   );
   const buf = new Uint8Array(8);
   const n = await Deno.stdin.read(buf);
-  const answer = n ? new TextDecoder().decode(buf.subarray(0, n)).trim().toLowerCase() : "";
+  const answer = n
+    ? new TextDecoder().decode(buf.subarray(0, n)).trim().toLowerCase()
+    : "";
   if (answer !== "y" && answer !== "yes") {
     console.error("Aborted.");
     Deno.exit(0);
@@ -1228,7 +1319,9 @@ async function main(): Promise<number> {
   const url = String(args._[0]);
   const speakers = Number(args.speakers);
   if (!Number.isInteger(speakers) || speakers < 1) {
-    console.error(`--speakers must be a positive integer, got: ${args.speakers}`);
+    console.error(
+      `--speakers must be a positive integer, got: ${args.speakers}`,
+    );
     return 2;
   }
 
@@ -1257,13 +1350,21 @@ async function main(): Promise<number> {
           fetchedAt,
           method: `timedtext (${track.kind})`,
         };
-        const path = await writeTranscript(args.out, videoId, track.lang, meta, track.text);
+        const path = await writeTranscript(
+          args.out,
+          videoId,
+          track.lang,
+          meta,
+          track.text,
+        );
         written.push(path);
       }
       console.error(`Wrote: ${written.join(", ")}`);
       return 0;
     }
-    console.error("No Malayalam/English captions on YouTube — falling back to Sarvam.");
+    console.error(
+      "No Malayalam/English captions on YouTube — falling back to Sarvam.",
+    );
   }
 
   // Stage 2+3: Audio + Sarvam
@@ -1358,8 +1459,13 @@ deno task transcript "https://www.youtube.com/watch?v=5MVkCqd2U10"
 
 **Expected outcomes (any of these is success):**
 
-- **If the video has YouTube captions**: prints `Step 1/3: probing YouTube captions...` then `Wrote: data/transcripts/5MVkCqd2U10.ml.txt` (and possibly `.en.txt`). Exits 0.
-- **If no captions**: falls through to `Step 2/3: extracting audio...`, possibly prompts for cost confirmation, then `Step 3/3: transcribing with Sarvam...`, then writes `data/transcripts/5MVkCqd2U10.ml.txt`.
+- **If the video has YouTube captions**: prints
+  `Step 1/3: probing YouTube captions...` then
+  `Wrote: data/transcripts/5MVkCqd2U10.ml.txt` (and possibly `.en.txt`).
+  Exits 0.
+- **If no captions**: falls through to `Step 2/3: extracting audio...`, possibly
+  prompts for cost confirmation, then `Step 3/3: transcribing with Sarvam...`,
+  then writes `data/transcripts/5MVkCqd2U10.ml.txt`.
 
 - [ ] **Step 2: Inspect the output**
 
@@ -1368,17 +1474,24 @@ head -20 data/transcripts/5MVkCqd2U10.ml.txt
 wc -l data/transcripts/5MVkCqd2U10.ml.txt
 ```
 
-Expected: 9-line header (Source, Video ID, Title, Language, Fetched, Method, blank, `---`, blank), then transcript body. Body should be non-empty Malayalam text (or `[Speaker N]: ...` lines if Sarvam ran).
+Expected: 9-line header (Source, Video ID, Title, Language, Fetched, Method,
+blank, `---`, blank), then transcript body. Body should be non-empty Malayalam
+text (or `[Speaker N]: ...` lines if Sarvam ran).
 
-- [ ] **Step 3: Smoke-test the `--force-sarvam` path (if YouTube captions succeeded above)**
+- [ ] **Step 3: Smoke-test the `--force-sarvam` path (if YouTube captions
+      succeeded above)**
 
 ```bash
 deno task transcript --force-sarvam --yes "https://www.youtube.com/watch?v=5MVkCqd2U10"
 ```
 
-Expected: skips Stage 1, downloads audio, calls Sarvam, writes `data/transcripts/5MVkCqd2U10.ml.txt` with `Method: sarvam-batch (saaras:v3, diarization)`. (Skip this step if Stage 1 already failed — the path was exercised in Step 1.)
+Expected: skips Stage 1, downloads audio, calls Sarvam, writes
+`data/transcripts/5MVkCqd2U10.ml.txt` with
+`Method: sarvam-batch (saaras:v3, diarization)`. (Skip this step if Stage 1
+already failed — the path was exercised in Step 1.)
 
-- [ ] **Step 4: Confirm `data/transcripts/.gitkeep` survived** (the real transcript files should not be committed unless you want them)
+- [ ] **Step 4: Confirm `data/transcripts/.gitkeep` survived** (the real
+      transcript files should not be committed unless you want them)
 
 ```bash
 ls -la data/transcripts/
@@ -1397,6 +1510,7 @@ git commit -m "Ignore generated transcript files"
 ## Task 10: README update
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Read the current README structure**
@@ -1407,12 +1521,15 @@ cat README.md
 
 - [ ] **Step 2: Add a "Transcripts" section**
 
-Find an appropriate spot (after the existing "Tasks" or "Scripts" section, or just before the bottom). Append:
+Find an appropriate spot (after the existing "Tasks" or "Scripts" section, or
+just before the bottom). Append:
 
 ````markdown
 ## Transcript download
 
-Downloads Malayalam (and English when available) transcripts for any YouTube URL, using YouTube's built-in captions when present and falling back to Sarvam AI batch STT (with speaker diarization) when not.
+Downloads Malayalam (and English when available) transcripts for any YouTube
+URL, using YouTube's built-in captions when present and falling back to Sarvam
+AI batch STT (with speaker diarization) when not.
 
 ```bash
 deno task transcript <youtube-url>
@@ -1425,19 +1542,20 @@ Output goes to `data/transcripts/<videoId>.<lang>.txt`.
 **Requirements:**
 
 - `yt-dlp` and `ffmpeg` on `$PATH` (`brew install yt-dlp ffmpeg`).
-- `SARVAM_API_KEY` in `.env` (gitignored). Format: `SARVAM_API_KEY=sk_...` — must include the variable-name prefix.
+- `SARVAM_API_KEY` in `.env` (gitignored). Format: `SARVAM_API_KEY=sk_...` —
+  must include the variable-name prefix.
 
 **Exit codes:**
 
-| Code | Meaning |
-| --- | --- |
-| 0 | Success |
-| 2 | Bad CLI args / invalid URL |
-| 3 | Missing `SARVAM_API_KEY` |
-| 4 | Missing `yt-dlp` / `ffmpeg` |
-| 5 | `yt-dlp` could not download the video |
-| 6 | Sarvam job failed |
-| 7 | Sarvam job polling timed out (>30 min) |
+| Code | Meaning                                |
+| ---- | -------------------------------------- |
+| 0    | Success                                |
+| 2    | Bad CLI args / invalid URL             |
+| 3    | Missing `SARVAM_API_KEY`               |
+| 4    | Missing `yt-dlp` / `ffmpeg`            |
+| 5    | `yt-dlp` could not download the video  |
+| 6    | Sarvam job failed                      |
+| 7    | Sarvam job polling timed out (>30 min) |
 ````
 
 - [ ] **Step 3: Commit**
@@ -1469,4 +1587,5 @@ Expected: no errors.
 
 - [ ] **Original request satisfied**
 
-`data/transcripts/5MVkCqd2U10.ml.txt` exists and contains a real transcript with header + body.
+`data/transcripts/5MVkCqd2U10.ml.txt` exists and contains a real transcript with
+header + body.
