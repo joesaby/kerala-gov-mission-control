@@ -9,7 +9,13 @@ from __future__ import annotations
 import pytest
 
 from translate import (
+    MODEL_LABEL,
+    TranscriptHeader,
+    build_output_header,
+    count_completed_paragraphs,
     parse_transcript,
+    split_paragraphs,
+    split_speaker_prefix,
 )
 
 SAMPLE_ML_TXT = """Source: https://www.youtube.com/watch?v=5MVkCqd2U10
@@ -58,13 +64,6 @@ def test_parse_transcript_language_line_missing():
     no_lang = SAMPLE_ML_TXT.replace("Language: ml (Malayalam)\n", "")
     with pytest.raises(ValueError, match=r"translates Malayalam \(`ml`\) only"):
         parse_transcript(no_lang)
-
-
-from translate import (
-    split_paragraphs,
-    split_speaker_prefix,
-    count_completed_paragraphs,
-)
 
 
 def test_split_paragraphs_youtube_style():
@@ -125,9 +124,6 @@ def test_count_completed_paragraphs_empty_body():
 
 def test_count_completed_paragraphs_no_separator():
     assert count_completed_paragraphs("just some text no separator") == 0
-
-
-from translate import build_output_header, TranscriptHeader, MODEL_LABEL
 
 
 def test_build_output_header_preserves_source_fields():
