@@ -2,13 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Deno CLI (`scripts/translate.ts`) that translates Malayalam transcript files produced by `scripts/transcript.ts` into English, locally, using Ollama + Aya Expanse 8B. Paragraph-level progress, crash-resume via a `.partial` file, no cloud APIs.
+**Goal:** Build a Python CLI (`scripts/translate.py`) that translates Malayalam transcript files produced by `scripts/transcript.ts` into English, locally on CPU, using AI4Bharat's IndicTrans2 distilled-200M model loaded in-process via Hugging Face `transformers`. Paragraph-level progress, crash-resume via a `.partial` file, single-file Python script managed by `uv` (PEP 723 inline dependency metadata).
 
-**Architecture:** Single-file CLI. Pure functions (parse, chunk, format, resume math) are unit-tested with `Deno.test`. The Ollama HTTP layer is unit-tested with an injected `fetch` and smoke-tested against a real local Ollama in Task 8.
+**Architecture:** One Python file owns the whole job. Pure helper functions (parse, chunk, format, resume math) are unit-tested with `pytest`. The IndicTrans2 model is wrapped behind a small `Translator` class so the per-paragraph code path can be unit-tested with a fake translator; the real model is only loaded by the orchestrator and exercised in the end-to-end smoke test.
 
-**Tech Stack:** Deno 2.x, TypeScript, `jsr:@std/cli` for arg parsing, `jsr:@std/assert` for tests, local Ollama (`localhost:11434`) running `aya-expanse:8b`.
+**Tech Stack:** Python ≥3.10 (auto-installed by `uv`), `transformers`, `torch` (CPU), `IndicTransToolkit`, `sentencepiece`. Test framework: `pytest`. The Deno side is a single `deno.json` task entry (`uv run scripts/translate.py`).
 
 **Source spec:** `docs/superpowers/specs/2026-05-18-malayalam-english-translate-script-design.md`
+
+> **Note on prior revision:** This plan was originally written for Ollama + Aya Expanse 8B and discarded after discovering Aya does not officially support Malayalam (sanity check passed on a trivial greeting but real transcripts would have degraded). The current plan is the IndicTrans2 redo.
 
 ---
 
@@ -16,78 +18,127 @@
 
 | Path | Responsibility | Status |
 | --- | --- | --- |
-| `scripts/translate.ts` | Single-file CLI: arg parsing, transcript parsing, paragraph chunking, Ollama pre-flight, translation loop with resume, output writing | Create |
-| `scripts/translate_test.ts` | Unit tests for all pure functions + mocked-`fetch` tests for the Ollama client | Create |
-| `deno.json` | Add `translate` task to the `tasks` block | Modify |
+| `scripts/translate.py` | Single-file Python CLI: PEP 723 deps header, arg parsing, transcript parsing, paragraph chunking, IndicTrans2 model load, translation loop with resume, output writing | Create |
+| `scripts/translate_test.py` | Unit tests for all pure functions + a `FakeTranslator`-backed test for the per-paragraph code path | Create |
+| `deno.json` | Add `translate` and `translate:test` tasks | Modify |
 | `.gitignore` | Ignore `*.partial` files under `data/transcripts/` | Modify |
-| `README.md` | Document the new task, Ollama/model dependency | Modify |
+| `README.md` | Document the new task, `uv` install, first-run model download | Modify |
 
 ---
 
-## Task 0: Pull Aya Expanse 8B and verify the Ollama tag
+## Task 0: Install uv + verify IndicTrans2 imports and runs on real Malayalam
 
-**Why first:** The spec assumes the model tag is `aya-expanse:8b`. If the Ollama library uses a different namespace (e.g. `aya:8b`, or it lives only on Hugging Face), the rest of the plan needs adjusting before any code is written.
+**Why first:** `IndicTransToolkit` has had API churn (the package on PyPI has been renamed between versions, and the processor module path has shifted). Verifying the actual API on this machine before writing 200 lines of code that assume one shape is much cheaper than discovering an `ImportError` in Task 5. We also need to confirm that CPU `torch` resolves cleanly via `uv` on this Mac.
 
-**Files:** none (verification step only)
+**Files (probe-only, deleted at end of task):**
+- Create: `/tmp/translate_probe.py`
 
-- [ ] **Step 1: Confirm Ollama is running**
-
-```bash
-curl -s http://localhost:11434/api/tags | head -c 200
-```
-
-Expected: a JSON response that starts with `{"models":[...`. If you get "Connection refused", start Ollama (`ollama serve` or open the Ollama app) and retry.
-
-- [ ] **Step 2: Pull the model**
+- [ ] **Step 1: Install uv if not present**
 
 ```bash
-ollama pull aya-expanse:8b
+command -v uv >/dev/null 2>&1 || brew install uv
+uv --version
 ```
 
-If that tag doesn't exist, the CLI will print "model not found". In that case, search the Ollama library at <https://ollama.com/library> for `aya` and pull whichever 8B-class multilingual Aya variant is available (e.g. `aya:8b`). **Update the spec's default model and this plan's references before continuing** — search-and-replace `aya-expanse:8b` across `docs/superpowers/specs/2026-05-18-malayalam-english-translate-script-design.md` and this plan, and commit that change separately.
+Expected: prints a version string (e.g. `uv 0.4.x`). If `brew` isn't available, fall back to `curl -LsSf https://astral.sh/uv/install.sh | sh` and re-source shell.
 
-- [ ] **Step 3: Confirm the pulled tag shows in `/api/tags`**
+- [ ] **Step 2: Write a one-off probe script**
+
+Create `/tmp/translate_probe.py` (this file is throwaway — it will be deleted in Step 5):
+
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "transformers>=4.46.0",
+#     "torch>=2.4",
+#     "sentencepiece>=0.2.0",
+#     "IndicTransToolkit>=1.0.3",
+# ]
+# ///
+import time
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from IndicTransToolkit.processor import IndicProcessor
+
+MODEL_ID = "ai4bharat/indictrans2-indic-en-dist-200M"
+
+t0 = time.time()
+print(f"Loading {MODEL_ID}...", flush=True)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, trust_remote_code=True)
+ip = IndicProcessor(inference=True)
+print(f"Loaded in {time.time() - t0:.1f}s", flush=True)
+
+samples = [
+    "നമസ്കാരം, എങ്ങനെയുണ്ട്?",
+    "ഇന്ന് കേരളത്തിലെ കാലാവസ്ഥ വളരെ നല്ലതാണ്. പുതിയ വർഷം എല്ലാവർക്കും ഭാവുകങ്ങൾ.",
+    "സർക്കാർ പുതിയ പദ്ധതി പ്രഖ്യാപിച്ചു. അത് കർഷകർക്ക് വളരെ പ്രയോജനപ്രദമാകും.",
+]
+
+for s in samples:
+    batch = ip.preprocess_batch([s], src_lang="mal_Mlym", tgt_lang="eng_Latn")
+    enc = tokenizer(batch, return_tensors="pt", padding="longest", truncation=True, max_length=256)
+    with torch.no_grad():
+        out = model.generate(**enc, num_beams=5, max_length=256)
+    decoded = tokenizer.batch_decode(out, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    english = ip.postprocess_batch(decoded, lang="eng_Latn")[0]
+    print(f"\nML: {s}")
+    print(f"EN: {english}")
+```
+
+- [ ] **Step 3: Run the probe (will download ~800 MB of model on first run + install deps)**
 
 ```bash
-curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"' | sort -u
+uv run /tmp/translate_probe.py
 ```
 
-Expected: the output includes `"name":"aya-expanse:8b"` (or whatever you settled on in Step 2).
+Expected:
+- `uv` resolves and installs `transformers`, `torch`, `sentencepiece`, `IndicTransToolkit` into an isolated env (may take a few minutes the first time).
+- Model loads in 10–30 s.
+- Three English translations print, each a reasonable rendering of the Malayalam input.
 
-- [ ] **Step 4: Sanity-translate one line through the raw API**
+If any of the following happen, **STOP** and report back:
+- `ImportError` on `from IndicTransToolkit.processor import IndicProcessor` — the module path may have changed. Inspect the installed package (`uv run python -c "import IndicTransToolkit; print(IndicTransToolkit.__file__)"`) and adjust the import in this plan + spec before continuing.
+- `torch` install fails on macOS — note the exact error; we may need to add a torch index hint to the PEP 723 metadata.
+- English output is gibberish — the model choice needs revisiting.
+
+- [ ] **Step 4: Record what worked**
+
+In your report back, paste:
+- The exact `uv` version, Python version uv chose, and the resolved versions of `transformers`, `torch`, `IndicTransToolkit`.
+- All three English translations.
+- Total wall-clock time for the run.
+
+These values will be referenced when writing Tasks 1 and 5.
+
+- [ ] **Step 5: Clean up the probe**
 
 ```bash
-curl -s http://localhost:11434/api/generate -d '{
-  "model": "aya-expanse:8b",
-  "system": "You are a precise translator. Translate the user'\''s Malayalam text to natural, fluent English. Output ONLY the English translation.",
-  "prompt": "നമസ്കാരം, എങ്ങനെയുണ്ട്?",
-  "stream": false,
-  "options": { "temperature": 0.2 }
-}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["response"])'
+rm /tmp/translate_probe.py
 ```
 
-Expected: something like "Hello, how are you?" (exact wording will vary). If the output is gibberish, not English, or contains preamble like `Here is the translation: ...`, the engine choice in the spec needs revisiting — STOP and flag this before continuing.
-
-- [ ] **Step 5: No commit** — this task produced no files.
+- [ ] **Step 6: No commit** — this task produced no project files.
 
 ---
 
-## Task 1: Scaffold the `translate` task and stub script
+## Task 1: Scaffold `scripts/translate.py` + `deno.json` tasks + `.gitignore`
 
 **Files:**
 - Modify: `deno.json` (tasks block)
-- Create: `scripts/translate.ts` (stub only)
+- Create: `scripts/translate.py` (stub with PEP 723 metadata)
 - Modify: `.gitignore` (ignore `data/transcripts/*.partial`)
 
-- [ ] **Step 1: Add the task to `deno.json`**
+- [ ] **Step 1: Add tasks to `deno.json`**
 
-Read `deno.json`. In the `tasks` block, add `translate` right after `transcript` (or after `seed` if `transcript` is not yet present):
+Read `deno.json`. In the `tasks` block, add `translate` and `translate:test` right after `transcript` (or after `seed` if `transcript` is not yet present):
 
 ```jsonc
-    "translate": "deno run -A scripts/translate.ts",
+    "translate": "uv run scripts/translate.py",
+    "translate:test": "uv run --with pytest pytest scripts/translate_test.py -v",
 ```
 
-Resulting block:
+Resulting block (with the prior `transcript` task assumed present):
 
 ```jsonc
   "tasks": {
@@ -97,23 +148,43 @@ Resulting block:
     "start": "deno serve -A _fresh/server.js",
     "seed": "deno run -A scripts/seed.ts",
     "transcript": "deno run -A --env-file=.env scripts/transcript.ts",
-    "translate": "deno run -A scripts/translate.ts",
+    "translate": "uv run scripts/translate.py",
+    "translate:test": "uv run --with pytest pytest scripts/translate_test.py -v",
     "update": "deno run -A -r jsr:@fresh/update ."
   },
 ```
 
-(`-A` matches existing tasks. No `--env-file` — this script reads no env vars.)
+- [ ] **Step 2: Create the script stub with PEP 723 metadata**
 
-- [ ] **Step 2: Create the CLI stub**
+Create `scripts/translate.py`:
 
-Create `scripts/translate.ts`:
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "transformers>=4.46.0",
+#     "torch>=2.4",
+#     "sentencepiece>=0.2.0",
+#     "IndicTransToolkit>=1.0.3",
+# ]
+# ///
+"""Translate Malayalam transcript files to English using IndicTrans2."""
 
-```typescript
-if (import.meta.main) {
-  console.error("scripts/translate.ts: not implemented yet");
-  Deno.exit(1);
-}
+from __future__ import annotations
+
+import sys
+
+
+def main() -> int:
+    print("scripts/translate.py: not implemented yet", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 ```
+
+If Task 0 found different version pins for any of the dependencies, use those exact versions here instead.
 
 - [ ] **Step 3: Ignore `.partial` files in git**
 
@@ -124,40 +195,49 @@ Append to `.gitignore`:
 data/transcripts/*.partial
 ```
 
-- [ ] **Step 4: Verify the task runs**
+- [ ] **Step 4: Verify the task runs (and uv resolves env)**
 
 ```bash
 deno task translate
 ```
 
-Expected: prints `scripts/translate.ts: not implemented yet` and exits 1.
+Expected: `scripts/translate.py: not implemented yet` on stderr, exit code 1. (`uv` will set up the env if not already cached from Task 0.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add deno.json scripts/translate.ts .gitignore
-git commit -m "Scaffold translate CLI task and stub"
+git add deno.json scripts/translate.py .gitignore
+git commit -m "Scaffold translate CLI: deno task, PEP 723 script, partial ignore"
 ```
 
 ---
 
-## Task 2: Transcript file parser + tests
+## Task 2: `parse_transcript` + tests
 
 **Files:**
-- Create: `scripts/translate_test.ts`
-- Modify: `scripts/translate.ts` (add `parseTranscript` export above the `if (import.meta.main)` block)
-
-`parseTranscript` is the first pure function. It splits a transcript file into header + body and extracts the named header fields the output writer needs.
+- Create: `scripts/translate_test.py`
+- Modify: `scripts/translate.py` (add `parse_transcript` and supporting types above `main`)
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `scripts/translate_test.ts`:
+Create `scripts/translate_test.py`:
 
-```typescript
-import { assertEquals, assertThrows } from "jsr:@std/assert@^1";
-import { parseTranscript } from "./translate.ts";
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pytest>=8.0"]
+# ///
+"""Unit tests for scripts/translate.py pure functions."""
 
-const SAMPLE_ML_TXT = `Source: https://www.youtube.com/watch?v=5MVkCqd2U10
+from __future__ import annotations
+
+import pytest
+
+from translate import (
+    parse_transcript,
+)
+
+SAMPLE_ML_TXT = """Source: https://www.youtube.com/watch?v=5MVkCqd2U10
 Video ID: 5MVkCqd2U10
 Title: Kerala CM press meet
 Language: ml (Malayalam)
@@ -169,119 +249,152 @@ Method: timedtext
 ഇന്ന് നമ്മൾ ചർച്ച ചെയ്യാൻ പോകുന്നത് വളരെ പ്രധാനപ്പെട്ട ഒരു വിഷയമാണ്.
 
 രണ്ടാമത്തെ ഖണ്ഡിക ഇവിടെ.
-`;
+"""
 
-Deno.test("parseTranscript: extracts header fields and body", () => {
-  const parsed = parseTranscript(SAMPLE_ML_TXT);
-  assertEquals(parsed.header.source, "https://www.youtube.com/watch?v=5MVkCqd2U10");
-  assertEquals(parsed.header.videoId, "5MVkCqd2U10");
-  assertEquals(parsed.header.title, "Kerala CM press meet");
-  assertEquals(parsed.header.language, "ml (Malayalam)");
-  assertEquals(parsed.header.fetched, "2026-05-18T12:34:56Z");
-  assertEquals(parsed.header.method, "timedtext");
-  assertEquals(
-    parsed.body.trim(),
-    "ഇന്ന് നമ്മൾ ചർച്ച ചെയ്യാൻ പോകുന്നത് വളരെ പ്രധാനപ്പെട്ട ഒരു വിഷയമാണ്.\n\nരണ്ടാമത്തെ ഖണ്ഡിക ഇവിടെ.",
-  );
-});
 
-Deno.test("parseTranscript: rejects file with no --- separator", () => {
-  assertThrows(
-    () => parseTranscript("Source: foo\nLanguage: ml (Malayalam)\nno separator here\n"),
-    Error,
-    "expected transcript header followed by `---`",
-  );
-});
+def test_parse_transcript_extracts_header_fields_and_body():
+    parsed = parse_transcript(SAMPLE_ML_TXT)
+    assert parsed.header.source == "https://www.youtube.com/watch?v=5MVkCqd2U10"
+    assert parsed.header.video_id == "5MVkCqd2U10"
+    assert parsed.header.title == "Kerala CM press meet"
+    assert parsed.header.language == "ml (Malayalam)"
+    assert parsed.header.fetched == "2026-05-18T12:34:56Z"
+    assert parsed.header.method == "timedtext"
+    assert parsed.body.strip() == (
+        "ഇന്ന് നമ്മൾ ചർച്ച ചെയ്യാൻ പോകുന്നത് വളരെ പ്രധാനപ്പെട്ട ഒരു വിഷയമാണ്.\n\n"
+        "രണ്ടാമത്തെ ഖണ്ഡിക ഇവിടെ."
+    )
 
-Deno.test("parseTranscript: rejects non-Malayalam language", () => {
-  const enInput = SAMPLE_ML_TXT.replace("Language: ml (Malayalam)", "Language: en (English)");
-  assertThrows(
-    () => parseTranscript(enInput),
-    Error,
-    "translates Malayalam (`ml`) only",
-  );
-});
 
-Deno.test("parseTranscript: language line missing entirely", () => {
-  const noLang = SAMPLE_ML_TXT.replace("Language: ml (Malayalam)\n", "");
-  assertThrows(
-    () => parseTranscript(noLang),
-    Error,
-    "translates Malayalam (`ml`) only",
-  );
-});
+def test_parse_transcript_rejects_file_with_no_separator():
+    with pytest.raises(ValueError, match="expected transcript header followed by `---`"):
+        parse_transcript("Source: foo\nLanguage: ml (Malayalam)\nno separator here\n")
+
+
+def test_parse_transcript_rejects_non_malayalam_language():
+    en_input = SAMPLE_ML_TXT.replace(
+        "Language: ml (Malayalam)", "Language: en (English)"
+    )
+    with pytest.raises(ValueError, match=r"translates Malayalam \(`ml`\) only"):
+        parse_transcript(en_input)
+
+
+def test_parse_transcript_language_line_missing():
+    no_lang = SAMPLE_ML_TXT.replace("Language: ml (Malayalam)\n", "")
+    with pytest.raises(ValueError, match=r"translates Malayalam \(`ml`\) only"):
+        parse_transcript(no_lang)
 ```
+
+To make `from translate import ...` work, pytest needs to find `scripts/translate.py` on `sys.path`. We will run tests with the working directory set to `scripts/` — the `translate:test` task in `deno.json` from Task 1 should be updated now:
+
+In `deno.json`, change the `translate:test` line to:
+
+```jsonc
+    "translate:test": "sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'",
+```
+
+(Bare `pytest` from the repo root would still find the test file but the `from translate import` would fail because `scripts/` isn't on `sys.path`. `cd scripts` is the simplest fix and matches the convention of "tests live next to the code they test".)
 
 - [ ] **Step 2: Run tests, verify they fail**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
-Expected: all four tests FAIL with `parseTranscript` not exported.
+Expected: all four tests FAIL with `ImportError: cannot import name 'parse_transcript' from 'translate'`.
 
-- [ ] **Step 3: Implement `parseTranscript`**
+- [ ] **Step 3: Implement `parse_transcript`**
 
-Replace the contents of `scripts/translate.ts` with:
+Replace the contents of `scripts/translate.py` with:
 
-```typescript
-export interface ParsedTranscript {
-  rawHeader: string;
-  body: string;
-  header: {
-    source?: string;
-    videoId?: string;
-    title?: string;
-    language: string;
-    fetched?: string;
-    method?: string;
-  };
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "transformers>=4.46.0",
+#     "torch>=2.4",
+#     "sentencepiece>=0.2.0",
+#     "IndicTransToolkit>=1.0.3",
+# ]
+# ///
+"""Translate Malayalam transcript files to English using IndicTrans2."""
+
+from __future__ import annotations
+
+import re
+import sys
+from dataclasses import dataclass, field
+
+
+@dataclass
+class TranscriptHeader:
+    source: str | None = None
+    video_id: str | None = None
+    title: str | None = None
+    language: str = ""
+    fetched: str | None = None
+    method: str | None = None
+
+
+@dataclass
+class ParsedTranscript:
+    raw_header: str
+    body: str
+    header: TranscriptHeader = field(default_factory=TranscriptHeader)
+
+
+_HEADER_FIELDS = {
+    "Source": "source",
+    "Video ID": "video_id",
+    "Title": "title",
+    "Language": "language",
+    "Fetched": "fetched",
+    "Method": "method",
 }
 
-const HEADER_FIELDS: Record<string, keyof ParsedTranscript["header"]> = {
-  "Source": "source",
-  "Video ID": "videoId",
-  "Title": "title",
-  "Language": "language",
-  "Fetched": "fetched",
-  "Method": "method",
-};
+_SEPARATOR_RE = re.compile(r"^---\s*$", re.MULTILINE)
+_HEADER_LINE_RE = re.compile(r"^([A-Za-z][A-Za-z ]*?):\s*(.+)$")
 
-export function parseTranscript(text: string): ParsedTranscript {
-  const sepMatch = text.match(/^---\s*$/m);
-  if (!sepMatch || sepMatch.index === undefined) {
-    throw new Error("expected transcript header followed by `---` on its own line");
-  }
-  const rawHeader = text.slice(0, sepMatch.index).trimEnd();
-  const body = text.slice(sepMatch.index + sepMatch[0].length).replace(/^\r?\n/, "");
 
-  const header: ParsedTranscript["header"] = { language: "" };
-  for (const line of rawHeader.split(/\r?\n/)) {
-    const m = line.match(/^([A-Za-z][A-Za-z ]*?):\s*(.+)$/);
-    if (!m) continue;
-    const key = HEADER_FIELDS[m[1]];
-    if (key) header[key] = m[2].trim();
-  }
+def parse_transcript(text: str) -> ParsedTranscript:
+    sep_match = _SEPARATOR_RE.search(text)
+    if sep_match is None:
+        raise ValueError("expected transcript header followed by `---` on its own line")
 
-  if (!header.language.startsWith("ml")) {
-    throw new Error(
-      `this script translates Malayalam (\`ml\`) only; got \`${header.language || "<missing>"}\``,
-    );
-  }
+    raw_header = text[: sep_match.start()].rstrip()
+    body = text[sep_match.end():].lstrip("\n")
 
-  return { rawHeader, body, header };
-}
+    header = TranscriptHeader()
+    for line in raw_header.splitlines():
+        m = _HEADER_LINE_RE.match(line)
+        if not m:
+            continue
+        key = _HEADER_FIELDS.get(m.group(1))
+        if key:
+            setattr(header, key, m.group(2).strip())
 
-if (import.meta.main) {
-  console.error("scripts/translate.ts: not implemented yet");
-  Deno.exit(1);
-}
+    if not header.language.startswith("ml"):
+        got = header.language or "<missing>"
+        raise ValueError(
+            f"this script translates Malayalam (`ml`) only; got `{got}`"
+        )
+
+    return ParsedTranscript(raw_header=raw_header, body=body, header=header)
+
+
+def main() -> int:
+    print("scripts/translate.py: not implemented yet", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 ```
 
 - [ ] **Step 4: Run tests, verify they pass**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
 Expected: all four PASS.
@@ -289,73 +402,66 @@ Expected: all four PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/translate.ts scripts/translate_test.ts
-git commit -m "Add parseTranscript with header/body extraction and language guard"
+git add deno.json scripts/translate.py scripts/translate_test.py
+git commit -m "Add parse_transcript with header/body extraction and language guard"
 ```
 
 ---
 
-## Task 3: Paragraph chunking utilities + tests
+## Task 3: Paragraph chunking helpers + tests
 
 **Files:**
-- Modify: `scripts/translate.ts` (add `splitParagraphs`, `splitSpeakerPrefix`, `countCompletedParagraphs`)
-- Modify: `scripts/translate_test.ts` (append tests)
-
-These three functions are all small, related, and share test fixtures, so they go in one task.
+- Modify: `scripts/translate.py` (add `split_paragraphs`, `split_speaker_prefix`, `count_completed_paragraphs`)
+- Modify: `scripts/translate_test.py` (append tests)
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `scripts/translate_test.ts`:
+Append to `scripts/translate_test.py`:
 
-```typescript
-import {
-  splitParagraphs,
-  splitSpeakerPrefix,
-  countCompletedParagraphs,
-} from "./translate.ts";
+```python
+from translate import (
+    split_paragraphs,
+    split_speaker_prefix,
+    count_completed_paragraphs,
+)
 
-Deno.test("splitParagraphs: YouTube paragraphs on single blank lines", () => {
-  const body = "Para one.\n\nPara two.\n\nPara three.\n";
-  assertEquals(splitParagraphs(body), ["Para one.", "Para two.", "Para three."]);
-});
 
-Deno.test("splitParagraphs: collapses multiple consecutive blank lines", () => {
-  const body = "First.\n\n\n\nSecond.\n";
-  assertEquals(splitParagraphs(body), ["First.", "Second."]);
-});
+def test_split_paragraphs_youtube_style():
+    body = "Para one.\n\nPara two.\n\nPara three.\n"
+    assert split_paragraphs(body) == ["Para one.", "Para two.", "Para three."]
 
-Deno.test("splitParagraphs: empty body returns empty list", () => {
-  assertEquals(splitParagraphs(""), []);
-  assertEquals(splitParagraphs("\n\n\n"), []);
-});
 
-Deno.test("splitParagraphs: trims whitespace per paragraph", () => {
-  assertEquals(splitParagraphs("  hello  \n\n  world  \n"), ["hello", "world"]);
-});
+def test_split_paragraphs_collapses_multiple_blank_lines():
+    body = "First.\n\n\n\nSecond.\n"
+    assert split_paragraphs(body) == ["First.", "Second."]
 
-Deno.test("splitSpeakerPrefix: extracts Sarvam speaker prefix", () => {
-  assertEquals(
-    splitSpeakerPrefix("[Speaker 1]: ഇത് ഒരു വാചകം."),
-    { prefix: "[Speaker 1]: ", text: "ഇത് ഒരു വാചകം." },
-  );
-});
 
-Deno.test("splitSpeakerPrefix: handles two-digit speaker numbers", () => {
-  assertEquals(
-    splitSpeakerPrefix("[Speaker 12]: hello"),
-    { prefix: "[Speaker 12]: ", text: "hello" },
-  );
-});
+def test_split_paragraphs_empty_body():
+    assert split_paragraphs("") == []
+    assert split_paragraphs("\n\n\n") == []
 
-Deno.test("splitSpeakerPrefix: no prefix returns empty prefix", () => {
-  assertEquals(
-    splitSpeakerPrefix("Plain paragraph text."),
-    { prefix: "", text: "Plain paragraph text." },
-  );
-});
 
-Deno.test("countCompletedParagraphs: counts paragraphs in partial body", () => {
-  const partial = `Source: ...
+def test_split_paragraphs_trims_whitespace():
+    assert split_paragraphs("  hello  \n\n  world  \n") == ["hello", "world"]
+
+
+def test_split_speaker_prefix_extracts_sarvam_prefix():
+    assert split_speaker_prefix("[Speaker 1]: ഇത് ഒരു വാചകം.") == (
+        "[Speaker 1]: ",
+        "ഇത് ഒരു വാചകം.",
+    )
+
+
+def test_split_speaker_prefix_two_digit_number():
+    assert split_speaker_prefix("[Speaker 12]: hello") == ("[Speaker 12]: ", "hello")
+
+
+def test_split_speaker_prefix_no_prefix():
+    assert split_speaker_prefix("Plain paragraph text.") == ("", "Plain paragraph text.")
+
+
+def test_count_completed_paragraphs_counts_body_paragraphs():
+    partial = """Source: ...
 Language: en (translated from ml)
 
 ---
@@ -363,434 +469,165 @@ Language: en (translated from ml)
 First translated.
 
 Second translated.
-`;
-  assertEquals(countCompletedParagraphs(partial), 2);
-});
+"""
+    assert count_completed_paragraphs(partial) == 2
 
-Deno.test("countCompletedParagraphs: empty body returns 0", () => {
-  const partial = `Source: ...
+
+def test_count_completed_paragraphs_empty_body():
+    partial = """Source: ...
 
 ---
 
-`;
-  assertEquals(countCompletedParagraphs(partial), 0);
-});
+"""
+    assert count_completed_paragraphs(partial) == 0
 
-Deno.test("countCompletedParagraphs: partial without --- returns 0", () => {
-  assertEquals(countCompletedParagraphs("just some text no separator"), 0);
-});
+
+def test_count_completed_paragraphs_no_separator():
+    assert count_completed_paragraphs("just some text no separator") == 0
 ```
 
 - [ ] **Step 2: Run tests, verify they fail**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
-Expected: the new tests FAIL (functions not exported). Tests from Task 2 still PASS.
+Expected: the new tests FAIL (`ImportError` for the three new names). Tests from Task 2 still PASS.
 
 - [ ] **Step 3: Implement the three functions**
 
-Add to `scripts/translate.ts`, above `if (import.meta.main)`:
+Add to `scripts/translate.py`, above `def main()`:
 
-```typescript
-export function splitParagraphs(body: string): string[] {
-  return body
-    .split(/(?:\r?\n)\s*(?:\r?\n)+/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-}
+```python
+_PARAGRAPH_SEP_RE = re.compile(r"(?:\r?\n)\s*(?:\r?\n)+")
+_SPEAKER_PREFIX_RE = re.compile(r"^(\[Speaker \d+\]: )(.*)$", re.DOTALL)
 
-const SPEAKER_PREFIX_RE = /^(\[Speaker \d+\]: )([\s\S]*)$/;
 
-export function splitSpeakerPrefix(paragraph: string): { prefix: string; text: string } {
-  const m = paragraph.match(SPEAKER_PREFIX_RE);
-  if (!m) return { prefix: "", text: paragraph };
-  return { prefix: m[1], text: m[2] };
-}
+def split_paragraphs(body: str) -> list[str]:
+    parts = _PARAGRAPH_SEP_RE.split(body)
+    return [p.strip() for p in parts if p.strip()]
 
-export function countCompletedParagraphs(partialContent: string): number {
-  const sep = partialContent.match(/^---\s*$/m);
-  if (!sep || sep.index === undefined) return 0;
-  const body = partialContent.slice(sep.index + sep[0].length);
-  return splitParagraphs(body).length;
-}
+
+def split_speaker_prefix(paragraph: str) -> tuple[str, str]:
+    m = _SPEAKER_PREFIX_RE.match(paragraph)
+    if not m:
+        return ("", paragraph)
+    return (m.group(1), m.group(2))
+
+
+def count_completed_paragraphs(partial_content: str) -> int:
+    sep = _SEPARATOR_RE.search(partial_content)
+    if sep is None:
+        return 0
+    body = partial_content[sep.end():]
+    return len(split_paragraphs(body))
 ```
 
 - [ ] **Step 4: Run tests, verify they pass**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
-Expected: all tests PASS (Tasks 2 + 3 combined).
+Expected: all tests PASS (Tasks 2 + 3 combined, 14 tests total).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/translate.ts scripts/translate_test.ts
+git add scripts/translate.py scripts/translate_test.py
 git commit -m "Add paragraph chunking and resume-count helpers"
 ```
 
 ---
 
-## Task 4: Output header builder + tests
+## Task 4: `build_output_header` + tests
 
 **Files:**
-- Modify: `scripts/translate.ts` (add `buildOutputHeader`)
-- Modify: `scripts/translate_test.ts` (append tests)
+- Modify: `scripts/translate.py` (add `build_output_header` and `MODEL_LABEL` constant)
+- Modify: `scripts/translate_test.py` (append tests)
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `scripts/translate_test.ts`:
+Append to `scripts/translate_test.py`:
 
-```typescript
-import { buildOutputHeader } from "./translate.ts";
+```python
+from translate import build_output_header, TranscriptHeader, MODEL_LABEL
 
-Deno.test("buildOutputHeader: builds English-side header preserving source fields", () => {
-  const input: import("./translate.ts").ParsedTranscript["header"] = {
-    source: "https://www.youtube.com/watch?v=5MVkCqd2U10",
-    videoId: "5MVkCqd2U10",
-    title: "Kerala CM press meet",
-    language: "ml (Malayalam)",
-    fetched: "2026-05-18T12:34:56Z",
-    method: "timedtext",
-  };
-  const out = buildOutputHeader(input, {
-    model: "aya-expanse:8b",
-    translatedAt: "2026-05-19T09:12:34Z",
-  });
-  assertEquals(
-    out,
-    `Source: https://www.youtube.com/watch?v=5MVkCqd2U10
-Video ID: 5MVkCqd2U10
-Title: Kerala CM press meet
-Language: en (translated from ml)
-Fetched: 2026-05-18T12:34:56Z
-Source method: timedtext
-Translation: aya-expanse:8b via Ollama (local)
-Translated: 2026-05-19T09:12:34Z`,
-  );
-});
 
-Deno.test("buildOutputHeader: omits missing optional fields", () => {
-  const out = buildOutputHeader(
-    { language: "ml (Malayalam)" },
-    { model: "aya-expanse:8b", translatedAt: "2026-05-19T09:12:34Z" },
-  );
-  // Source, Video ID, Title, Fetched, Source method lines all absent
-  assertEquals(
-    out,
-    `Language: en (translated from ml)
-Translation: aya-expanse:8b via Ollama (local)
-Translated: 2026-05-19T09:12:34Z`,
-  );
-});
-```
-
-- [ ] **Step 2: Run tests, verify they fail**
-
-```bash
-deno test scripts/translate_test.ts
-```
-
-Expected: the two new tests FAIL (`buildOutputHeader` not exported).
-
-- [ ] **Step 3: Implement `buildOutputHeader`**
-
-Add to `scripts/translate.ts`, above `if (import.meta.main)`:
-
-```typescript
-export function buildOutputHeader(
-  input: ParsedTranscript["header"],
-  opts: { model: string; translatedAt: string },
-): string {
-  const lines: string[] = [];
-  if (input.source) lines.push(`Source: ${input.source}`);
-  if (input.videoId) lines.push(`Video ID: ${input.videoId}`);
-  if (input.title) lines.push(`Title: ${input.title}`);
-  lines.push(`Language: en (translated from ml)`);
-  if (input.fetched) lines.push(`Fetched: ${input.fetched}`);
-  if (input.method) lines.push(`Source method: ${input.method}`);
-  lines.push(`Translation: ${opts.model} via Ollama (local)`);
-  lines.push(`Translated: ${opts.translatedAt}`);
-  return lines.join("\n");
-}
-```
-
-- [ ] **Step 4: Run tests, verify they pass**
-
-```bash
-deno test scripts/translate_test.ts
-```
-
-Expected: all tests PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add scripts/translate.ts scripts/translate_test.ts
-git commit -m "Add buildOutputHeader for English transcript header"
-```
-
----
-
-## Task 5: Ollama pre-flight (`checkOllama`) + mocked tests
-
-**Files:**
-- Modify: `scripts/translate.ts` (add `checkOllama` and a `FetchFn` type)
-- Modify: `scripts/translate_test.ts` (append mocked-fetch tests)
-
-`checkOllama` verifies the daemon is reachable and the requested model is pulled. It takes a `fetch`-compatible function as a parameter so tests can swap in a mock.
-
-- [ ] **Step 1: Write the failing tests**
-
-Append to `scripts/translate_test.ts`:
-
-```typescript
-import { checkOllama } from "./translate.ts";
-
-function mockFetch(
-  handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
-): typeof fetch {
-  return ((input: Request | URL | string, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
-    return Promise.resolve(handler(url, init));
-  }) as typeof fetch;
-}
-
-Deno.test("checkOllama: passes when model is present in /api/tags", async () => {
-  const fetchFn = mockFetch((url) => {
-    assertEquals(url, "http://localhost:11434/api/tags");
-    return new Response(
-      JSON.stringify({ models: [{ name: "aya-expanse:8b" }, { name: "llama3.2:1b" }] }),
-      { status: 200 },
-    );
-  });
-  // Should not throw
-  await checkOllama("aya-expanse:8b", fetchFn);
-});
-
-Deno.test("checkOllama: throws when daemon refuses connection", async () => {
-  const fetchFn = mockFetch(() => {
-    throw new TypeError("error sending request: connection refused");
-  });
-  let err: Error | undefined;
-  try {
-    await checkOllama("aya-expanse:8b", fetchFn);
-  } catch (e) {
-    err = e as Error;
-  }
-  assertEquals(err?.message.includes("Ollama isn't running"), true);
-});
-
-Deno.test("checkOllama: throws when model is not pulled", async () => {
-  const fetchFn = mockFetch(() =>
-    new Response(JSON.stringify({ models: [{ name: "llama3.2:1b" }] }), { status: 200 })
-  );
-  let err: Error | undefined;
-  try {
-    await checkOllama("aya-expanse:8b", fetchFn);
-  } catch (e) {
-    err = e as Error;
-  }
-  assertEquals(err?.message.includes("ollama pull aya-expanse:8b"), true);
-});
-```
-
-- [ ] **Step 2: Run tests, verify they fail**
-
-```bash
-deno test scripts/translate_test.ts
-```
-
-Expected: the three new tests FAIL (`checkOllama` not exported).
-
-- [ ] **Step 3: Implement `checkOllama`**
-
-Add to `scripts/translate.ts`, above `if (import.meta.main)`:
-
-```typescript
-export type FetchFn = typeof fetch;
-
-const OLLAMA_BASE = "http://localhost:11434";
-
-export async function checkOllama(model: string, fetchFn: FetchFn = fetch): Promise<void> {
-  let resp: Response;
-  try {
-    resp = await fetchFn(`${OLLAMA_BASE}/api/tags`);
-  } catch (_e) {
-    throw new Error(
-      "Ollama isn't running. Start with `ollama serve` or open the Ollama app.",
-    );
-  }
-  if (!resp.ok) {
-    throw new Error(
-      `Ollama /api/tags returned HTTP ${resp.status}. Is the daemon healthy?`,
-    );
-  }
-  const data = await resp.json() as { models?: Array<{ name: string }> };
-  const pulled = (data.models ?? []).map((m) => m.name);
-  if (!pulled.includes(model)) {
-    throw new Error(`Run \`ollama pull ${model}\` (~5GB).`);
-  }
-}
-```
-
-- [ ] **Step 4: Run tests, verify they pass**
-
-```bash
-deno test scripts/translate_test.ts
-```
-
-Expected: all tests PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add scripts/translate.ts scripts/translate_test.ts
-git commit -m "Add checkOllama pre-flight with mocked-fetch tests"
-```
-
----
-
-## Task 6: Ollama HTTP translator (`translateParagraph`) + mocked tests
-
-**Files:**
-- Modify: `scripts/translate.ts` (add `TRANSLATE_SYSTEM_PROMPT` and `translateParagraph`)
-- Modify: `scripts/translate_test.ts` (append mocked-fetch tests)
-
-- [ ] **Step 1: Write the failing tests**
-
-Append to `scripts/translate_test.ts`:
-
-```typescript
-import { translateParagraph } from "./translate.ts";
-
-Deno.test("translateParagraph: sends correct payload and returns response text", async () => {
-  let capturedBody: unknown;
-  const fetchFn = mockFetch((url, init) => {
-    assertEquals(url, "http://localhost:11434/api/generate");
-    capturedBody = JSON.parse(init!.body as string);
-    return new Response(
-      JSON.stringify({ response: "Hello, how are you?", done: true }),
-      { status: 200 },
-    );
-  });
-  const out = await translateParagraph("നമസ്കാരം, എങ്ങനെയുണ്ട്?", "aya-expanse:8b", fetchFn);
-  assertEquals(out, "Hello, how are you?");
-  assertEquals((capturedBody as { model: string }).model, "aya-expanse:8b");
-  assertEquals((capturedBody as { prompt: string }).prompt, "നമസ്കാരം, എങ്ങനെയുണ്ട്?");
-  assertEquals((capturedBody as { stream: boolean }).stream, false);
-  assertEquals(
-    (capturedBody as { options: { temperature: number } }).options.temperature,
-    0.2,
-  );
-});
-
-Deno.test("translateParagraph: throws on HTTP error", async () => {
-  const fetchFn = mockFetch(() => new Response("internal err", { status: 500 }));
-  let err: Error | undefined;
-  try {
-    await translateParagraph("hello", "aya-expanse:8b", fetchFn);
-  } catch (e) {
-    err = e as Error;
-  }
-  assertEquals(err?.message.includes("Ollama returned HTTP 500"), true);
-});
-
-Deno.test("translateParagraph: throws on empty response", async () => {
-  const fetchFn = mockFetch(() =>
-    new Response(JSON.stringify({ response: "   \n\t", done: true }), { status: 200 })
-  );
-  let err: Error | undefined;
-  try {
-    await translateParagraph("hello", "aya-expanse:8b", fetchFn);
-  } catch (e) {
-    err = e as Error;
-  }
-  assertEquals(err?.message.includes("empty translation"), true);
-});
-
-Deno.test("translateParagraph: trims whitespace from response", async () => {
-  const fetchFn = mockFetch(() =>
-    new Response(
-      JSON.stringify({ response: "  Hello.\n", done: true }),
-      { status: 200 },
+def test_build_output_header_preserves_source_fields():
+    header = TranscriptHeader(
+        source="https://www.youtube.com/watch?v=5MVkCqd2U10",
+        video_id="5MVkCqd2U10",
+        title="Kerala CM press meet",
+        language="ml (Malayalam)",
+        fetched="2026-05-18T12:34:56Z",
+        method="timedtext",
     )
-  );
-  const out = await translateParagraph("hello", "aya-expanse:8b", fetchFn);
-  assertEquals(out, "Hello.");
-});
-
-Deno.test("translateParagraph: collapses internal blank lines (so resume math stays correct)", async () => {
-  const fetchFn = mockFetch(() =>
-    new Response(
-      JSON.stringify({ response: "Line one.\n\nLine two.\n\n\nLine three.", done: true }),
-      { status: 200 },
+    out = build_output_header(header, translated_at="2026-05-19T09:12:34Z")
+    assert out == (
+        "Source: https://www.youtube.com/watch?v=5MVkCqd2U10\n"
+        "Video ID: 5MVkCqd2U10\n"
+        "Title: Kerala CM press meet\n"
+        "Language: en (translated from ml)\n"
+        "Fetched: 2026-05-18T12:34:56Z\n"
+        "Source method: timedtext\n"
+        f"Translation: {MODEL_LABEL}\n"
+        "Translated: 2026-05-19T09:12:34Z"
     )
-  );
-  const out = await translateParagraph("hello", "aya-expanse:8b", fetchFn);
-  // Internal \n\n collapsed to single \n so the paragraph remains ONE paragraph
-  // when re-split by splitParagraphs during resume.
-  assertEquals(out, "Line one.\nLine two.\nLine three.");
-});
+
+
+def test_build_output_header_omits_missing_optionals():
+    header = TranscriptHeader(language="ml (Malayalam)")
+    out = build_output_header(header, translated_at="2026-05-19T09:12:34Z")
+    assert out == (
+        "Language: en (translated from ml)\n"
+        f"Translation: {MODEL_LABEL}\n"
+        "Translated: 2026-05-19T09:12:34Z"
+    )
+
+
+def test_model_label_identifies_indictrans2():
+    assert "indictrans2" in MODEL_LABEL.lower()
 ```
 
 - [ ] **Step 2: Run tests, verify they fail**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
-Expected: the four new tests FAIL (`translateParagraph` not exported).
+Expected: the three new tests FAIL.
 
-- [ ] **Step 3: Implement `translateParagraph`**
+- [ ] **Step 3: Implement `build_output_header` and `MODEL_LABEL`**
 
-Add to `scripts/translate.ts`, above `if (import.meta.main)`:
+Add to `scripts/translate.py`, above `def main()`:
 
-```typescript
-export const TRANSLATE_SYSTEM_PROMPT =
-  "You are a precise translator. Translate the user's Malayalam text to natural, " +
-  "fluent English. Preserve meaning, names, numbers, and dates exactly. Output ONLY " +
-  "the English translation — no preamble, no explanation, no quotation marks.";
+```python
+MODEL_LABEL = "ai4bharat/indictrans2-indic-en-dist-200M (local CPU)"
 
-export async function translateParagraph(
-  malayalam: string,
-  model: string,
-  fetchFn: FetchFn = fetch,
-): Promise<string> {
-  const resp = await fetchFn(`${OLLAMA_BASE}/api/generate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      model,
-      system: TRANSLATE_SYSTEM_PROMPT,
-      prompt: malayalam,
-      stream: false,
-      options: { temperature: 0.2 },
-    }),
-  });
-  if (!resp.ok) {
-    const errBody = await resp.text();
-    throw new Error(`Ollama returned HTTP ${resp.status}: ${errBody.slice(0, 200)}`);
-  }
-  const data = await resp.json() as { response?: string };
-  // Collapse any internal blank lines so the result is always exactly ONE
-  // paragraph in the output file. This keeps countCompletedParagraphs in
-  // sync with the translation loop's position when resuming.
-  const text = (data.response ?? "").trim().replace(/\n\s*\n+/g, "\n");
-  if (text.length === 0) {
-    throw new Error("Ollama returned an empty translation");
-  }
-  return text;
-}
+
+def build_output_header(header: TranscriptHeader, translated_at: str) -> str:
+    lines: list[str] = []
+    if header.source:
+        lines.append(f"Source: {header.source}")
+    if header.video_id:
+        lines.append(f"Video ID: {header.video_id}")
+    if header.title:
+        lines.append(f"Title: {header.title}")
+    lines.append("Language: en (translated from ml)")
+    if header.fetched:
+        lines.append(f"Fetched: {header.fetched}")
+    if header.method:
+        lines.append(f"Source method: {header.method}")
+    lines.append(f"Translation: {MODEL_LABEL}")
+    lines.append(f"Translated: {translated_at}")
+    return "\n".join(lines)
 ```
 
 - [ ] **Step 4: Run tests, verify they pass**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
 Expected: all tests PASS.
@@ -798,232 +635,398 @@ Expected: all tests PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/translate.ts scripts/translate_test.ts
-git commit -m "Add translateParagraph Ollama HTTP client with mocked tests"
+git add scripts/translate.py scripts/translate_test.py
+git commit -m "Add build_output_header for English transcript header"
 ```
 
 ---
 
-## Task 7: CLI orchestrator + arg parsing
+## Task 5: `Translator` wrapper + `translate_paragraph` + fake-translator tests
 
 **Files:**
-- Modify: `scripts/translate.ts` (replace the `if (import.meta.main)` stub with the full main function)
+- Modify: `scripts/translate.py` (add `Translator` class and `translate_paragraph` function)
+- Modify: `scripts/translate_test.py` (append tests using a `FakeTranslator`)
 
-This task wires the pieces together: argument parsing, file IO, pre-flight, the translation loop, progress output, resume logic, and exit-code mapping. It is the only task without unit tests — the end-to-end smoke test in Task 8 covers it.
+This task introduces the IndicTrans2 wrapper. The class is structured so the heavy model load is deferred to `load()`, and the per-paragraph translation logic (including the blank-line collapse fix) is a separate pure-ish function that takes any object with a `.translate(str) -> str` method — so it can be unit-tested with a fake.
 
-- [ ] **Step 1: Replace the `import.meta.main` block with the full main function**
+- [ ] **Step 1: Write the failing tests**
 
-In `scripts/translate.ts`, replace:
+Append to `scripts/translate_test.py`:
 
-```typescript
-if (import.meta.main) {
-  console.error("scripts/translate.ts: not implemented yet");
-  Deno.exit(1);
-}
+```python
+from translate import translate_paragraph
+
+
+class FakeTranslator:
+    def __init__(self, output: str):
+        self._output = output
+        self.calls: list[str] = []
+
+    def translate(self, text: str) -> str:
+        self.calls.append(text)
+        return self._output
+
+
+def test_translate_paragraph_strips_whitespace():
+    fake = FakeTranslator(output="  Hello.\n")
+    assert translate_paragraph("hello", fake) == "Hello."
+
+
+def test_translate_paragraph_collapses_internal_blank_lines():
+    # Critical for resume math: every translated paragraph must remain
+    # exactly ONE paragraph when re-split by split_paragraphs.
+    fake = FakeTranslator(output="Line one.\n\nLine two.\n\n\nLine three.")
+    assert translate_paragraph("x", fake) == "Line one.\nLine two.\nLine three."
+
+
+def test_translate_paragraph_raises_on_empty_output():
+    fake = FakeTranslator(output="   \n\t")
+    with pytest.raises(ValueError, match="empty translation"):
+        translate_paragraph("hello", fake)
+
+
+def test_translate_paragraph_passes_input_through_to_translator():
+    fake = FakeTranslator(output="english")
+    translate_paragraph("malayalam input", fake)
+    assert fake.calls == ["malayalam input"]
+```
+
+- [ ] **Step 2: Run tests, verify they fail**
+
+```bash
+deno task translate:test
+```
+
+Expected: the four new tests FAIL.
+
+- [ ] **Step 3: Implement `Translator` and `translate_paragraph`**
+
+First, add `Protocol` to the existing `typing`-area imports at the top of `scripts/translate.py`. The file's import block should now look like:
+
+```python
+from __future__ import annotations
+
+import re
+import sys
+from dataclasses import dataclass, field
+from typing import Protocol
+```
+
+Then add to `scripts/translate.py`, above `def main()`:
+
+```python
+MODEL_ID = "ai4bharat/indictrans2-indic-en-dist-200M"
+_BLANK_LINE_RE = re.compile(r"\n\s*\n+")
+
+
+class _TranslatorProtocol(Protocol):
+    def translate(self, text: str) -> str: ...
+
+
+class Translator:
+    """Lazy wrapper around IndicTrans2 (loaded on first .load() call)."""
+
+    def __init__(self) -> None:
+        self._loaded = False
+        self._tokenizer = None
+        self._model = None
+        self._processor = None
+
+    def load(self) -> None:
+        if self._loaded:
+            return
+        # Imports are deferred so importing this module from tests does not
+        # require transformers/torch to be installed.
+        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+        from IndicTransToolkit.processor import IndicProcessor
+
+        self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+        self._model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, trust_remote_code=True)
+        self._processor = IndicProcessor(inference=True)
+        self._loaded = True
+
+    def translate(self, text: str) -> str:
+        if not self._loaded:
+            raise RuntimeError("Translator.load() must be called before translate()")
+        import torch
+
+        batch = self._processor.preprocess_batch(
+            [text], src_lang="mal_Mlym", tgt_lang="eng_Latn"
+        )
+        enc = self._tokenizer(
+            batch,
+            return_tensors="pt",
+            padding="longest",
+            truncation=True,
+            max_length=256,
+        )
+        with torch.no_grad():
+            out = self._model.generate(**enc, num_beams=5, max_length=256)
+        decoded = self._tokenizer.batch_decode(
+            out, skip_special_tokens=True, clean_up_tokenization_spaces=True
+        )
+        return self._processor.postprocess_batch(decoded, lang="eng_Latn")[0]
+
+
+def translate_paragraph(text: str, translator: _TranslatorProtocol) -> str:
+    raw = translator.translate(text)
+    # Collapse any internal blank lines so the result is always exactly ONE
+    # paragraph in the output file. This keeps count_completed_paragraphs in
+    # sync with the translation loop's position when resuming.
+    collapsed = _BLANK_LINE_RE.sub("\n", raw.strip())
+    if not collapsed:
+        raise ValueError("empty translation")
+    return collapsed
+```
+
+- [ ] **Step 4: Run tests, verify they pass**
+
+```bash
+deno task translate:test
+```
+
+Expected: all tests PASS.
+
+Note: the `Translator` class itself is NOT unit-tested — its real behavior depends on the model. The end-to-end smoke test (Task 7) exercises it.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add scripts/translate.py scripts/translate_test.py
+git commit -m "Add Translator wrapper and translate_paragraph with blank-line collapse"
+```
+
+---
+
+## Task 6: CLI orchestrator (`main`)
+
+**Files:**
+- Modify: `scripts/translate.py` (replace the `main` stub with the full orchestrator)
+
+This task wires everything: arg parsing, file IO, model load with timing, the translation loop with progress and resume, exit-code mapping. Not unit-tested — the end-to-end smoke test in Task 7 covers it.
+
+- [ ] **Step 1: Add the new top-level imports**
+
+Extend the file's import block at the top of `scripts/translate.py`. After Task 5, the imports look like:
+
+```python
+from __future__ import annotations
+
+import re
+import sys
+from dataclasses import dataclass, field
+from typing import Protocol
+```
+
+Change them to:
+
+```python
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Protocol
+```
+
+- [ ] **Step 2: Replace the `main` stub with the full orchestrator**
+
+In `scripts/translate.py`, replace:
+
+```python
+def main() -> int:
+    print("scripts/translate.py: not implemented yet", file=sys.stderr)
+    return 1
 ```
 
 with:
 
-```typescript
-import { parseArgs } from "jsr:@std/cli@^1/parse-args";
-import { basename, dirname, join } from "jsr:@std/path@^1";
+```python
+def _die(code: int, message: str) -> int:
+    print(message, file=sys.stderr)
+    return code
 
-const DEFAULT_MODEL = "aya-expanse:8b";
 
-function die(code: number, message: string): never {
-  console.error(message);
-  Deno.exit(code);
-}
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="translate",
+        description="Translate a Malayalam transcript (.ml.txt) to English (.en.txt).",
+    )
+    parser.add_argument("input", help="Path to the Malayalam transcript file.")
+    parser.add_argument("--out", help="Output directory (defaults to input's directory).")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing .en.txt and ignore any stale .partial.",
+    )
+    args = parser.parse_args(argv)
 
-async function main(): Promise<void> {
-  const args = parseArgs(Deno.args, {
-    string: ["model", "out"],
-    boolean: ["force", "help"],
-    alias: { h: "help" },
-    default: { model: DEFAULT_MODEL },
-  });
+    input_path = Path(args.input)
+    out_dir = Path(args.out) if args.out else input_path.parent
+    force = args.force
 
-  if (args.help || args._.length === 0) {
-    console.log(
-      "Usage: deno task translate <file.ml.txt> [--model <tag>] [--out <dir>] [--force]",
-    );
-    Deno.exit(args.help ? 0 : 2);
-  }
+    if not input_path.is_file():
+        return _die(2, f"Input file not found: {input_path}")
 
-  const inputPath = String(args._[0]);
-  const model = args.model as string;
-  const outDir = (args.out as string | undefined) ?? dirname(inputPath);
-  const force = Boolean(args.force);
+    try:
+        raw = input_path.read_text(encoding="utf-8")
+    except OSError as e:
+        return _die(2, f"Could not read {input_path}: {e}")
 
-  // Read input
-  let raw: string;
-  try {
-    raw = await Deno.readTextFile(inputPath);
-  } catch {
-    die(2, `Input file not found: ${inputPath}`);
-  }
+    try:
+        parsed = parse_transcript(raw)
+    except ValueError as e:
+        return _die(2, str(e))
 
-  // Parse + validate
-  let parsed: ParsedTranscript;
-  try {
-    parsed = parseTranscript(raw);
-  } catch (e) {
-    die(2, (e as Error).message);
-  }
+    base_name = input_path.name
+    if base_name.endswith(".ml.txt"):
+        base_name = base_name[: -len(".ml.txt")]
+    out_path = out_dir / f"{base_name}.en.txt"
+    partial_path = out_dir.joinpath(f"{base_name}.en.txt.partial")
 
-  // Output paths
-  const baseName = basename(inputPath).replace(/\.ml\.txt$/, "");
-  const outPath = join(outDir, `${baseName}.en.txt`);
-  const partialPath = `${outPath}.partial`;
+    if out_path.exists():
+        if not force:
+            return _die(7, f"Output exists: {out_path}. Pass --force to overwrite.")
+        out_path.unlink()
 
-  // Existing-output guard
-  try {
-    await Deno.stat(outPath);
-    if (!force) {
-      die(7, `Output exists: ${outPath}. Pass --force to overwrite.`);
-    }
-    await Deno.remove(outPath);
-  } catch (e) {
-    if (!(e instanceof Deno.errors.NotFound)) throw e;
-  }
+    paragraphs = split_paragraphs(parsed.body)
+    if not paragraphs:
+        return _die(2, "Input transcript body is empty — nothing to translate.")
 
-  // Pre-flight Ollama
-  try {
-    await checkOllama(model);
-  } catch (e) {
-    const msg = (e as Error).message;
-    if (msg.includes("Ollama isn't running")) die(3, msg);
-    if (msg.includes("ollama pull")) die(4, msg);
-    die(5, msg);
-  }
+    resume_from = 0
+    if not force and partial_path.exists():
+        partial_content = partial_path.read_text(encoding="utf-8")
+        resume_from = count_completed_paragraphs(partial_content)
+        if resume_from > len(paragraphs):
+            return _die(
+                8,
+                f"Partial file has {resume_from} paragraphs but input has {len(paragraphs)}; "
+                "pass --force to start over.",
+            )
+    elif force and partial_path.exists():
+        partial_path.unlink()
 
-  // Chunk
-  const paragraphs = splitParagraphs(parsed.body);
-  if (paragraphs.length === 0) {
-    die(2, "Input transcript body is empty — nothing to translate.");
-  }
+    # Seed the .partial with the header if we're starting fresh.
+    if resume_from == 0:
+        translated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        header = build_output_header(parsed.header, translated_at=translated_at)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        partial_path.write_text(f"{header}\n\n---\n\n", encoding="utf-8")
+    else:
+        print(
+            f"Resuming from paragraph {resume_from + 1}/{len(paragraphs)} "
+            f"(using existing {partial_path})"
+        )
 
-  // Resume detection
-  let resumeFrom = 0;
-  let partialContent = "";
-  if (!force) {
-    try {
-      partialContent = await Deno.readTextFile(partialPath);
-      resumeFrom = countCompletedParagraphs(partialContent);
-      if (resumeFrom > paragraphs.length) {
-        die(
-          8,
-          `Partial file has ${resumeFrom} paragraphs but input has ${paragraphs.length}; pass --force to start over.`,
-        );
-      }
-    } catch (e) {
-      if (!(e instanceof Deno.errors.NotFound)) throw e;
-    }
-  } else {
-    try {
-      await Deno.remove(partialPath);
-    } catch (e) {
-      if (!(e instanceof Deno.errors.NotFound)) throw e;
-    }
-  }
+    # Load the model.
+    print(f"Loading IndicTrans2 ({MODEL_ID})...", flush=True)
+    t0 = time.time()
+    translator = Translator()
+    try:
+        translator.load()
+    except Exception as e:  # noqa: BLE001
+        return _die(
+            4,
+            f"first-run model download (~800 MB) failed: {e}\n"
+            "Check network connectivity and retry. Model weights cache under "
+            "~/.cache/huggingface/.",
+        )
+    print(f"  done in {time.time() - t0:.1f}s", flush=True)
 
-  // If no partial yet, seed it with the header
-  if (resumeFrom === 0) {
-    const header = buildOutputHeader(parsed.header, {
-      model,
-      translatedAt: new Date().toISOString(),
-    });
-    await Deno.writeTextFile(partialPath, `${header}\n\n---\n\n`);
-  } else {
-    console.log(`Resuming from paragraph ${resumeFrom + 1}/${paragraphs.length} (using existing ${partialPath})`);
-  }
+    # Translation loop.
+    started = time.time()
+    for i in range(resume_from, len(paragraphs)):
+        prefix, text = split_speaker_prefix(paragraphs[i])
+        try:
+            translated = translate_paragraph(text, translator)
+        except ValueError as e:
+            # Empty translation
+            print(
+                f"Paragraph {i + 1}/{len(paragraphs)} failed: {e}\n"
+                f"  input: {text[:200]}{'…' if len(text) > 200 else ''}\n"
+                f"Partial file preserved at: {partial_path}",
+                file=sys.stderr,
+            )
+            return 6
+        except Exception as e:  # noqa: BLE001
+            print(
+                f"Paragraph {i + 1}/{len(paragraphs)} failed with model error: {e}\n"
+                f"  input: {text[:200]}{'…' if len(text) > 200 else ''}\n"
+                f"Partial file preserved at: {partial_path}",
+                file=sys.stderr,
+            )
+            return 5
+        with partial_path.open("a", encoding="utf-8") as f:
+            f.write(f"{prefix}{translated}\n\n")
+        print(f"[{i + 1}/{len(paragraphs)}] ✓", flush=True)
 
-  // Translation loop
-  const started = Date.now();
-  for (let i = resumeFrom; i < paragraphs.length; i++) {
-    const { prefix, text } = splitSpeakerPrefix(paragraphs[i]);
-    let translated: string;
-    try {
-      translated = await translateParagraph(text, model);
-    } catch (e) {
-      const msg = (e as Error).message;
-      console.error(`Paragraph ${i + 1}/${paragraphs.length} failed:`);
-      console.error(`  input: ${text.slice(0, 200)}${text.length > 200 ? "…" : ""}`);
-      console.error(`  error: ${msg}`);
-      console.error(`Partial file preserved at: ${partialPath}`);
-      if (msg.includes("empty translation")) Deno.exit(6);
-      Deno.exit(5);
-    }
-    await Deno.writeTextFile(partialPath, `${prefix}${translated}\n\n`, { append: true });
-    console.log(`[${i + 1}/${paragraphs.length}] ✓`);
-  }
+    # Finalize.
+    partial_path.rename(out_path)
+    elapsed = int(time.time() - started)
+    mins, secs = divmod(elapsed, 60)
+    print(f"Done. Wrote {out_path} ({len(paragraphs)} paragraphs, {mins}m{secs}s).")
+    return 0
 
-  // Finalize
-  await Deno.rename(partialPath, outPath);
-  const elapsed = Math.round((Date.now() - started) / 1000);
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  console.log(
-    `Done. Wrote ${outPath} (${paragraphs.length} paragraphs, ${mins}m${secs}s).`,
-  );
-}
 
-if (import.meta.main) {
-  await main();
-}
+if __name__ == "__main__":
+    sys.exit(main())
 ```
 
-- [ ] **Step 2: Type-check the script**
+The `if __name__ == "__main__"` block at the bottom of the file should already exist from Task 1 — leave it untouched.
+
+- [ ] **Step 3: Syntax check the script**
 
 ```bash
-deno check scripts/translate.ts
+uv run --no-project python -c "import ast; ast.parse(open('scripts/translate.py').read()); print('ok')"
 ```
 
-Expected: no errors.
+Expected: `ok`.
 
-- [ ] **Step 3: Confirm `--help` works**
+- [ ] **Step 4: Confirm `--help` works**
 
 ```bash
 deno task translate --help
 ```
 
-Expected: prints the usage line and exits 0.
+Expected: argparse-generated help text printed; exit code 0.
 
-- [ ] **Step 4: Confirm missing-arg behavior**
+- [ ] **Step 5: Confirm missing-arg behavior**
 
 ```bash
 deno task translate
 ```
 
-Expected: prints the usage line and exits 2.
+Expected: argparse error message about the required `input` argument; exit code 2.
 
-- [ ] **Step 5: Run the full test suite to confirm nothing regressed**
+- [ ] **Step 6: Run the full unit-test suite to confirm nothing regressed**
 
 ```bash
-deno test scripts/translate_test.ts
+deno task translate:test
 ```
 
 Expected: all tests still PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add scripts/translate.ts
-git commit -m "Wire translate.ts CLI: parsing, pre-flight, loop, resume"
+git add scripts/translate.py
+git commit -m "Wire translate.py CLI: parsing, model load, loop, resume"
 ```
 
 ---
 
-## Task 8: End-to-end smoke test against real Ollama
+## Task 7: End-to-end smoke test against the real model
 
-**Why this task is manual:** the unit tests cover every pure function and the HTTP layer with a mocked `fetch`. The remaining risk is integration — that the script reads a real file, talks to a real Ollama, produces a sensible English output file, and resumes correctly after a kill. This task walks through that by hand.
+**Why this task is manual:** the unit tests cover every pure function and the per-paragraph translation logic with a fake translator. The remaining risk is integration — that the script actually loads IndicTrans2, processes a real file, produces an English output, and resumes correctly after a kill. This walks through that by hand.
 
 **Files:**
 - Create (temporary, then delete): `data/transcripts/_smoke.ml.txt`
 
 - [ ] **Step 1: Create a tiny fixture transcript**
-
-Run:
 
 ```bash
 mkdir -p data/transcripts
@@ -1054,10 +1057,10 @@ deno task translate data/transcripts/_smoke.ml.txt
 ```
 
 Expected:
-- Progress output: `[1/4] ✓` through `[4/4] ✓`.
-- Final line: `Done. Wrote data/transcripts/_smoke.en.txt (4 paragraphs, ...).`
-- File exists: `ls -la data/transcripts/_smoke.en.txt`.
-- No `.partial` file remains: `ls data/transcripts/_smoke.en.txt.partial 2>&1` should say "No such file".
+- `Loading IndicTrans2 (...)...` followed by `done in <N>s`.
+- Progress: `[1/4] ✓` through `[4/4] ✓`.
+- Final: `Done. Wrote data/transcripts/_smoke.en.txt (4 paragraphs, ...)`.
+- No `.partial` file remains.
 
 - [ ] **Step 3: Inspect the English output**
 
@@ -1066,24 +1069,18 @@ cat data/transcripts/_smoke.en.txt
 ```
 
 Verify by eye:
-- Header has `Language: en (translated from ml)`, `Source method: smoke`, `Translation: aya-expanse:8b via Ollama (local)`, and a `Translated:` timestamp.
+- Header has `Language: en (translated from ml)`, `Source method: smoke`, `Translation: ai4bharat/indictrans2-indic-en-dist-200M (local CPU)`, and a `Translated:` timestamp.
 - Body has four paragraphs in English.
 - The last two paragraphs preserve the `[Speaker 1]:` / `[Speaker 2]:` prefixes verbatim.
-- Translations make sense (not gibberish, not Malayalam, not preambles like "Here is the translation:").
+- Translations are coherent English (not gibberish, not Malayalam left over, not preambles).
 
 - [ ] **Step 4: Test the existing-output guard**
 
 ```bash
-deno task translate data/transcripts/_smoke.ml.txt
+deno task translate data/transcripts/_smoke.ml.txt; echo "exit=$?"
 ```
 
-Expected: exits with `Output exists: data/transcripts/_smoke.en.txt. Pass --force to overwrite.` and exit code 7.
-
-```bash
-echo $?
-```
-
-Expected: `7`.
+Expected: prints `Output exists: data/transcripts/_smoke.en.txt. Pass --force to overwrite.`, then `exit=7`.
 
 - [ ] **Step 5: Test `--force` overwrites**
 
@@ -1091,7 +1088,7 @@ Expected: `7`.
 deno task translate data/transcripts/_smoke.ml.txt --force
 ```
 
-Expected: runs the full translation again, ends with `Done.`
+Expected: runs the full translation again, ends with `Done.`.
 
 - [ ] **Step 6: Test resume after kill**
 
@@ -1101,7 +1098,7 @@ In one terminal:
 deno task translate data/transcripts/_smoke.ml.txt --force
 ```
 
-After the first `[1/4] ✓` appears, hit `Ctrl+C`. Then check:
+Wait for the model load to finish and `[1/4] ✓` to appear, then hit `Ctrl+C`. Check:
 
 ```bash
 cat data/transcripts/_smoke.en.txt.partial
@@ -1116,21 +1113,19 @@ deno task translate data/transcripts/_smoke.ml.txt
 ```
 
 Expected:
-- First line: `Resuming from paragraph 2/4 (using existing data/transcripts/_smoke.en.txt.partial)`.
+- `Resuming from paragraph 2/4 (using existing data/transcripts/_smoke.en.txt.partial)`.
+- Model loads again.
 - Progress continues from `[2/4] ✓`.
 - Finalizes to `_smoke.en.txt`.
 
-- [ ] **Step 7: Test the Ollama-down error path**
-
-In a separate terminal, stop Ollama (close the app or kill `ollama serve`). Then:
+- [ ] **Step 7: Test wrong-language guard**
 
 ```bash
-deno task translate data/transcripts/_smoke.ml.txt --force
+sed 's/Language: ml (Malayalam)/Language: en (English)/' data/transcripts/_smoke.ml.txt > /tmp/_wronglang.ml.txt
+deno task translate /tmp/_wronglang.ml.txt; echo "exit=$?"
 ```
 
-Expected: `Ollama isn't running. Start with \`ollama serve\` or open the Ollama app.`, exit code 3.
-
-Restart Ollama before continuing.
+Expected: prints `this script translates Malayalam (\`ml\`) only; got \`en (English)\``, then `exit=2`. Then `rm /tmp/_wronglang.ml.txt`.
 
 - [ ] **Step 8: Clean up the fixture**
 
@@ -1145,7 +1140,7 @@ Expected: no `_smoke.*` files remain.
 
 ---
 
-## Task 9: README update
+## Task 8: README update
 
 **Files:**
 - Modify: `README.md`
@@ -1156,7 +1151,7 @@ Expected: no `_smoke.*` files remain.
 cat README.md
 ```
 
-Find the section that documents `deno task transcript` (added by the transcript-script work). The new `translate` task should be documented adjacent to it.
+Find the section that documents `deno task transcript`. The new `translate` documentation should sit immediately after it.
 
 - [ ] **Step 2: Add a `translate` section**
 
@@ -1165,23 +1160,29 @@ Add a subsection right after the `transcript` documentation:
 ```markdown
 ### Translate a Malayalam transcript to English
 
-After `deno task transcript <url>` produces a `data/transcripts/<id>.ml.txt`, translate it locally with Ollama + Aya Expanse 8B:
+After `deno task transcript <url>` produces a `data/transcripts/<id>.ml.txt`, translate it to English locally with IndicTrans2:
 
 ```bash
 deno task translate data/transcripts/<id>.ml.txt
 ```
 
-Produces `data/transcripts/<id>.en.txt` alongside the source file.
+Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run downloads the IndicTrans2 distilled-200M model (~800 MB) from Hugging Face and caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
 
 **One-time setup:**
 
 ```bash
-ollama pull aya-expanse:8b   # ~5 GB
+brew install uv          # or: curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Ollama must be running (`ollama serve` or the desktop app) when the task is invoked. The script prints progress per paragraph and writes a `.partial` file as it goes — if you Ctrl+C or the process dies, re-running picks up where it left off.
+`uv` manages a Python ≥3.10 interpreter, an isolated virtual environment, and the Python dependencies declared inline in `scripts/translate.py`. You do not need to manage Python or pip yourself.
 
-Flags: `--model <tag>` overrides the default model. `--out <dir>` writes the output elsewhere. `--force` overwrites an existing `.en.txt` or ignores a stale `.partial`.
+**Flags:**
+- `--out <dir>` writes the output elsewhere (default: same directory as input).
+- `--force` overwrites an existing `.en.txt` or ignores a stale `.partial`.
+
+**Resume:** The script writes a `.partial` file as it goes. If you Ctrl+C or the process dies, re-run the same command and it picks up from the last completed paragraph.
+
+**Tests:** `deno task translate:test` runs the pytest suite for the pure helpers (transcript parsing, chunking, header building, paragraph collapse).
 ```
 
 - [ ] **Step 3: Verify formatting**
@@ -1196,14 +1197,14 @@ If it reports diffs, run `deno fmt README.md` and re-check.
 
 ```bash
 git add README.md
-git commit -m "Document deno task translate in README"
+git commit -m "Document deno task translate (IndicTrans2 + uv) in README"
 ```
 
 ---
 
 ## Plan summary
 
-10 tasks (0–9). Tasks 0 and 8 are manual / verification. Tasks 1–7 are TDD-style with explicit tests, code, and per-task commits. Task 9 is documentation.
+9 tasks (0–8). Tasks 0 and 7 are manual / verification. Tasks 1–6 are TDD-style with explicit tests, code, and per-task commits. Task 8 is documentation.
 
 When complete, the contributor can:
 
@@ -1212,4 +1213,4 @@ deno task transcript https://www.youtube.com/watch?v=<id>      # produces .ml.tx
 deno task translate data/transcripts/<id>.ml.txt               # produces .en.txt
 ```
 
-…fully locally, fully free, with crash-safe resume on long runs.
+…fully locally, fully free, with crash-safe resume on long runs, using a model that actually supports Malayalam.
