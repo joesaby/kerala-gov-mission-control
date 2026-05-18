@@ -1,39 +1,65 @@
 # Malayalam → English Translate Script Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Python CLI (`scripts/translate.py`) that translates Malayalam transcript files produced by `scripts/transcript.ts` into English, locally on CPU, using Meta's NLLB-200 distilled-600M model loaded in-process via Hugging Face `transformers`. Paragraph-level progress, crash-resume via a `.partial` file, single-file Python script managed by `uv` (PEP 723 inline dependency metadata).
+**Goal:** Build a Python CLI (`scripts/translate.py`) that translates Malayalam
+transcript files produced by `scripts/transcript.ts` into English, locally on
+CPU, using Meta's NLLB-200 distilled-600M model loaded in-process via Hugging
+Face `transformers`. Paragraph-level progress, crash-resume via a `.partial`
+file, single-file Python script managed by `uv` (PEP 723 inline dependency
+metadata).
 
-**Architecture:** One Python file owns the whole job. Pure helper functions (parse, chunk, format, resume math) are unit-tested with `pytest`. The NLLB model is wrapped behind a small `Translator` class so the per-paragraph code path can be unit-tested with a fake translator; the real model is only loaded by the orchestrator and exercised in the end-to-end smoke test.
+**Architecture:** One Python file owns the whole job. Pure helper functions
+(parse, chunk, format, resume math) are unit-tested with `pytest`. The NLLB
+model is wrapped behind a small `Translator` class so the per-paragraph code
+path can be unit-tested with a fake translator; the real model is only loaded by
+the orchestrator and exercised in the end-to-end smoke test.
 
-**Tech Stack:** Python ≥3.10 (auto-installed by `uv`), `transformers>=4.46.0,<5.0`, `torch` (CPU), `sentencepiece`. Test framework: `pytest`. The Deno side is a single `deno.json` task entry (`uv run scripts/translate.py`).
+**Tech Stack:** Python ≥3.10 (auto-installed by `uv`),
+`transformers>=4.46.0,<5.0`, `torch` (CPU), `sentencepiece`. Test framework:
+`pytest`. The Deno side is a single `deno.json` task entry
+(`uv run scripts/translate.py`).
 
-**Source spec:** `docs/superpowers/specs/2026-05-18-malayalam-english-translate-script-design.md`
+**Source spec:**
+`docs/superpowers/specs/2026-05-18-malayalam-english-translate-script-design.md`
 
-> **Note on prior revisions:** This plan was first written for Ollama + Aya Expanse 8B (discarded — Aya doesn't officially support Malayalam), then rewritten for IndicTrans2 (discarded — the weights are gated and a probe couldn't complete the click-through). The current plan is the NLLB-200 redo. The NLLB probe ran cleanly and produced fluent translations of real government Malayalam during the discarded Task 0 attempts.
+> **Note on prior revisions:** This plan was first written for Ollama + Aya
+> Expanse 8B (discarded — Aya doesn't officially support Malayalam), then
+> rewritten for IndicTrans2 (discarded — the weights are gated and a probe
+> couldn't complete the click-through). The current plan is the NLLB-200 redo.
+> The NLLB probe ran cleanly and produced fluent translations of real government
+> Malayalam during the discarded Task 0 attempts.
 
 ---
 
 ## File Map
 
-| Path | Responsibility | Status |
-| --- | --- | --- |
-| `scripts/translate.py` | Single-file Python CLI: PEP 723 deps header, arg parsing, transcript parsing, paragraph chunking, NLLB-200 model load, translation loop with resume, output writing | Create |
-| `scripts/translate_test.py` | Unit tests for all pure functions + a `FakeTranslator`-backed test for the per-paragraph code path | Create |
-| `deno.json` | Add `translate` and `translate:test` tasks | Modify |
-| `.gitignore` | Ignore `*.partial` files under `data/transcripts/` | Modify |
-| `README.md` | Document the new task, `uv` install, first-run model download | Modify |
+| Path                        | Responsibility                                                                                                                                                      | Status |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `scripts/translate.py`      | Single-file Python CLI: PEP 723 deps header, arg parsing, transcript parsing, paragraph chunking, NLLB-200 model load, translation loop with resume, output writing | Create |
+| `scripts/translate_test.py` | Unit tests for all pure functions + a `FakeTranslator`-backed test for the per-paragraph code path                                                                  | Create |
+| `deno.json`                 | Add `translate` and `translate:test` tasks                                                                                                                          | Modify |
+| `.gitignore`                | Ignore `*.partial` files under `data/transcripts/`                                                                                                                  | Modify |
+| `README.md`                 | Document the new task, `uv` install, first-run model download                                                                                                       | Modify |
 
 ---
 
 ## Task 0: ~~Install uv + verify IndicTrans2 imports~~ — DONE via NLLB-200 probe
 
-**Status:** Completed during the earlier IndicTrans2 attempt. Findings carried forward:
+**Status:** Completed during the earlier IndicTrans2 attempt. Findings carried
+forward:
 
 - `uv` 0.11.14 installed via Homebrew. `uv --version` works.
-- `transformers>=4.46.0` with no upper bound resolves to 5.8.1 which removed `PreTrainedTokenizerBase` and breaks NLLB and many other models. **Pin `transformers>=4.46.0,<5.0` (resolves to 4.57.6).**
+- `transformers>=4.46.0` with no upper bound resolves to 5.8.1 which removed
+  `PreTrainedTokenizerBase` and breaks NLLB and many other models. **Pin
+  `transformers>=4.46.0,<5.0` (resolves to 4.57.6).**
 - `torch>=2.4` resolves cleanly on macOS via `uv` (no index hint needed).
-- `facebook/nllb-200-distilled-600M` is ungated, downloads ~2.4 GB on first run, and produced fluent Kerala-government Malayalam → English on the probe samples.
+- `facebook/nllb-200-distilled-600M` is ungated, downloads ~2.4 GB on first run,
+  and produced fluent Kerala-government Malayalam → English on the probe
+  samples.
 - Python 3.12 was chosen by `uv`.
 
 No further action in this task. Move directly to Task 1.
@@ -82,40 +108,43 @@ for s in samples:
     print(f"ML: {s}\nEN: {tokenizer.batch_decode(out, skip_special_tokens=True)[0]}\n")
 ```
 
-- [x] **Step 1–6:** Already complete via the NLLB probe described above. No further work in this task.
+- [x] **Step 1–6:** Already complete via the NLLB probe described above. No
+      further work in this task.
 
 ---
 
 ## Task 1: Scaffold `scripts/translate.py` + `deno.json` tasks + `.gitignore`
 
 **Files:**
+
 - Modify: `deno.json` (tasks block)
 - Create: `scripts/translate.py` (stub with PEP 723 metadata)
 - Modify: `.gitignore` (ignore `data/transcripts/*.partial`)
 
 - [ ] **Step 1: Add tasks to `deno.json`**
 
-Read `deno.json`. In the `tasks` block, add `translate` and `translate:test` right after `transcript` (or after `seed` if `transcript` is not yet present):
+Read `deno.json`. In the `tasks` block, add `translate` and `translate:test`
+right after `transcript` (or after `seed` if `transcript` is not yet present):
 
 ```jsonc
-    "translate": "uv run scripts/translate.py",
-    "translate:test": "uv run --with pytest pytest scripts/translate_test.py -v",
+"translate": "uv run scripts/translate.py",
+"translate:test": "uv run --with pytest pytest scripts/translate_test.py -v",
 ```
 
 Resulting block (with the prior `transcript` task assumed present):
 
 ```jsonc
-  "tasks": {
-    "check": "deno fmt --check . && deno lint . && deno check",
-    "dev": "deno run -A --watch=static/,routes/ dev.ts",
-    "build": "deno run -A dev.ts build",
-    "start": "deno serve -A _fresh/server.js",
-    "seed": "deno run -A scripts/seed.ts",
-    "transcript": "deno run -A --env-file=.env scripts/transcript.ts",
-    "translate": "uv run scripts/translate.py",
-    "translate:test": "uv run --with pytest pytest scripts/translate_test.py -v",
-    "update": "deno run -A -r jsr:@fresh/update ."
-  },
+"tasks": {
+  "check": "deno fmt --check . && deno lint . && deno check",
+  "dev": "deno run -A --watch=static/,routes/ dev.ts",
+  "build": "deno run -A dev.ts build",
+  "start": "deno serve -A _fresh/server.js",
+  "seed": "deno run -A scripts/seed.ts",
+  "transcript": "deno run -A --env-file=.env scripts/transcript.ts",
+  "translate": "uv run scripts/translate.py",
+  "translate:test": "uv run --with pytest pytest scripts/translate_test.py -v",
+  "update": "deno run -A -r jsr:@fresh/update ."
+},
 ```
 
 - [ ] **Step 2: Create the script stub with PEP 723 metadata**
@@ -147,7 +176,9 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-The `<5.0` cap on `transformers` is load-bearing: transformers 5.x removed `PreTrainedTokenizerBase` from `transformers.tokenization_utils`, which NLLB's tokenizer path still references on certain code paths.
+The `<5.0` cap on `transformers` is load-bearing: transformers 5.x removed
+`PreTrainedTokenizerBase` from `transformers.tokenization_utils`, which NLLB's
+tokenizer path still references on certain code paths.
 
 - [ ] **Step 3: Ignore `.partial` files in git**
 
@@ -164,7 +195,8 @@ data/transcripts/*.partial
 deno task translate
 ```
 
-Expected: `scripts/translate.py: not implemented yet` on stderr, exit code 1. (`uv` will set up the env if not already cached from Task 0.)
+Expected: `scripts/translate.py: not implemented yet` on stderr, exit code 1.
+(`uv` will set up the env if not already cached from Task 0.)
 
 - [ ] **Step 5: Commit**
 
@@ -178,8 +210,10 @@ git commit -m "Scaffold translate CLI: deno task, PEP 723 script, partial ignore
 ## Task 2: `parse_transcript` + tests
 
 **Files:**
+
 - Create: `scripts/translate_test.py`
-- Modify: `scripts/translate.py` (add `parse_transcript` and supporting types above `main`)
+- Modify: `scripts/translate.py` (add `parse_transcript` and supporting types
+  above `main`)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -248,7 +282,14 @@ def test_parse_transcript_language_line_missing():
         parse_transcript(no_lang)
 ```
 
-To make `from translate import ...` work, pytest needs to find `scripts/translate.py` on `sys.path`. The `translate:test` task in `deno.json` was already set to `sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'` in Task 1 — no `deno.json` edit needed for this task. (Bare `pytest` from the repo root would still find the test file but the `from translate import` would fail because `scripts/` isn't on `sys.path`. `cd scripts` is the simplest fix and matches the convention of "tests live next to the code they test".)
+To make `from translate import ...` work, pytest needs to find
+`scripts/translate.py` on `sys.path`. The `translate:test` task in `deno.json`
+was already set to
+`sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'` in Task
+1 — no `deno.json` edit needed for this task. (Bare `pytest` from the repo root
+would still find the test file but the `from translate import` would fail
+because `scripts/` isn't on `sys.path`. `cd scripts` is the simplest fix and
+matches the convention of "tests live next to the code they test".)
 
 - [ ] **Step 2: Run tests, verify they fail**
 
@@ -256,7 +297,8 @@ To make `from translate import ...` work, pytest needs to find `scripts/translat
 deno task translate:test
 ```
 
-Expected: all four tests FAIL with `ImportError: cannot import name 'parse_transcript' from 'translate'`.
+Expected: all four tests FAIL with
+`ImportError: cannot import name 'parse_transcript' from 'translate'`.
 
 - [ ] **Step 3: Implement `parse_transcript`**
 
@@ -365,7 +407,9 @@ git commit -m "Add parse_transcript with header/body extraction and language gua
 ## Task 3: Paragraph chunking helpers + tests
 
 **Files:**
-- Modify: `scripts/translate.py` (add `split_paragraphs`, `split_speaker_prefix`, `count_completed_paragraphs`)
+
+- Modify: `scripts/translate.py` (add `split_paragraphs`,
+  `split_speaker_prefix`, `count_completed_paragraphs`)
 - Modify: `scripts/translate_test.py` (append tests)
 
 - [ ] **Step 1: Write the failing tests**
@@ -446,7 +490,8 @@ def test_count_completed_paragraphs_no_separator():
 deno task translate:test
 ```
 
-Expected: the new tests FAIL (`ImportError` for the three new names). Tests from Task 2 still PASS.
+Expected: the new tests FAIL (`ImportError` for the three new names). Tests from
+Task 2 still PASS.
 
 - [ ] **Step 3: Implement the three functions**
 
@@ -497,7 +542,9 @@ git commit -m "Add paragraph chunking and resume-count helpers"
 ## Task 4: `build_output_header` + tests
 
 **Files:**
-- Modify: `scripts/translate.py` (add `build_output_header` and `MODEL_LABEL` constant)
+
+- Modify: `scripts/translate.py` (add `build_output_header` and `MODEL_LABEL`
+  constant)
 - Modify: `scripts/translate_test.py` (append tests)
 
 - [ ] **Step 1: Write the failing tests**
@@ -598,10 +645,16 @@ git commit -m "Add build_output_header for English transcript header"
 ## Task 5: `Translator` wrapper + `translate_paragraph` + fake-translator tests
 
 **Files:**
-- Modify: `scripts/translate.py` (add `Translator` class and `translate_paragraph` function)
+
+- Modify: `scripts/translate.py` (add `Translator` class and
+  `translate_paragraph` function)
 - Modify: `scripts/translate_test.py` (append tests using a `FakeTranslator`)
 
-This task introduces the NLLB-200 wrapper. The class is structured so the heavy model load is deferred to `load()`, and the per-paragraph translation logic (including the blank-line collapse fix) is a separate pure-ish function that takes any object with a `.translate(str) -> str` method — so it can be unit-tested with a fake.
+This task introduces the NLLB-200 wrapper. The class is structured so the heavy
+model load is deferred to `load()`, and the per-paragraph translation logic
+(including the blank-line collapse fix) is a separate pure-ish function that
+takes any object with a `.translate(str) -> str` method — so it can be
+unit-tested with a fake.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -655,7 +708,8 @@ Expected: the four new tests FAIL.
 
 - [ ] **Step 3: Implement `Translator` and `translate_paragraph`**
 
-First, add `Protocol` to the existing `typing`-area imports at the top of `scripts/translate.py`. The file's import block should now look like:
+First, add `Protocol` to the existing `typing`-area imports at the top of
+`scripts/translate.py`. The file's import block should now look like:
 
 ```python
 from __future__ import annotations
@@ -738,7 +792,8 @@ deno task translate:test
 
 Expected: all tests PASS.
 
-Note: the `Translator` class itself is NOT unit-tested — its real behavior depends on the model. The end-to-end smoke test (Task 7) exercises it.
+Note: the `Translator` class itself is NOT unit-tested — its real behavior
+depends on the model. The end-to-end smoke test (Task 7) exercises it.
 
 - [ ] **Step 5: Commit**
 
@@ -752,13 +807,18 @@ git commit -m "Add Translator wrapper and translate_paragraph with blank-line co
 ## Task 6: CLI orchestrator (`main`)
 
 **Files:**
-- Modify: `scripts/translate.py` (replace the `main` stub with the full orchestrator)
 
-This task wires everything: arg parsing, file IO, model load with timing, the translation loop with progress and resume, exit-code mapping. Not unit-tested — the end-to-end smoke test in Task 7 covers it.
+- Modify: `scripts/translate.py` (replace the `main` stub with the full
+  orchestrator)
+
+This task wires everything: arg parsing, file IO, model load with timing, the
+translation loop with progress and resume, exit-code mapping. Not unit-tested —
+the end-to-end smoke test in Task 7 covers it.
 
 - [ ] **Step 1: Add the new top-level imports**
 
-Extend the file's import block at the top of `scripts/translate.py`. After Task 5, the imports look like:
+Extend the file's import block at the top of `scripts/translate.py`. After Task
+5, the imports look like:
 
 ```python
 from __future__ import annotations
@@ -927,7 +987,8 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-The `if __name__ == "__main__"` block at the bottom of the file should already exist from Task 1 — leave it untouched.
+The `if __name__ == "__main__"` block at the bottom of the file should already
+exist from Task 1 — leave it untouched.
 
 - [ ] **Step 3: Syntax check the script**
 
@@ -951,7 +1012,8 @@ Expected: argparse-generated help text printed; exit code 0.
 deno task translate
 ```
 
-Expected: argparse error message about the required `input` argument; exit code 2.
+Expected: argparse error message about the required `input` argument; exit
+code 2.
 
 - [ ] **Step 6: Run the full unit-test suite to confirm nothing regressed**
 
@@ -972,9 +1034,14 @@ git commit -m "Wire translate.py CLI: parsing, model load, loop, resume"
 
 ## Task 7: End-to-end smoke test against the real model
 
-**Why this task is manual:** the unit tests cover every pure function and the per-paragraph translation logic with a fake translator. The remaining risk is integration — that the script actually loads NLLB-200, processes a real file, produces an English output, and resumes correctly after a kill. This walks through that by hand.
+**Why this task is manual:** the unit tests cover every pure function and the
+per-paragraph translation logic with a fake translator. The remaining risk is
+integration — that the script actually loads NLLB-200, processes a real file,
+produces an English output, and resumes correctly after a kill. This walks
+through that by hand.
 
 **Files:**
+
 - Create (temporary, then delete): `data/transcripts/_smoke.ml.txt`
 
 - [ ] **Step 1: Create a tiny fixture transcript**
@@ -1008,7 +1075,9 @@ deno task translate data/transcripts/_smoke.ml.txt
 ```
 
 Expected:
-- `Loading NLLB-200 (...)...` followed by `done in <N>s` (likely 20–60 s on first run, faster on subsequent cached runs).
+
+- `Loading NLLB-200 (...)...` followed by `done in <N>s` (likely 20–60 s on
+  first run, faster on subsequent cached runs).
 - Progress: `[1/4] ✓` through `[4/4] ✓`.
 - Final: `Done. Wrote data/transcripts/_smoke.en.txt (4 paragraphs, ...)`.
 - No `.partial` file remains.
@@ -1020,10 +1089,15 @@ cat data/transcripts/_smoke.en.txt
 ```
 
 Verify by eye:
-- Header has `Language: en (translated from ml)`, `Source method: smoke`, `Translation: facebook/nllb-200-distilled-600M (local CPU)`, and a `Translated:` timestamp.
+
+- Header has `Language: en (translated from ml)`, `Source method: smoke`,
+  `Translation: facebook/nllb-200-distilled-600M (local CPU)`, and a
+  `Translated:` timestamp.
 - Body has four paragraphs in English.
-- The last two paragraphs preserve the `[Speaker 1]:` / `[Speaker 2]:` prefixes verbatim.
-- Translations are coherent English (not gibberish, not Malayalam left over, not preambles).
+- The last two paragraphs preserve the `[Speaker 1]:` / `[Speaker 2]:` prefixes
+  verbatim.
+- Translations are coherent English (not gibberish, not Malayalam left over, not
+  preambles).
 
 - [ ] **Step 4: Test the existing-output guard**
 
@@ -1031,7 +1105,9 @@ Verify by eye:
 deno task translate data/transcripts/_smoke.ml.txt; echo "exit=$?"
 ```
 
-Expected: prints `Output exists: data/transcripts/_smoke.en.txt. Pass --force to overwrite.`, then `exit=7`.
+Expected: prints
+`Output exists: data/transcripts/_smoke.en.txt. Pass --force to overwrite.`,
+then `exit=7`.
 
 - [ ] **Step 5: Test `--force` overwrites**
 
@@ -1049,7 +1125,8 @@ In one terminal:
 deno task translate data/transcripts/_smoke.ml.txt --force
 ```
 
-Wait for the model load to finish and `[1/4] ✓` to appear, then hit `Ctrl+C`. Check:
+Wait for the model load to finish and `[1/4] ✓` to appear, then hit `Ctrl+C`.
+Check:
 
 ```bash
 cat data/transcripts/_smoke.en.txt.partial
@@ -1064,6 +1141,7 @@ deno task translate data/transcripts/_smoke.ml.txt
 ```
 
 Expected:
+
 - `Resuming from paragraph 2/4 (using existing data/transcripts/_smoke.en.txt.partial)`.
 - Model loads again.
 - Progress continues from `[2/4] ✓`.
@@ -1076,7 +1154,8 @@ sed 's/Language: ml (Malayalam)/Language: en (English)/' data/transcripts/_smoke
 deno task translate /tmp/_wronglang.ml.txt; echo "exit=$?"
 ```
 
-Expected: prints `this script translates Malayalam (\`ml\`) only; got \`en (English)\``, then `exit=2`. Then `rm /tmp/_wronglang.ml.txt`.
+Expected: prints `this script translates Malayalam (\`ml\`) only; got \`en
+(English)\``, then`exit=2`. Then`rm /tmp/_wronglang.ml.txt`.
 
 - [ ] **Step 8: Clean up the fixture**
 
@@ -1094,6 +1173,7 @@ Expected: no `_smoke.*` files remain.
 ## Task 8: README update
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Read the current README**
@@ -1102,22 +1182,27 @@ Expected: no `_smoke.*` files remain.
 cat README.md
 ```
 
-Find the section that documents `deno task transcript`. The new `translate` documentation should sit immediately after it.
+Find the section that documents `deno task transcript`. The new `translate`
+documentation should sit immediately after it.
 
 - [ ] **Step 2: Add a `translate` section**
 
 Add a subsection right after the `transcript` documentation:
 
-```markdown
+````markdown
 ### Translate a Malayalam transcript to English
 
-After `deno task transcript <url>` produces a `data/transcripts/<id>.ml.txt`, translate it to English locally with NLLB-200:
+After `deno task transcript <url>` produces a `data/transcripts/<id>.ml.txt`,
+translate it to English locally with NLLB-200:
 
 ```bash
 deno task translate data/transcripts/<id>.ml.txt
 ```
+````
 
-Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run downloads the NLLB-200 distilled-600M model (~2.4 GB) from Hugging Face and caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
+Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run
+downloads the NLLB-200 distilled-600M model (~2.4 GB) from Hugging Face and
+caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
 
 **One-time setup:**
 
@@ -1125,22 +1210,28 @@ Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run
 brew install uv          # or: curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-`uv` manages a Python ≥3.10 interpreter, an isolated virtual environment, and the Python dependencies declared inline in `scripts/translate.py`. You do not need to manage Python or pip yourself.
+`uv` manages a Python ≥3.10 interpreter, an isolated virtual environment, and
+the Python dependencies declared inline in `scripts/translate.py`. You do not
+need to manage Python or pip yourself.
 
 **Flags:**
+
 - `--out <dir>` writes the output elsewhere (default: same directory as input).
 - `--force` overwrites an existing `.en.txt` or ignores a stale `.partial`.
 
-**Resume:** The script writes a `.partial` file as it goes. If you Ctrl+C or the process dies, re-run the same command and it picks up from the last completed paragraph.
+**Resume:** The script writes a `.partial` file as it goes. If you Ctrl+C or the
+process dies, re-run the same command and it picks up from the last completed
+paragraph.
 
-**Tests:** `deno task translate:test` runs the pytest suite for the pure helpers (transcript parsing, chunking, header building, paragraph collapse).
-```
+**Tests:** `deno task translate:test` runs the pytest suite for the pure helpers
+(transcript parsing, chunking, header building, paragraph collapse).
 
+````
 - [ ] **Step 3: Verify formatting**
 
 ```bash
 deno fmt --check README.md
-```
+````
 
 If it reports diffs, run `deno fmt README.md` and re-check.
 
@@ -1155,7 +1246,8 @@ git commit -m "Document deno task translate (NLLB-200 + uv) in README"
 
 ## Plan summary
 
-9 tasks (0–8). Tasks 0 and 7 are manual / verification. Tasks 1–6 are TDD-style with explicit tests, code, and per-task commits. Task 8 is documentation.
+9 tasks (0–8). Tasks 0 and 7 are manual / verification. Tasks 1–6 are TDD-style
+with explicit tests, code, and per-task commits. Task 8 is documentation.
 
 When complete, the contributor can:
 
@@ -1164,4 +1256,5 @@ deno task transcript https://www.youtube.com/watch?v=<id>      # produces .ml.tx
 deno task translate data/transcripts/<id>.ml.txt               # produces .en.txt
 ```
 
-…fully locally, fully free, with crash-safe resume on long runs, using a model that actually supports Malayalam.
+…fully locally, fully free, with crash-safe resume on long runs, using a model
+that actually supports Malayalam.

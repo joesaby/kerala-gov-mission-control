@@ -30,7 +30,6 @@ export function Header({ lang }: { lang: Lang }) {
             { href: "/gov", en: "Government", ml: "സർക്കാർ" },
             { href: "/money", en: "Money", ml: "പണം" },
             { href: "/promises", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
-            { href: "/panchayat", en: "My Panchayat", ml: "എന്റെ പഞ്ചായത്ത്" },
           ].map((item) => (
             <a
               href={item.href}

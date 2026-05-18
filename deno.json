@@ -2,10 +2,10 @@
   "nodeModulesDir": "auto",
   "tasks": {
     "check": "deno fmt --check . && deno lint . && deno check",
-    "dev": "deno run -A --watch=static/,routes/ dev.ts",
-    "build": "deno run -A dev.ts build",
-    "start": "deno serve -A _fresh/server.js",
-    "seed": "deno run -A scripts/seed.ts",
+    "dev": "deno run -A --unstable-kv --watch=static/,routes/ dev.ts",
+    "build": "deno run -A --unstable-kv dev.ts build",
+    "start": "deno serve -A --unstable-kv _fresh/server.js",
+    "seed": "deno run -A --unstable-kv scripts/seed.ts",
     "translate": "uv run scripts/translate.py",
     "translate:test": "sh -c 'cd scripts && uv run --with pytest pytest translate_test.py -v'",
     "update": "deno run -A -r jsr:@fresh/update ."

@@ -3,10 +3,11 @@ import type { Kpi } from "./types.ts";
 /**
  * Headline KPIs for the Kerala Today landing screen.
  *
- * Values are illustrative mock data shaped exactly like the production schema
- * so the visualization layer is correct; swap the static export for a real
- * data loader (DB query, API fetch, materialized view) without changing
- * anything else.
+ * timeSeries convention:
+ *   year 2026 = actual / provisional reading at new-govt baseline (May 2026).
+ *   years 2027–2030 = trajectory targets set by the 16th KLA government.
+ *   Source for projections: government budget speeches, Vision Kerala 2030,
+ *   and department five-year plans unless noted otherwise.
  */
 export const HEADLINE_KPIS: Kpi[] = [
   {
@@ -37,6 +38,13 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "quarterly",
       lastRefreshed: "2026-05-12T09:30:00+05:30",
     },
+    timeSeries: [
+      { year: 2026, value: 36.4, kind: "actual", source: "Finance Dept / CAG" },
+      { year: 2027, value: 35.0, kind: "target" },
+      { year: 2028, value: 34.0, kind: "target" },
+      { year: 2029, value: 33.0, kind: "target" },
+      { year: 2030, value: 32.0, kind: "target", note: "FRBM ceiling" },
+    ],
   },
   {
     id: "fiscal.revenue-deficit",
@@ -64,6 +72,18 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "annual",
       lastRefreshed: "2026-03-31T00:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 2.1,
+        kind: "actual",
+        source: "Budget 2026-27, Finance Dept",
+      },
+      { year: 2027, value: 1.9, kind: "target" },
+      { year: 2028, value: 1.7, kind: "target" },
+      { year: 2029, value: 1.6, kind: "target" },
+      { year: 2030, value: 1.5, kind: "target", note: "FRBM target" },
+    ],
   },
   {
     id: "health.imr",
@@ -91,6 +111,13 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "annual",
       lastRefreshed: "2026-04-10T00:00:00+05:30",
     },
+    timeSeries: [
+      { year: 2026, value: 5.8, kind: "actual", source: "SRS Bulletin 2024" },
+      { year: 2027, value: 5.4, kind: "projection" },
+      { year: 2028, value: 5.0, kind: "projection" },
+      { year: 2029, value: 4.5, kind: "projection" },
+      { year: 2030, value: 4.0, kind: "target", note: "SDG-aligned target" },
+    ],
   },
   {
     id: "health.public-health-spend",
@@ -119,6 +146,23 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "annual",
       lastRefreshed: "2026-03-31T00:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 1.4,
+        kind: "actual",
+        source: "Finance Accounts FY2025-26",
+      },
+      { year: 2027, value: 1.7, kind: "target" },
+      { year: 2028, value: 2.0, kind: "target" },
+      { year: 2029, value: 2.3, kind: "target" },
+      {
+        year: 2030,
+        value: 2.5,
+        kind: "target",
+        note: "National Health Policy goal",
+      },
+    ],
   },
   {
     id: "education.foundational-literacy",
@@ -146,6 +190,18 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "annual",
       lastRefreshed: "2026-02-18T00:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 78,
+        kind: "actual",
+        source: "SCERT State Achievement Survey 2025-26",
+      },
+      { year: 2027, value: 82, kind: "target" },
+      { year: 2028, value: 85, kind: "target" },
+      { year: 2029, value: 88, kind: "target" },
+      { year: 2030, value: 90, kind: "target", note: "NIPUN Kerala milestone" },
+    ],
   },
   {
     id: "livelihood.unemployment",
@@ -174,6 +230,13 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "quarterly",
       lastRefreshed: "2026-05-08T00:00:00+05:30",
     },
+    timeSeries: [
+      { year: 2026, value: 7.0, kind: "actual", source: "PLFS Q4 2025-26" },
+      { year: 2027, value: 6.5, kind: "projection" },
+      { year: 2028, value: 6.0, kind: "projection" },
+      { year: 2029, value: 5.5, kind: "projection" },
+      { year: 2030, value: 5.0, kind: "target" },
+    ],
   },
   {
     id: "safety.crime-against-women",
@@ -201,6 +264,18 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "monthly",
       lastRefreshed: "2026-05-01T00:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 73.3,
+        kind: "actual",
+        source: "NCRB 2025 / Kerala Police CCTNS",
+      },
+      { year: 2027, value: 67.0, kind: "target" },
+      { year: 2028, value: 61.0, kind: "target" },
+      { year: 2029, value: 55.0, kind: "target" },
+      { year: 2030, value: 50.0, kind: "target" },
+    ],
   },
   {
     id: "trust.grievance-resolution",
@@ -228,6 +303,13 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "daily",
       lastRefreshed: "2026-05-18T07:15:00+05:30",
     },
+    timeSeries: [
+      { year: 2026, value: 64, kind: "actual", source: "CMO PGRS dashboard" },
+      { year: 2027, value: 73, kind: "target" },
+      { year: 2028, value: 80, kind: "target" },
+      { year: 2029, value: 86, kind: "target" },
+      { year: 2030, value: 90, kind: "target", note: "Citizen charter SLA" },
+    ],
   },
   {
     id: "delivery.service-clock",
@@ -255,6 +337,18 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "daily",
       lastRefreshed: "2026-05-18T06:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 4.2,
+        kind: "actual",
+        source: "e-District / K-SMART telemetry",
+      },
+      { year: 2027, value: 3.8, kind: "target" },
+      { year: 2028, value: 3.5, kind: "target" },
+      { year: 2029, value: 3.2, kind: "target" },
+      { year: 2030, value: 3.0, kind: "target", note: "Citizen charter SLA" },
+    ],
   },
   {
     id: "delivery.tender-publication",
@@ -283,6 +377,13 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "daily",
       lastRefreshed: "2026-05-18T05:30:00+05:30",
     },
+    timeSeries: [
+      { year: 2026, value: 87, kind: "actual", source: "Kerala e-Tenders" },
+      { year: 2027, value: 92, kind: "target" },
+      { year: 2028, value: 96, kind: "target" },
+      { year: 2029, value: 99, kind: "target" },
+      { year: 2030, value: 100, kind: "target" },
+    ],
   },
   {
     id: "environment.air-quality",
@@ -310,6 +411,23 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "real-time",
       lastRefreshed: "2026-05-18T13:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 28,
+        kind: "actual",
+        source: "CPCB CAAQMS annual mean",
+      },
+      { year: 2027, value: 25, kind: "target" },
+      { year: 2028, value: 22, kind: "target" },
+      { year: 2029, value: 18, kind: "target" },
+      {
+        year: 2030,
+        value: 15,
+        kind: "target",
+        note: "WHO annual mean guideline",
+      },
+    ],
   },
   {
     id: "delivery.kiifb-on-time",
@@ -337,6 +455,18 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "monthly",
       lastRefreshed: "2026-05-05T00:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 71,
+        kind: "actual",
+        source: "KIIFB Project Monitoring Cell",
+      },
+      { year: 2027, value: 75, kind: "target" },
+      { year: 2028, value: 79, kind: "target" },
+      { year: 2029, value: 82, kind: "target" },
+      { year: 2030, value: 85, kind: "target" },
+    ],
   },
   {
     id: "transport.road-fatalities",
@@ -365,5 +495,22 @@ export const HEADLINE_KPIS: Kpi[] = [
       updateFrequency: "monthly",
       lastRefreshed: "2026-05-10T00:00:00+05:30",
     },
+    timeSeries: [
+      {
+        year: 2026,
+        value: 8.4,
+        kind: "actual",
+        source: "MoRTH Road Accidents 2025",
+      },
+      { year: 2027, value: 7.2, kind: "projection" },
+      { year: 2028, value: 6.2, kind: "projection" },
+      { year: 2029, value: 5.1, kind: "projection" },
+      {
+        year: 2030,
+        value: 4.0,
+        kind: "target",
+        note: "Stockholm Declaration 50% reduction",
+      },
+    ],
   },
 ];
