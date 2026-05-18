@@ -27,7 +27,13 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
-    "lib": ["dom", "dom.asynciterable", "dom.iterable", "deno.ns"]
+    "lib": [
+      "dom",
+      "dom.asynciterable",
+      "dom.iterable",
+      "deno.ns",
+      "deno.unstable"
+    ]
   },
   "fmt": {
     "exclude": ["_fresh/", "static/styles.css"]
