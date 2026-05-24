@@ -48,8 +48,27 @@ const FIXTURE_PATH = join(REPO_ROOT, "data", "government-orders.ts");
 const DB_PATH = join(REPO_ROOT, "data", "db.ts");
 
 const PORTAL_BASE = "https://document.kerala.gov.in";
-const DEFAULT_GO_LIST_URL = Deno.env.get("KERALA_GO_URL") ??
-  `${PORTAL_BASE}/documentdetails/en/dDVtK21nV2l6c0RxcCtWTC9oTGcvZz09`;
+
+// Named document sources on the Kerala portal.
+// Pass --source orders,cabinet (comma-separated) to restrict; default = all.
+const KNOWN_SOURCES: Record<string, { url: string; hint: string }> = {
+  orders: {
+    url: `${PORTAL_BASE}/documentdetails/ml/dDVtK21nV2l6c0RxcCtWTC9oTGcvZz09`,
+    hint: "Kerala Government Orders (G.O.)",
+  },
+  cabinet: {
+    url: `${PORTAL_BASE}/documentdetails/en/eHcyeDczNDR5WEtGRnlEbDg4NWlNQT09`,
+    hint: "Kerala Cabinet Decisions",
+  },
+  circulars: {
+    url: `${PORTAL_BASE}/documentdetails/en/TGxDdnM3eTYwSE0zanV1Tm53UW1EQT09`,
+    hint: "Kerala Government Circulars",
+  },
+  rts: {
+    url: `${PORTAL_BASE}/documentdetails/en/V0xnSVVqcm15MWpOZjF2MWJEcHVRdz09`,
+    hint: "Kerala RTS (Right to Service) documents",
+  },
+};
 
 const DEFAULT_SINCE = "2026-05-18"; // Satheesan cabinet sworn in
 const REQUEST_DELAY_MS = 1_000;
@@ -198,25 +217,52 @@ interface Extracted {
   subjectMl: string | null;
 }
 
-const EXTRACT_PROMPT = `\
-You are a structured data extractor for Kerala Government Orders (GOs).
-Kerala GOs may be in Malayalam only, English only, or bilingual.
+const EXTRACT_PROMPT_BASE = `\
+You are a structured data extractor for Kerala government documents.
+Documents may be in Malayalam only, English only, or bilingual.
 Extract fields exactly as they appear; never invent or paraphrase content.
 
 Return ONLY a valid JSON object with these exact keys:
-  goNumber   – exact GO number string as printed (e.g. "G.O.(P) No.1/2026/GAD")
-  type       – one of: "P" | "Ms" | "Rt" | "SRO" | "Circular" | "Bill"
+  goNumber   – document/order number as printed, or null if absent
+  type       – one of: "P" | "Ms" | "Rt" | "SRO" | "Circular" | "Bill" | "Cabinet"
   date       – ISO date "YYYY-MM-DD" (Kerala uses dd/mm/yyyy or dd-mm-yyyy)
-  subject    – English subject line, or null if only Malayalam is present
-  subjectMl  – Malayalam subject line in Unicode, or null if not present
+  subject    – English subject/title line, or null if only Malayalam is present
+  subjectMl  – Malayalam subject/title in Unicode, or null if not present
 
-GO type mapping:
-  G.O.(P)  → "P"   G.O.(Ms) → "Ms"   G.O.(Rt) → "Rt"
-  S.R.O.   → "SRO"   Circular → "Circular"   Bill → "Bill"
+Type mapping:
+  G.O.(P)          → "P"        (Policy order)
+  G.O.(Ms)         → "Ms"       (Memo / Subordinate)
+  G.O.(Rt)         → "Rt"       (Routine / Routing)
+  S.R.O.           → "SRO"      (Statutory Rules & Orders)
+  Circular         → "Circular"
+  Bill             → "Bill"
+  Cabinet Decision → "Cabinet"
 
 The subject is the main heading near the top of the document,
 often after "Subject:" or "വിഷയം:".
 If only Malayalam is present, return subjectMl and null for subject.`;
+
+function buildPrompt(
+  hint: string,
+  pdfText: string,
+  fallback: { goNumber: string; dateStr: string; subjectRaw: string },
+): string {
+  const cleanFallback = cleanPortalHtml(fallback.subjectRaw);
+  return [
+    EXTRACT_PROMPT_BASE,
+    `Document source: ${hint}`,
+    "",
+    pdfText
+      ? `PDF text (first 8000 chars):\n${pdfText.slice(0, 8000)}`
+      : "No PDF text available — use fallback values.",
+    "",
+    `Fallback document number: ${fallback.goNumber}`,
+    `Fallback date: ${fallback.dateStr}`,
+    `Fallback subject from portal: ${cleanFallback}`,
+    "",
+    "Return ONLY a JSON object.",
+  ].join("\n");
+}
 
 async function extractPdfText(pdfPath: string): Promise<string> {
   const script = "import pypdf, sys; r=pypdf.PdfReader(sys.argv[1]); " +
@@ -237,6 +283,7 @@ function cleanPortalHtml(s: string): string {
 async function claudeExtract(
   pdfPath: string | null,
   fallback: { goNumber: string; dateStr: string; subjectRaw: string },
+  hint: string,
 ): Promise<Extracted> {
   let pdfText = "";
   if (pdfPath) {
@@ -248,19 +295,7 @@ async function claudeExtract(
   }
 
   const cleanFallback = cleanPortalHtml(fallback.subjectRaw);
-  const prompt = [
-    EXTRACT_PROMPT,
-    "",
-    pdfText
-      ? `PDF text (first 8000 chars):\n${pdfText.slice(0, 8000)}`
-      : "No PDF text available — use fallback values.",
-    "",
-    `Fallback GO number: ${fallback.goNumber}`,
-    `Fallback date: ${fallback.dateStr}`,
-    `Fallback subject from portal: ${cleanFallback}`,
-    "",
-    "Return ONLY a JSON object.",
-  ].join("\n");
+  const prompt = buildPrompt(hint, pdfText, fallback);
 
   try {
     const result = await new Deno.Command("claude", {
@@ -279,7 +314,7 @@ async function claudeExtract(
 
     return {
       goNumber: parsed.goNumber || fallback.goNumber,
-      type: parsed.type || inferType(fallback.goNumber),
+      type: parsed.type || inferType(fallback.goNumber, hint),
       date: parsed.date || toIso(fallback.dateStr),
       subject: parsed.subject || null,
       subjectMl: parsed.subjectMl || null,
@@ -288,7 +323,7 @@ async function claudeExtract(
     console.error(`  [3] claude CLI extraction failed: ${e} — using fallbacks`);
     return {
       goNumber: fallback.goNumber,
-      type: inferType(fallback.goNumber),
+      type: inferType(fallback.goNumber, hint),
       date: toIso(fallback.dateStr),
       subject: cleanFallback || null,
       subjectMl: null,
@@ -306,7 +341,9 @@ function toIso(ddmmyyyy: string): string {
   return ddmmyyyy;
 }
 
-function inferType(goNumber: string): GoOrderType {
+function inferType(goNumber: string, hint = ""): GoOrderType {
+  if (hint.toLowerCase().includes("cabinet")) return "Cabinet";
+  if (hint.toLowerCase().includes("circular")) return "Circular";
   const s = goNumber.toLowerCase();
   if (s.includes("(p)")) return "P";
   if (s.includes("(ms)")) return "Ms";
@@ -495,20 +532,22 @@ function bumpSeedVersion(dbPath: string): void {
 // ---------------------------------------------------------------------------
 
 const args = parseArgs(Deno.args, {
-  string: ["since", "limit", "url"],
+  string: ["since", "limit", "source"],
   boolean: ["dry-run", "help"],
   default: { since: DEFAULT_SINCE },
 });
 
 if (args.help) {
+  const sourceNames = Object.keys(KNOWN_SOURCES).join(", ");
   console.log(`
 deno task ingest-gos [options]
 
-  --since YYYY-MM-DD   Only include GOs on or after this date (default: ${DEFAULT_SINCE})
-  --limit N            Process at most N new GOs
-  --dry-run            Skip downloads and fixture write; print what would change
-  --url URL            Override the portal listing URL
-  --help               Show this help
+  --since YYYY-MM-DD        Only include docs on or after this date (default: ${DEFAULT_SINCE})
+  --limit N                 Process at most N new documents total
+  --source <name[,name]>    Sources to scrape: ${sourceNames}
+                            Default: all sources
+  --dry-run                 Skip downloads and fixture write; print what would change
+  --help                    Show this help
   `);
   Deno.exit(0);
 }
@@ -516,79 +555,98 @@ deno task ingest-gos [options]
 const since = args.since as string;
 const limit = args.limit ? Number(args.limit) : undefined;
 const dryRun = args["dry-run"] as boolean;
-const listUrl = (args.url as string) ?? DEFAULT_GO_LIST_URL;
 
-// Stage 1: scrape
-const listings = await scrapeListings(listUrl, since);
-if (listings.length === 0) {
-  console.error("[!] No listings found — check the portal URL or date filter.");
+// Resolve which sources to process
+const sourceArg = args.source as string | undefined;
+const selectedSources = sourceArg
+  ? sourceArg.split(",").map((s) => s.trim()).filter((s) => s in KNOWN_SOURCES)
+  : Object.keys(KNOWN_SOURCES);
+
+if (selectedSources.length === 0) {
+  console.error(
+    `[!] No valid sources. Choose from: ${
+      Object.keys(KNOWN_SOURCES).join(", ")
+    }`,
+  );
   Deno.exit(1);
 }
 
-const limited = limit ? listings.slice(0, limit) : listings;
-
-// Stage 5 (early): load existing to skip already-ingested GOs
+// Load existing GOs once (shared dedup across all sources)
 const existingGoNumbers = loadExistingGoNumbers(FIXTURE_PATH);
-const newListings = limited.filter(
-  (l) => !existingGoNumbers.has(l.goNumber),
-);
-console.error(
-  `[+] ${newListings.length} new GOs to process ` +
-    `(${limited.length - newListings.length} already in fixture)`,
-);
-
-if (newListings.length === 0) {
-  console.error("[+] Nothing new to ingest. Fixture is up to date.");
-  Deno.exit(0);
-}
-
-// Stages 2–4: download + Claude extract + tag
 const newRecords: GovernmentOrder[] = [];
+let globalIndex = 0;
 
-for (const [i, listing] of newListings.entries()) {
-  console.error(`\n  → ${listing.goNumber} (${listing.dateStr})`);
+for (const sourceName of selectedSources) {
+  const { url, hint } = KNOWN_SOURCES[sourceName];
+  console.error(`\n[source: ${sourceName}] ${hint}`);
 
-  const pdfPath = dryRun ? null : await downloadPdf(listing.pdfUrl);
-
-  const extracted = await claudeExtract(pdfPath, {
-    goNumber: listing.goNumber,
-    dateStr: listing.dateStr,
-    subjectRaw: listing.subjectRaw,
-  });
-
-  if (!extracted.subject && !extracted.subjectMl) {
-    console.error("  [!] No subject — skipping");
+  // Stage 1: scrape
+  const listings = await scrapeListings(url, since);
+  if (listings.length === 0) {
+    console.error(`  [!] No listings found — skipping`);
     continue;
   }
 
-  const { deptId, deptConfidence } = tagDepartment(
-    extracted.goNumber,
-    extracted.subject ?? extracted.subjectMl ?? "",
+  const remaining = limit ? limit - newRecords.length : undefined;
+  const scoped = remaining !== undefined
+    ? listings.slice(0, remaining)
+    : listings;
+  const newListings = scoped.filter((l) => !existingGoNumbers.has(l.goNumber));
+
+  console.error(
+    `  [+] ${newListings.length} new docs to process ` +
+      `(${scoped.length - newListings.length} already in fixture)`,
   );
 
-  const id = generateId(
-    extracted.goNumber,
-    extracted.type,
-    extracted.date,
-    i + 1,
-  );
+  // Stages 2–4: download + Claude extract + tag
+  for (const listing of newListings) {
+    if (limit && newRecords.length >= limit) break;
+    console.error(`\n  → ${listing.goNumber} (${listing.dateStr})`);
 
-  newRecords.push({
-    id,
-    goNumber: extracted.goNumber,
-    type: extracted.type,
-    subject: extracted.subject ?? extracted.subjectMl ?? "",
-    subjectMl: extracted.subjectMl ?? undefined,
-    deptId,
-    deptConfidence,
-    date: extracted.date,
-    meta: {
-      source: "Document Portal, Government of Kerala",
-      sourceUrl: listing.pdfUrl,
-      retrievedAt: new Date().toISOString(),
-    },
-    dataStatus: "verified",
-  });
+    const pdfPath = dryRun ? null : await downloadPdf(listing.pdfUrl);
+
+    const extracted = await claudeExtract(pdfPath, {
+      goNumber: listing.goNumber,
+      dateStr: listing.dateStr,
+      subjectRaw: listing.subjectRaw,
+    }, hint);
+
+    if (!extracted.subject && !extracted.subjectMl) {
+      console.error("  [!] No subject — skipping");
+      continue;
+    }
+
+    const { deptId, deptConfidence } = tagDepartment(
+      extracted.goNumber,
+      extracted.subject ?? extracted.subjectMl ?? "",
+    );
+
+    globalIndex++;
+    const id = generateId(
+      extracted.goNumber,
+      extracted.type,
+      extracted.date,
+      globalIndex,
+    );
+
+    existingGoNumbers.add(extracted.goNumber); // prevent cross-source dupes
+    newRecords.push({
+      id,
+      goNumber: extracted.goNumber,
+      type: extracted.type,
+      subject: extracted.subject ?? extracted.subjectMl ?? "",
+      subjectMl: extracted.subjectMl ?? undefined,
+      deptId,
+      deptConfidence,
+      date: extracted.date,
+      meta: {
+        source: "Document Portal, Government of Kerala",
+        sourceUrl: listing.pdfUrl,
+        retrievedAt: new Date().toISOString(),
+      },
+      dataStatus: "verified",
+    });
+  }
 }
 
 if (newRecords.length === 0) {
