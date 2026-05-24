@@ -11,6 +11,23 @@ import type { GovernmentOrder } from "./types.ts";
  */
 export const GOVERNMENT_ORDERS: GovernmentOrder[] = [
   {
+    id: "go.2026-misc-15",
+    goNumber: "G.O.(Ms)No.15/2026/TRANS",
+    type: "Ms",
+    subject:
+      "Transport Department - Railways - Thiruvananthapuram - Kasaragod Semi High Speed Silverline Project - Cancelled - Orders issued",
+    deptId: "dept.transport",
+    deptConfidence: "medium",
+    date: "2026-05-21",
+    meta: {
+      source: "Document Portal, Government of Kerala",
+      sourceUrl:
+        "https://document.kerala.gov.in/documents/governmentorders/eofficeorder_134_2305202602:00:43.pdf",
+      retrievedAt: "2026-05-24T12:33:28.768Z",
+    },
+    dataStatus: "verified",
+  },
+  {
     id: "go.2026-clad-300",
     goNumber: "G.O.(Rt) No.300/2026/CLAD",
     type: "Rt",

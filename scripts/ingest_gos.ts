@@ -53,7 +53,7 @@ const PORTAL_BASE = "https://document.kerala.gov.in";
 // Pass --source orders,cabinet (comma-separated) to restrict; default = all.
 const KNOWN_SOURCES: Record<string, { url: string; hint: string }> = {
   orders: {
-    url: `${PORTAL_BASE}/documentdetails/ml/dDVtK21nV2l6c0RxcCtWTC9oTGcvZz09`,
+    url: `${PORTAL_BASE}/documentdetails/en/dDVtK21nV2l6c0RxcCtWTC9oTGcvZz09`,
     hint: "Kerala Government Orders (G.O.)",
   },
   cabinet: {
@@ -80,20 +80,26 @@ const FETCH_HEADERS = {
 };
 
 // ---------------------------------------------------------------------------
-// Stage 1 — Scrape GO listing
+// Stage 1 — Scrape document listing
 // ---------------------------------------------------------------------------
 
 interface Listing {
-  goNumber: string;
+  goNumber: string; // GO/reference number, or URL-derived key for non-GO docs
   dateStr: string; // dd-mm-yyyy
-  departmentRaw: string;
-  subjectRaw: string;
+  subjectRaw: string; // text from portal title attribute
   pdfUrl: string;
 }
 
 const GO_NUMBER_RE = /G\.O\.\s*\([A-Za-z/&]+\)\s*\d+\/\d{4}\/[A-Za-z&]+/gi;
-const DATE_RE = /\b(\d{2}-\d{2}-\d{4})\b/;
-const PDF_HREF_RE = /href="([^"]+\/documents\/governmentorders\/[^"]+\.pdf)"/gi;
+
+// Each document entry on the portal has a facebookcion <a> with:
+//   title="[REFERENCE]-[SUBJECT]"  href1="[PDF_URL]"
+// This pattern is consistent across orders, cabinet, circulars, and RTS pages.
+const ENTRY_RE =
+  /title="(\s*[^"]{5,}?)\s*"\s+href1="(https?:\/\/document\.kerala\.gov\.in\/documents\/[^"]+\.pdf)"\s+[^>]*class="facebookcion"/gis;
+
+// Date in the calendar-day div that appears before each entry
+const CALENDAR_DATE_RE = /calendar-day[^;]*?&nbsp;(\d{2}-\d{2}-\d{4})/gi;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -106,11 +112,14 @@ async function politeGet(url: string): Promise<Response> {
   return r;
 }
 
-function extractTextAroundMatch(html: string, matchIndex: number): string {
-  // Grab ~2 000 chars of raw HTML around the PDF link and strip tags
-  const start = Math.max(0, matchIndex - 1500);
-  const end = Math.min(html.length, matchIndex + 500);
-  return html.slice(start, end).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
 }
 
 async function scrapeListings(
@@ -120,56 +129,59 @@ async function scrapeListings(
   console.error(`[1] Fetching listing: ${listUrl}`);
   const html = await (await politeGet(listUrl)).text();
 
+  // Build ordered list of date positions for backwards lookup
+  const datePosMap: Array<{ pos: number; dateStr: string }> = [];
+  CALENDAR_DATE_RE.lastIndex = 0;
+  let dm: RegExpExecArray | null;
+  while ((dm = CALENDAR_DATE_RE.exec(html)) !== null) {
+    datePosMap.push({ pos: dm.index, dateStr: dm[1] });
+  }
+
   const results: Listing[] = [];
   const seenUrls = new Set<string>();
 
+  ENTRY_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
-  PDF_HREF_RE.lastIndex = 0;
-
-  while ((m = PDF_HREF_RE.exec(html)) !== null) {
-    const href = m[1];
-    const pdfUrl = href.startsWith("http") ? href : PORTAL_BASE + href;
+  while ((m = ENTRY_RE.exec(html)) !== null) {
+    const pdfUrl = m[2];
     if (seenUrls.has(pdfUrl)) continue;
     seenUrls.add(pdfUrl);
 
-    const context = extractTextAroundMatch(html, m.index);
-
-    GO_NUMBER_RE.lastIndex = 0;
-    const goMatch = GO_NUMBER_RE.exec(context);
-    const dateMatch = DATE_RE.exec(context);
-    if (!goMatch || !dateMatch) continue;
-
-    const dateStr = dateMatch[1];
-    if (dateStr < since.split("-").reverse().join("-")) {
-      // Compare as dd-mm-yyyy strings is tricky; convert to ISO for comparison
-      const iso = dateStr.split("-").reverse().join("-");
-      if (iso < since) continue;
+    // Find the nearest calendar-day date before this entry
+    let dateStr = "";
+    for (let i = datePosMap.length - 1; i >= 0; i--) {
+      if (datePosMap[i].pos < m.index) {
+        dateStr = datePosMap[i].dateStr;
+        break;
+      }
     }
+    if (!dateStr) continue;
 
-    const goNumber = goMatch[0].trim();
-    const subjectRaw = context
-      .split(goNumber)[0]
-      .replace(/^[\s>•:[\]-]+/, "")
-      .trim()
-      .slice(-300); // last 300 chars before GO number = subject area
+    // Date filter
+    if (toIso(dateStr) < since) continue;
+
+    const titleRaw = decodeHtmlEntities(m[1].trim());
+
+    // Extract GO number if present; else use reference from title or URL
+    GO_NUMBER_RE.lastIndex = 0;
+    const goMatch = GO_NUMBER_RE.exec(titleRaw);
+    const goNumber = goMatch
+      ? goMatch[0].trim()
+      : (titleRaw.split(/\s{2,}/)[0].slice(0, 80).trim() ||
+        pdfUrl.split("/").pop()!.replace(/[?#].*$/, ""));
 
     results.push({
       goNumber,
       dateStr,
-      departmentRaw: "", // will be enriched by Claude from PDF
-      subjectRaw: subjectRaw.trim(),
+      subjectRaw: titleRaw,
       pdfUrl,
     });
   }
 
-  // Sort newest first (dd-mm-yyyy → ISO for comparison)
-  results.sort((a, b) => {
-    const isoA = a.dateStr.split("-").reverse().join("-");
-    const isoB = b.dateStr.split("-").reverse().join("-");
-    return isoB.localeCompare(isoA);
-  });
+  // Sort newest first
+  results.sort((a, b) => toIso(b.dateStr).localeCompare(toIso(a.dateStr)));
 
-  console.error(`[1] Found ${results.length} GOs on or after ${since}`);
+  console.error(`[1] Found ${results.length} docs on or after ${since}`);
   return results;
 }
 
@@ -447,11 +459,16 @@ function generateId(
 // Stage 6 — Load existing fixture for idempotent merge
 // ---------------------------------------------------------------------------
 
-function loadExistingGoNumbers(fixturePath: string): Set<string> {
+function loadExistingKeys(fixturePath: string): Set<string> {
   try {
     const text = Deno.readTextFileSync(fixturePath);
-    const matches = text.matchAll(/"goNumber":\s*"([^"]+)"/g);
-    return new Set([...matches].map((m) => m[1]));
+    const goNums = [...text.matchAll(/"goNumber":\s*"([^"]+)"/g)].map((m) =>
+      m[1]
+    );
+    const urls = [...text.matchAll(/"sourceUrl":\s*"([^"]+)"/g)].map((m) =>
+      m[1]
+    );
+    return new Set([...goNums, ...urls]);
   } catch {
     return new Set();
   }
@@ -571,8 +588,8 @@ if (selectedSources.length === 0) {
   Deno.exit(1);
 }
 
-// Load existing GOs once (shared dedup across all sources)
-const existingGoNumbers = loadExistingGoNumbers(FIXTURE_PATH);
+// Load existing keys once (goNumbers + sourceUrls, shared dedup across sources)
+const existingKeys = loadExistingKeys(FIXTURE_PATH);
 const newRecords: GovernmentOrder[] = [];
 let globalIndex = 0;
 
@@ -591,7 +608,9 @@ for (const sourceName of selectedSources) {
   const scoped = remaining !== undefined
     ? listings.slice(0, remaining)
     : listings;
-  const newListings = scoped.filter((l) => !existingGoNumbers.has(l.goNumber));
+  const newListings = scoped.filter(
+    (l) => !existingKeys.has(l.goNumber) && !existingKeys.has(l.pdfUrl),
+  );
 
   console.error(
     `  [+] ${newListings.length} new docs to process ` +
@@ -629,7 +648,8 @@ for (const sourceName of selectedSources) {
       globalIndex,
     );
 
-    existingGoNumbers.add(extracted.goNumber); // prevent cross-source dupes
+    existingKeys.add(extracted.goNumber); // prevent cross-source dupes
+    existingKeys.add(listing.pdfUrl);
     newRecords.push({
       id,
       goNumber: extracted.goNumber,
