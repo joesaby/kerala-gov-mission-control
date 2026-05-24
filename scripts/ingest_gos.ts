@@ -4,9 +4,9 @@
  * Stages:
  *   1. Scrape  — fetch GO listing from document.kerala.gov.in
  *   2. Download — cache PDFs locally in .cache/pdfs/
- *   3. Extract  — send each PDF to Claude as a document block;
- *                 Claude reads Malayalam + English natively and returns
- *                 structured JSON (goNumber, type, date, subject, subjectMl)
+ *   3. Extract  — extract text from PDF via uv+pypdf, then pipe to
+ *                 `claude -p` (Claude Code CLI) for structured JSON output
+ *                 (goNumber, type, date, subject, subjectMl)
  *   4. Tag      — map GO number suffix to dept.id (high confidence) or
  *                 keyword match (medium), else low
  *   5. Merge    — skip GOs already in the fixture; preserve hand-curated
@@ -20,13 +20,14 @@
  *   deno task ingest-gos --limit 20 --dry-run
  *
  * Env:
- *   ANTHROPIC_API_KEY   required
- *   KERALA_GO_URL       override the portal listing URL (optional)
+ *   KERALA_GO_URL   override the portal listing URL (optional)
+ *
+ * Requires:
+ *   claude CLI (Claude Code) authenticated in PATH
+ *   uv (for pypdf PDF text extraction)
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { parseArgs } from "@std/cli/parse-args";
-import { encodeBase64 } from "@std/encoding/base64";
 import { ensureDir } from "@std/fs/ensure-dir";
 import { join } from "@std/path";
 
@@ -52,7 +53,6 @@ const DEFAULT_GO_LIST_URL = Deno.env.get("KERALA_GO_URL") ??
 
 const DEFAULT_SINCE = "2026-05-18"; // Satheesan cabinet sworn in
 const REQUEST_DELAY_MS = 1_000;
-const CLAUDE_MODEL = "claude-sonnet-4-6";
 
 const FETCH_HEADERS = {
   "User-Agent":
@@ -198,11 +198,10 @@ interface Extracted {
   subjectMl: string | null;
 }
 
-const EXTRACT_SYSTEM = `\
+const EXTRACT_PROMPT = `\
 You are a structured data extractor for Kerala Government Orders (GOs).
-Kerala GOs are official government documents — they may be in Malayalam only,
-English only, or bilingual. Extract fields exactly as they appear; never
-invent or paraphrase content.
+Kerala GOs may be in Malayalam only, English only, or bilingual.
+Extract fields exactly as they appear; never invent or paraphrase content.
 
 Return ONLY a valid JSON object with these exact keys:
   goNumber   – exact GO number string as printed (e.g. "G.O.(P) No.1/2026/GAD")
@@ -212,79 +211,71 @@ Return ONLY a valid JSON object with these exact keys:
   subjectMl  – Malayalam subject line in Unicode, or null if not present
 
 GO type mapping:
-  G.O.(P)  → "P"       (Policy)
-  G.O.(Ms) → "Ms"      (Memo / Subordinate)
-  G.O.(Rt) → "Rt"      (Routine / Routing)
-  S.R.O.   → "SRO"     (Statutory Rules & Orders)
-  Circular → "Circular"
-  Bill     → "Bill"
+  G.O.(P)  → "P"   G.O.(Ms) → "Ms"   G.O.(Rt) → "Rt"
+  S.R.O.   → "SRO"   Circular → "Circular"   Bill → "Bill"
 
-The subject line is the main heading — appears prominently near the top,
-often after "Subject:" or "വിഷയം:" in Malayalam documents.
-If both languages are present, return both; if only Malayalam, return
-subjectMl and null for subject.`;
+The subject is the main heading near the top of the document,
+often after "Subject:" or "വിഷയം:".
+If only Malayalam is present, return subjectMl and null for subject.`;
 
-let _client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!_client) {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
-      throw new Error(
-        "ANTHROPIC_API_KEY is not set. Export it before running.",
-      );
-    }
-    _client = new Anthropic({ apiKey });
-  }
-  return _client;
+async function extractPdfText(pdfPath: string): Promise<string> {
+  const script = "import pypdf, sys; r=pypdf.PdfReader(sys.argv[1]); " +
+    'print("\\n".join(p.extract_text() or "" for p in r.pages))';
+  const result = await new Deno.Command("uv", {
+    args: ["run", "--with", "pypdf", "python", "-c", script, pdfPath],
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  if (!result.success) return "";
+  return new TextDecoder().decode(result.stdout).trim();
+}
+
+function cleanPortalHtml(s: string): string {
+  return s.replace(/[">]|&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
 async function claudeExtract(
   pdfPath: string | null,
   fallback: { goNumber: string; dateStr: string; subjectRaw: string },
 ): Promise<Extracted> {
-  const userParts: Anthropic.MessageParam["content"] = [];
-
+  let pdfText = "";
   if (pdfPath) {
     try {
-      const pdfBytes = await Deno.readFile(pdfPath);
-      const pdfBase64 = encodeBase64(pdfBytes);
-      userParts.push({
-        type: "document",
-        source: {
-          type: "base64",
-          media_type: "application/pdf",
-          data: pdfBase64,
-        },
-      } as Anthropic.DocumentBlockParam);
+      pdfText = await extractPdfText(pdfPath);
     } catch (e) {
-      console.error(`  [3] Could not read PDF: ${e}`);
+      console.error(`  [3] PDF text extraction failed: ${e}`);
     }
   }
 
-  userParts.push({
-    type: "text",
-    text: [
-      `Fallback GO number from portal: ${fallback.goNumber}`,
-      `Fallback date from portal: ${fallback.dateStr}`,
-      `Fallback subject from portal HTML: ${fallback.subjectRaw}`,
-      "",
-      "Extract the structured fields. If the PDF is missing or unreadable, use the fallback values.",
-    ].join("\n"),
-  });
+  const cleanFallback = cleanPortalHtml(fallback.subjectRaw);
+  const prompt = [
+    EXTRACT_PROMPT,
+    "",
+    pdfText
+      ? `PDF text (first 8000 chars):\n${pdfText.slice(0, 8000)}`
+      : "No PDF text available — use fallback values.",
+    "",
+    `Fallback GO number: ${fallback.goNumber}`,
+    `Fallback date: ${fallback.dateStr}`,
+    `Fallback subject from portal: ${cleanFallback}`,
+    "",
+    "Return ONLY a JSON object.",
+  ].join("\n");
 
   try {
-    const msg = await getClient().messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 512,
-      system: EXTRACT_SYSTEM,
-      messages: [{ role: "user", content: userParts }],
-    });
+    const result = await new Deno.Command("claude", {
+      args: ["-p", prompt, "--model", "claude-haiku-4-5-20251001"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
 
-    const raw = (msg.content[0] as Anthropic.TextBlock).text
-      .trim()
-      .replace(/^```[a-z]*\n?/, "")
-      .replace(/\n?```$/, "");
-    const parsed = JSON.parse(raw);
+    const raw = new TextDecoder().decode(result.stdout).trim();
+    const jsonStart = raw.indexOf("{");
+    const jsonEnd = raw.lastIndexOf("}");
+    if (jsonStart === -1 || jsonEnd === -1) {
+      throw new Error("No JSON in output");
+    }
+    const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
 
     return {
       goNumber: parsed.goNumber || fallback.goNumber,
@@ -294,12 +285,12 @@ async function claudeExtract(
       subjectMl: parsed.subjectMl || null,
     };
   } catch (e) {
-    console.error(`  [3] Claude extraction failed: ${e} — using fallbacks`);
+    console.error(`  [3] claude CLI extraction failed: ${e} — using fallbacks`);
     return {
       goNumber: fallback.goNumber,
       type: inferType(fallback.goNumber),
       date: toIso(fallback.dateStr),
-      subject: fallback.subjectRaw || null,
+      subject: cleanFallback || null,
       subjectMl: null,
     };
   }
