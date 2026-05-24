@@ -4,28 +4,40 @@ import { define } from "../../../utils.ts";
 import {
   getDepartmentBySlug,
   getMinister,
+  listDepartments,
+  listGovernmentOrdersByDept,
   listKpisByDept,
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
-import type { Department, Kpi, Minister } from "../../../data/types.ts";
+import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
+import type {
+  Department,
+  GovernmentOrder,
+  Kpi,
+  Minister,
+} from "../../../data/types.ts";
 
 interface Data {
   dept: Department;
   minister: Minister | null;
   kpis: Kpi[];
+  orders: GovernmentOrder[];
+  allDepts: Department[];
 }
 
 export const handler = define.handlers<Data>({
   async GET(ctx) {
     const dept = await getDepartmentBySlug(ctx.params.slug);
     if (!dept) throw new HttpError(404, "Department not found");
-    const [minister, kpis] = await Promise.all([
+    const [minister, kpis, orders, allDepts] = await Promise.all([
       dept.ministerId ? getMinister(dept.ministerId) : Promise.resolve(null),
       listKpisByDept(dept.id),
+      listGovernmentOrdersByDept(dept.id),
+      listDepartments(),
     ]);
-    return page({ dept, minister, kpis });
+    return page({ dept, minister, kpis, orders, allDepts });
   },
 });
 
@@ -33,7 +45,7 @@ export default define.page<typeof handler>(function DeptPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { dept, minister, kpis } = data;
+  const { dept, minister, kpis, orders, allDepts } = data;
 
   return (
     <>
@@ -117,6 +129,22 @@ export default define.page<typeof handler>(function DeptPage(
                 ))}
               </div>
             )}
+        </section>
+
+        <section class="mt-12">
+          <h2 class="text-xl font-semibold mb-4">
+            {lang === "ml"
+              ? "സമീപകാല വകുപ്പ് ഉത്തരവുകളും തീരുമാനങ്ങളും"
+              : "Recent Government Orders & Bills"}
+          </h2>
+          <div class="max-w-4xl">
+            <GovernmentOrderList
+              orders={orders}
+              depts={allDepts}
+              lang={lang}
+              hideDepartment
+            />
+          </div>
         </section>
       </main>
       <Footer lang={lang} />

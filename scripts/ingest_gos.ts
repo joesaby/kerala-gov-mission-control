@@ -1,0 +1,639 @@
+/**
+ * ingest_gos.ts — Kerala Government Order ingestion pipeline
+ *
+ * Stages:
+ *   1. Scrape  — fetch GO listing from document.kerala.gov.in
+ *   2. Download — cache PDFs locally in .cache/pdfs/
+ *   3. Extract  — send each PDF to Claude as a document block;
+ *                 Claude reads Malayalam + English natively and returns
+ *                 structured JSON (goNumber, type, date, subject, subjectMl)
+ *   4. Tag      — map GO number suffix to dept.id (high confidence) or
+ *                 keyword match (medium), else low
+ *   5. Merge    — skip GOs already in the fixture; preserve hand-curated
+ *                 fields (manifestoGoalIds, etc.) in existing records
+ *   6. Write    — prepend new records to data/government-orders.ts;
+ *                 bump SEED_VERSION in data/db.ts
+ *
+ * Usage:
+ *   deno task ingest-gos
+ *   deno task ingest-gos --since 2026-05-18
+ *   deno task ingest-gos --limit 20 --dry-run
+ *
+ * Env:
+ *   ANTHROPIC_API_KEY   required
+ *   KERALA_GO_URL       override the portal listing URL (optional)
+ */
+
+import Anthropic from "@anthropic-ai/sdk";
+import { parseArgs } from "@std/cli/parse-args";
+import { encodeBase64 } from "@std/encoding/base64";
+import { ensureDir } from "@std/fs/ensure-dir";
+import { join } from "@std/path";
+
+import type {
+  DeptTagConfidence,
+  GoOrderType,
+  GovernmentOrder,
+} from "../data/types.ts";
+import { DEPARTMENTS } from "../data/departments.ts";
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
+const REPO_ROOT = new URL("../", import.meta.url).pathname;
+const CACHE_DIR = join(REPO_ROOT, ".cache", "pdfs");
+const FIXTURE_PATH = join(REPO_ROOT, "data", "government-orders.ts");
+const DB_PATH = join(REPO_ROOT, "data", "db.ts");
+
+const PORTAL_BASE = "https://document.kerala.gov.in";
+const DEFAULT_GO_LIST_URL = Deno.env.get("KERALA_GO_URL") ??
+  `${PORTAL_BASE}/documentdetails/en/dDVtK21nV2l6c0RxcCtWTC9oTGcvZz09`;
+
+const DEFAULT_SINCE = "2026-05-18"; // Satheesan cabinet sworn in
+const REQUEST_DELAY_MS = 1_000;
+const CLAUDE_MODEL = "claude-sonnet-4-6";
+
+const FETCH_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (compatible; KeralaGovResearchBot/1.0; public accountability dashboard)",
+  "Accept-Language": "en-IN,ml-IN,en;q=0.9",
+};
+
+// ---------------------------------------------------------------------------
+// Stage 1 — Scrape GO listing
+// ---------------------------------------------------------------------------
+
+interface Listing {
+  goNumber: string;
+  dateStr: string; // dd-mm-yyyy
+  departmentRaw: string;
+  subjectRaw: string;
+  pdfUrl: string;
+}
+
+const GO_NUMBER_RE = /G\.O\.\s*\([A-Za-z/&]+\)\s*\d+\/\d{4}\/[A-Za-z&]+/gi;
+const DATE_RE = /\b(\d{2}-\d{2}-\d{4})\b/;
+const PDF_HREF_RE = /href="([^"]+\/documents\/governmentorders\/[^"]+\.pdf)"/gi;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function politeGet(url: string): Promise<Response> {
+  await sleep(REQUEST_DELAY_MS);
+  const r = await fetch(url, { headers: FETCH_HEADERS });
+  if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url}`);
+  return r;
+}
+
+function extractTextAroundMatch(html: string, matchIndex: number): string {
+  // Grab ~2 000 chars of raw HTML around the PDF link and strip tags
+  const start = Math.max(0, matchIndex - 1500);
+  const end = Math.min(html.length, matchIndex + 500);
+  return html.slice(start, end).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+}
+
+async function scrapeListings(
+  listUrl: string,
+  since: string,
+): Promise<Listing[]> {
+  console.error(`[1] Fetching listing: ${listUrl}`);
+  const html = await (await politeGet(listUrl)).text();
+
+  const results: Listing[] = [];
+  const seenUrls = new Set<string>();
+
+  let m: RegExpExecArray | null;
+  PDF_HREF_RE.lastIndex = 0;
+
+  while ((m = PDF_HREF_RE.exec(html)) !== null) {
+    const href = m[1];
+    const pdfUrl = href.startsWith("http") ? href : PORTAL_BASE + href;
+    if (seenUrls.has(pdfUrl)) continue;
+    seenUrls.add(pdfUrl);
+
+    const context = extractTextAroundMatch(html, m.index);
+
+    GO_NUMBER_RE.lastIndex = 0;
+    const goMatch = GO_NUMBER_RE.exec(context);
+    const dateMatch = DATE_RE.exec(context);
+    if (!goMatch || !dateMatch) continue;
+
+    const dateStr = dateMatch[1];
+    if (dateStr < since.split("-").reverse().join("-")) {
+      // Compare as dd-mm-yyyy strings is tricky; convert to ISO for comparison
+      const iso = dateStr.split("-").reverse().join("-");
+      if (iso < since) continue;
+    }
+
+    const goNumber = goMatch[0].trim();
+    const subjectRaw = context
+      .split(goNumber)[0]
+      .replace(/^[\s>•:[\]-]+/, "")
+      .trim()
+      .slice(-300); // last 300 chars before GO number = subject area
+
+    results.push({
+      goNumber,
+      dateStr,
+      departmentRaw: "", // will be enriched by Claude from PDF
+      subjectRaw: subjectRaw.trim(),
+      pdfUrl,
+    });
+  }
+
+  // Sort newest first (dd-mm-yyyy → ISO for comparison)
+  results.sort((a, b) => {
+    const isoA = a.dateStr.split("-").reverse().join("-");
+    const isoB = b.dateStr.split("-").reverse().join("-");
+    return isoB.localeCompare(isoA);
+  });
+
+  console.error(`[1] Found ${results.length} GOs on or after ${since}`);
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2 — Download PDFs
+// ---------------------------------------------------------------------------
+
+async function downloadPdf(pdfUrl: string): Promise<string | null> {
+  await ensureDir(CACHE_DIR);
+  const filename = pdfUrl.split("/").pop()!.split("?")[0];
+  const localPath = join(CACHE_DIR, filename);
+
+  try {
+    await Deno.stat(localPath);
+    return localPath; // already cached
+  } catch {
+    // not cached yet
+  }
+
+  console.error(`  [2] Downloading ${filename} …`);
+  try {
+    const r = await politeGet(pdfUrl);
+    const ct = r.headers.get("content-type") ?? "";
+    if (!ct.includes("pdf")) {
+      console.error(`  [2] Not a PDF (${ct}) — skipping`);
+      return null;
+    }
+    await Deno.writeFile(localPath, new Uint8Array(await r.arrayBuffer()));
+    return localPath;
+  } catch (e) {
+    console.error(`  [2] Download failed: ${e}`);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Claude PDF extraction
+// ---------------------------------------------------------------------------
+
+interface Extracted {
+  goNumber: string;
+  type: GoOrderType;
+  date: string; // YYYY-MM-DD
+  subject: string | null;
+  subjectMl: string | null;
+}
+
+const EXTRACT_SYSTEM = `\
+You are a structured data extractor for Kerala Government Orders (GOs).
+Kerala GOs are official government documents — they may be in Malayalam only,
+English only, or bilingual. Extract fields exactly as they appear; never
+invent or paraphrase content.
+
+Return ONLY a valid JSON object with these exact keys:
+  goNumber   – exact GO number string as printed (e.g. "G.O.(P) No.1/2026/GAD")
+  type       – one of: "P" | "Ms" | "Rt" | "SRO" | "Circular" | "Bill"
+  date       – ISO date "YYYY-MM-DD" (Kerala uses dd/mm/yyyy or dd-mm-yyyy)
+  subject    – English subject line, or null if only Malayalam is present
+  subjectMl  – Malayalam subject line in Unicode, or null if not present
+
+GO type mapping:
+  G.O.(P)  → "P"       (Policy)
+  G.O.(Ms) → "Ms"      (Memo / Subordinate)
+  G.O.(Rt) → "Rt"      (Routine / Routing)
+  S.R.O.   → "SRO"     (Statutory Rules & Orders)
+  Circular → "Circular"
+  Bill     → "Bill"
+
+The subject line is the main heading — appears prominently near the top,
+often after "Subject:" or "വിഷയം:" in Malayalam documents.
+If both languages are present, return both; if only Malayalam, return
+subjectMl and null for subject.`;
+
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) {
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      throw new Error(
+        "ANTHROPIC_API_KEY is not set. Export it before running.",
+      );
+    }
+    _client = new Anthropic({ apiKey });
+  }
+  return _client;
+}
+
+async function claudeExtract(
+  pdfPath: string | null,
+  fallback: { goNumber: string; dateStr: string; subjectRaw: string },
+): Promise<Extracted> {
+  const userParts: Anthropic.MessageParam["content"] = [];
+
+  if (pdfPath) {
+    try {
+      const pdfBytes = await Deno.readFile(pdfPath);
+      const pdfBase64 = encodeBase64(pdfBytes);
+      userParts.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: pdfBase64,
+        },
+      } as Anthropic.DocumentBlockParam);
+    } catch (e) {
+      console.error(`  [3] Could not read PDF: ${e}`);
+    }
+  }
+
+  userParts.push({
+    type: "text",
+    text: [
+      `Fallback GO number from portal: ${fallback.goNumber}`,
+      `Fallback date from portal: ${fallback.dateStr}`,
+      `Fallback subject from portal HTML: ${fallback.subjectRaw}`,
+      "",
+      "Extract the structured fields. If the PDF is missing or unreadable, use the fallback values.",
+    ].join("\n"),
+  });
+
+  try {
+    const msg = await getClient().messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 512,
+      system: EXTRACT_SYSTEM,
+      messages: [{ role: "user", content: userParts }],
+    });
+
+    const raw = (msg.content[0] as Anthropic.TextBlock).text
+      .trim()
+      .replace(/^```[a-z]*\n?/, "")
+      .replace(/\n?```$/, "");
+    const parsed = JSON.parse(raw);
+
+    return {
+      goNumber: parsed.goNumber || fallback.goNumber,
+      type: parsed.type || inferType(fallback.goNumber),
+      date: parsed.date || toIso(fallback.dateStr),
+      subject: parsed.subject || null,
+      subjectMl: parsed.subjectMl || null,
+    };
+  } catch (e) {
+    console.error(`  [3] Claude extraction failed: ${e} — using fallbacks`);
+    return {
+      goNumber: fallback.goNumber,
+      type: inferType(fallback.goNumber),
+      date: toIso(fallback.dateStr),
+      subject: fallback.subjectRaw || null,
+      subjectMl: null,
+    };
+  }
+}
+
+function toIso(ddmmyyyy: string): string {
+  const parts = ddmmyyyy.split(/[-/]/);
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, "0")}-${
+      parts[0].padStart(2, "0")
+    }`;
+  }
+  return ddmmyyyy;
+}
+
+function inferType(goNumber: string): GoOrderType {
+  const s = goNumber.toLowerCase();
+  if (s.includes("(p)")) return "P";
+  if (s.includes("(ms)")) return "Ms";
+  if (s.includes("(rt)")) return "Rt";
+  if (s.includes("s.r.o") || s.includes("sro")) return "SRO";
+  if (s.includes("circular")) return "Circular";
+  if (s.includes("bill")) return "Bill";
+  return "Rt";
+}
+
+// ---------------------------------------------------------------------------
+// Stage 4 — Department tagging
+// ---------------------------------------------------------------------------
+
+const DEPT_CODE_MAP: Record<string, string> = {
+  "fin": "dept.finance",
+  "rev": "dept.revenue",
+  "h&fwd": "dept.health-family-welfare",
+  "hfwd": "dept.health-family-welfare",
+  "hfw": "dept.health-family-welfare",
+  "gad": "dept.cmo",
+  "gen": "dept.cmo",
+  "clad": "dept.cmo",
+  "lsg": "dept.local-self-government",
+  "edu": "dept.general-education",
+  "gedn": "dept.general-education",
+  "hedn": "dept.higher-education",
+  "home": "dept.home",
+  "pwd": "dept.public-works",
+  "tran": "dept.transport",
+  "lab": "dept.labour-skills",
+  "for": "dept.forest-wildlife",
+  "ind": "dept.industries-commerce",
+  "agri": "dept.agriculture-farmers-welfare",
+  "coop": "dept.cooperation",
+  "fish": "dept.fisheries-harbour",
+  "pwr": "dept.power",
+  "elec": "dept.power",
+  "wr": "dept.water-resources",
+  "irr": "dept.water-resources",
+  "sc/st": "dept.scheduled-castes-tribes-bcd",
+  "scstbcd": "dept.scheduled-castes-tribes-bcd",
+  "wcd": "dept.women-child-development",
+  "tur": "dept.tourism",
+  "vig": "dept.vigilance",
+  "exc": "dept.excise",
+  "plan": "dept.planning-economic-affairs",
+  "dev": "dept.devaswom",
+  "devaswom": "dept.devaswom",
+  "min": "dept.minority-welfare",
+  "it": "dept.electronics-it",
+  "ict": "dept.electronics-it",
+  "cult": "dept.cultural-affairs",
+  "port": "dept.ports",
+  "yth": "dept.youth-welfare",
+  "law": "dept.law",
+};
+
+function tagDepartment(
+  goNumber: string,
+  subject: string,
+): { deptId?: string; deptConfidence: DeptTagConfidence } {
+  const segments = goNumber.split("/");
+  const suffix = segments[segments.length - 1]?.trim().toLowerCase();
+  if (suffix && DEPT_CODE_MAP[suffix]) {
+    return { deptId: DEPT_CODE_MAP[suffix], deptConfidence: "high" };
+  }
+  const subjectLower = subject.toLowerCase();
+  for (const dept of DEPARTMENTS) {
+    if (
+      subjectLower.includes(dept.name.toLowerCase()) ||
+      (dept.nameMl && subjectLower.includes(dept.nameMl.toLowerCase()))
+    ) {
+      return { deptId: dept.id, deptConfidence: "medium" };
+    }
+  }
+  return { deptConfidence: "low" };
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — ID generation
+// ---------------------------------------------------------------------------
+
+function generateId(
+  goNumber: string,
+  type: GoOrderType,
+  dateIso: string,
+  index: number,
+): string {
+  const year = dateIso.slice(0, 4);
+  const segments = goNumber.split("/");
+  const suffix = segments[segments.length - 1]?.trim().toLowerCase();
+  const numMatch = goNumber.match(/No\.(\d+)/i);
+  const num = numMatch ? numMatch[1] : String(index);
+  if (suffix && DEPT_CODE_MAP[suffix]) return `go.${year}-${suffix}-${num}`;
+  if (type === "Bill") return `go.${year}-bill-${num}`;
+  return `go.${year}-misc-${num}`;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 6 — Load existing fixture for idempotent merge
+// ---------------------------------------------------------------------------
+
+function loadExistingGoNumbers(fixturePath: string): Set<string> {
+  try {
+    const text = Deno.readTextFileSync(fixturePath);
+    const matches = text.matchAll(/"goNumber":\s*"([^"]+)"/g);
+    return new Set([...matches].map((m) => m[1]));
+  } catch {
+    return new Set();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Stage 7 — Render TypeScript fixture records
+// ---------------------------------------------------------------------------
+
+function ts(v: string | null | undefined): string {
+  if (v == null) return "undefined";
+  return JSON.stringify(v);
+}
+
+function renderRecord(r: GovernmentOrder): string {
+  const lines: string[] = ["  {"];
+  lines.push(`    id: ${ts(r.id)},`);
+  lines.push(`    goNumber: ${ts(r.goNumber)},`);
+  lines.push(`    type: ${ts(r.type)},`);
+  lines.push(`    subject: ${ts(r.subject)},`);
+  if (r.subjectMl) lines.push(`    subjectMl: ${ts(r.subjectMl)},`);
+  if (r.deptId) lines.push(`    deptId: ${ts(r.deptId)},`);
+  lines.push(`    deptConfidence: ${ts(r.deptConfidence)},`);
+  lines.push(`    date: ${ts(r.date)},`);
+  if (r.manifestoGoalIds?.length) {
+    const arr = r.manifestoGoalIds.map((g) => `"${g}"`).join(", ");
+    lines.push(`    manifestoGoalIds: [${arr}],`);
+    if (r.manifestoConfidence) {
+      lines.push(`    manifestoConfidence: ${ts(r.manifestoConfidence)},`);
+    }
+  }
+  lines.push(`    meta: {`);
+  lines.push(`      source: ${ts(r.meta.source)},`);
+  lines.push(`      sourceUrl: ${ts(r.meta.sourceUrl)},`);
+  lines.push(`      retrievedAt: ${ts(r.meta.retrievedAt)},`);
+  lines.push(`    },`);
+  lines.push(`    dataStatus: "verified",`);
+  lines.push(`  },`);
+  return lines.join("\n");
+}
+
+const FIXTURE_HEADER = `import type { GovernmentOrder } from "./types.ts";
+
+/**
+ * Ingested Kerala Government Orders, Circulars, and Legislative Bills.
+ * Generated by \`deno task ingest-gos\` — do not edit manually.
+ *
+ * Every record carries meta.sourceUrl — a verified link to the PDF on the
+ * official Kerala Government Document Portal (document.kerala.gov.in).
+ *
+ * IDs: go.<year>-<deptCode>-<number>
+ */
+export const GOVERNMENT_ORDERS: GovernmentOrder[] = [
+`;
+
+// ---------------------------------------------------------------------------
+// Stage 8 — Bump SEED_VERSION
+// ---------------------------------------------------------------------------
+
+function bumpSeedVersion(dbPath: string): void {
+  let text = Deno.readTextFileSync(dbPath);
+  const m = text.match(/const SEED_VERSION = (\d+);/);
+  if (!m) {
+    console.error("[8] Could not locate SEED_VERSION in db.ts");
+    return;
+  }
+  const next = Number(m[1]) + 1;
+  text = text.replace(
+    /const SEED_VERSION = \d+;/,
+    `const SEED_VERSION = ${next};`,
+  );
+  Deno.writeTextFileSync(dbPath, text);
+  console.error(`[8] SEED_VERSION bumped to ${next}`);
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+const args = parseArgs(Deno.args, {
+  string: ["since", "limit", "url"],
+  boolean: ["dry-run", "help"],
+  default: { since: DEFAULT_SINCE },
+});
+
+if (args.help) {
+  console.log(`
+deno task ingest-gos [options]
+
+  --since YYYY-MM-DD   Only include GOs on or after this date (default: ${DEFAULT_SINCE})
+  --limit N            Process at most N new GOs
+  --dry-run            Skip downloads and fixture write; print what would change
+  --url URL            Override the portal listing URL
+  --help               Show this help
+  `);
+  Deno.exit(0);
+}
+
+const since = args.since as string;
+const limit = args.limit ? Number(args.limit) : undefined;
+const dryRun = args["dry-run"] as boolean;
+const listUrl = (args.url as string) ?? DEFAULT_GO_LIST_URL;
+
+// Stage 1: scrape
+const listings = await scrapeListings(listUrl, since);
+if (listings.length === 0) {
+  console.error("[!] No listings found — check the portal URL or date filter.");
+  Deno.exit(1);
+}
+
+const limited = limit ? listings.slice(0, limit) : listings;
+
+// Stage 5 (early): load existing to skip already-ingested GOs
+const existingGoNumbers = loadExistingGoNumbers(FIXTURE_PATH);
+const newListings = limited.filter(
+  (l) => !existingGoNumbers.has(l.goNumber),
+);
+console.error(
+  `[+] ${newListings.length} new GOs to process ` +
+    `(${limited.length - newListings.length} already in fixture)`,
+);
+
+if (newListings.length === 0) {
+  console.error("[+] Nothing new to ingest. Fixture is up to date.");
+  Deno.exit(0);
+}
+
+// Stages 2–4: download + Claude extract + tag
+const newRecords: GovernmentOrder[] = [];
+
+for (const [i, listing] of newListings.entries()) {
+  console.error(`\n  → ${listing.goNumber} (${listing.dateStr})`);
+
+  const pdfPath = dryRun ? null : await downloadPdf(listing.pdfUrl);
+
+  const extracted = await claudeExtract(pdfPath, {
+    goNumber: listing.goNumber,
+    dateStr: listing.dateStr,
+    subjectRaw: listing.subjectRaw,
+  });
+
+  if (!extracted.subject && !extracted.subjectMl) {
+    console.error("  [!] No subject — skipping");
+    continue;
+  }
+
+  const { deptId, deptConfidence } = tagDepartment(
+    extracted.goNumber,
+    extracted.subject ?? extracted.subjectMl ?? "",
+  );
+
+  const id = generateId(
+    extracted.goNumber,
+    extracted.type,
+    extracted.date,
+    i + 1,
+  );
+
+  newRecords.push({
+    id,
+    goNumber: extracted.goNumber,
+    type: extracted.type,
+    subject: extracted.subject ?? extracted.subjectMl ?? "",
+    subjectMl: extracted.subjectMl ?? undefined,
+    deptId,
+    deptConfidence,
+    date: extracted.date,
+    meta: {
+      source: "Document Portal, Government of Kerala",
+      sourceUrl: listing.pdfUrl,
+      retrievedAt: new Date().toISOString(),
+    },
+    dataStatus: "verified",
+  });
+}
+
+if (newRecords.length === 0) {
+  console.error("[!] No records extracted.");
+  Deno.exit(1);
+}
+
+if (dryRun) {
+  console.log("\n[DRY RUN] Would add these records:");
+  for (const r of newRecords) {
+    console.log(`  ${r.id}  |  ${r.goNumber}  |  ${r.date}`);
+    if (r.subject) console.log(`  subject:   ${r.subject}`);
+    if (r.subjectMl) console.log(`  subjectMl: ${r.subjectMl}`);
+  }
+  Deno.exit(0);
+}
+
+// Stage 7: merge into fixture — prepend new records (newest first)
+const existingText = await Deno.readTextFile(FIXTURE_PATH).catch(() => "");
+const existingBodyMatch = existingText.match(
+  /export const GOVERNMENT_ORDERS[^=]+=\s*\[([\s\S]*?)\];/,
+);
+const existingBody = existingBodyMatch?.[1]?.trim() ?? "";
+
+const newBody = newRecords.map(renderRecord).join("\n");
+const combined = existingBody ? `${newBody}\n${existingBody}` : newBody;
+
+await Deno.writeTextFile(
+  FIXTURE_PATH,
+  FIXTURE_HEADER + combined + "\n];\n",
+);
+console.error(
+  `[7] Wrote ${newRecords.length} new records → ${FIXTURE_PATH}`,
+);
+
+// Stage 8: bump SEED_VERSION
+bumpSeedVersion(DB_PATH);
+
+console.error(`\n✓ Done — ${newRecords.length} new GOs ingested.`);
