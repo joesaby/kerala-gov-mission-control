@@ -3,7 +3,9 @@ import type {
   CoalitionMembership,
   Department,
   Government,
+  GovernmentOrder,
   Kpi,
+  ManifestoGoal,
   Minister,
   Party,
   Person,
@@ -20,6 +22,8 @@ import { COALITION_MEMBERSHIPS, PARTIES } from "./parties.ts";
 import { PERSONS } from "./persons.ts";
 import { SPEAKERS } from "./speakers.ts";
 import { PUBLIC_SPEECHES } from "./public-speeches.ts";
+import { GOVERNMENT_ORDERS } from "./government-orders.ts";
+import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 
 /**
  * Deno KV layout.
@@ -47,12 +51,14 @@ import { PUBLIC_SPEECHES } from "./public-speeches.ts";
  *   ["speaker_by_term", assemblyTerm, speakerId]  -> null
  *   ["speech_by_person", personId, speechId]      -> null
  *   ["speech_by_type",   type, speechId]          -> null
+ *   ["manifesto_goal_by_govt", govtId, goalId]    -> null
+ *   ["go_by_manifesto_goal", goalId, orderId]     -> null
  *
  * Bookkeeping:
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 9;
+const SEED_VERSION = 11;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -368,6 +374,80 @@ export async function listSpeechesByType(
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+// ----- Government Order --------------------------------------------------
+
+export async function listGovernmentOrders(): Promise<GovernmentOrder[]> {
+  await ensureSeeded();
+  return (await listAll<GovernmentOrder>(["go"]))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function getGovernmentOrder(
+  id: string,
+): Promise<GovernmentOrder | null> {
+  await ensureSeeded();
+  const res = await (await kv()).get<GovernmentOrder>(["go", id]);
+  return res.value;
+}
+
+export async function listGovernmentOrdersByDept(
+  deptId: string,
+): Promise<GovernmentOrder[]> {
+  await ensureSeeded();
+  const k = await kv();
+  const ids: string[] = [];
+  for await (
+    const entry of k.list<unknown>({ prefix: ["go_by_dept", deptId] })
+  ) {
+    ids.push(entry.key[entry.key.length - 1] as string);
+  }
+  const results = await Promise.all(
+    ids.map((id) => k.get<GovernmentOrder>(["go", id])),
+  );
+  return (results.map((r) => r.value).filter(Boolean) as GovernmentOrder[])
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function listGovernmentOrdersByManifestoGoal(
+  goalId: string,
+): Promise<GovernmentOrder[]> {
+  await ensureSeeded();
+  const k = await kv();
+  const ids: string[] = [];
+  for await (
+    const entry of k.list<unknown>({
+      prefix: ["go_by_manifesto_goal", goalId],
+    })
+  ) {
+    ids.push(entry.key[entry.key.length - 1] as string);
+  }
+  const results = await Promise.all(
+    ids.map((id) => k.get<GovernmentOrder>(["go", id])),
+  );
+  return (results.map((r) => r.value).filter(Boolean) as GovernmentOrder[])
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// ----- Manifesto Goal --------------------------------------------------------
+
+export async function listManifestoGoals(
+  governmentId?: string,
+): Promise<ManifestoGoal[]> {
+  await ensureSeeded();
+  const all = await listAll<ManifestoGoal>(["manifesto_goal"]);
+  return governmentId
+    ? all.filter((g) => g.governmentId === governmentId)
+    : all;
+}
+
+export async function getManifestoGoal(
+  id: string,
+): Promise<ManifestoGoal | null> {
+  await ensureSeeded();
+  const res = await (await kv()).get<ManifestoGoal>(["manifesto_goal", id]);
+  return res.value;
+}
+
 // ----- Write helpers (used by seed + admin endpoints) --------------------
 
 export async function putKpi(kpi: Kpi): Promise<void> {
@@ -455,6 +535,28 @@ export async function putSpeech(sp: PublicSpeech): Promise<void> {
   if (!res.ok) throw new Error(`Failed to put speech ${sp.id}`);
 }
 
+export async function putGovernmentOrder(go: GovernmentOrder): Promise<void> {
+  const k = await kv();
+  const atomic = k.atomic().set(["go", go.id], go);
+  if (go.deptId) {
+    atomic.set(["go_by_dept", go.deptId, go.id], null);
+  }
+  for (const goalId of go.manifestoGoalIds ?? []) {
+    atomic.set(["go_by_manifesto_goal", goalId, go.id], null);
+  }
+  const res = await atomic.commit();
+  if (!res.ok) throw new Error(`Failed to put government order ${go.id}`);
+}
+
+export async function putManifestoGoal(g: ManifestoGoal): Promise<void> {
+  const k = await kv();
+  const res = await k.atomic()
+    .set(["manifesto_goal", g.id], g)
+    .set(["manifesto_goal_by_govt", g.governmentId, g.id], null)
+    .commit();
+  if (!res.ok) throw new Error(`Failed to put manifesto goal ${g.id}`);
+}
+
 // ----- Seeding -----------------------------------------------------------
 
 export function ensureSeeded(): Promise<void> {
@@ -493,6 +595,11 @@ export async function seed(): Promise<void> {
       ["speech"],
       ["speech_by_person"],
       ["speech_by_type"],
+      ["go"],
+      ["go_by_dept"],
+      ["go_by_manifesto_goal"],
+      ["manifesto_goal"],
+      ["manifesto_goal_by_govt"],
     ] satisfies Deno.KvKey[]
   ) {
     for await (const entry of k.list({ prefix })) {
@@ -508,4 +615,6 @@ export async function seed(): Promise<void> {
   for (const d of DEPARTMENTS) await putDepartment(d);
   for (const kpi of HEADLINE_KPIS) await putKpi(kpi);
   for (const sp of PUBLIC_SPEECHES) await putSpeech(sp);
+  for (const mg of MANIFESTO_GOALS) await putManifestoGoal(mg);
+  for (const go of GOVERNMENT_ORDERS) await putGovernmentOrder(go);
 }

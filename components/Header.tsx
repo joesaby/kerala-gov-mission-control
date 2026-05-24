@@ -28,7 +28,8 @@ export function Header({ lang }: { lang: Lang }) {
           {[
             { href: "/", en: "Kerala Today", ml: "ഇന്നത്തെ കേരളം" },
             { href: "/gov", en: "Government", ml: "സർക്കാർ" },
-            { href: "/promises", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
+            { href: "/gov/cabinet", en: "Cabinet", ml: "മന്ത്രിസഭ" },
+            { href: "/gov/manifesto", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
           ].map((item) => (
             <a
               href={item.href}
