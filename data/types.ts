@@ -378,6 +378,47 @@ export interface PublicSpeech {
   dataStatus: "verified" | "unverified" | "tbd";
 }
 
+// ── Manifesto Goals ──────────────────────────────────────────────────────────
+
+export type ManifestoCategory =
+  | "welfare"
+  | "women"
+  | "health"
+  | "education"
+  | "livelihood"
+  | "infrastructure"
+  | "governance"
+  | "fiscal"
+  | "tribal"
+  | "environment";
+
+export type ManifestoGoalStatus =
+  | "committed"
+  | "in-progress"
+  | "fulfilled"
+  | "dropped";
+
+/**
+ * A single commitment from a government's election manifesto.
+ * `featured` marks the headline branded promises (e.g. "Indira Guarantees",
+ * "Dream Projects") that the party explicitly numbered and named.
+ */
+export interface ManifestoGoal {
+  id: string; // goal.<coalition><year>-<slug>
+  governmentId: string; // FK → Government.id
+  title: string;
+  titleMl?: string;
+  category: ManifestoCategory;
+  summary?: string;
+  summaryMl?: string;
+  /** Branded grouping label, e.g. "Indira Guarantee", "Dream Project". */
+  featuredLabel?: string;
+  featuredLabelMl?: string;
+  status: ManifestoGoalStatus;
+  sourceUrl?: string;
+  dataStatus: "verified" | "unverified" | "tbd";
+}
+
 // ── Government Orders ────────────────────────────────────────────────────────
 
 /**
@@ -421,6 +462,10 @@ export interface GovernmentOrder {
   date: string;
   /** ISO date the GO comes into force, if different from issue date. */
   effectiveDate?: string;
+  /** FKs → ManifestoGoal.id — one GO may serve multiple goals. */
+  manifestoGoalIds?: string[];
+  /** How strongly this GO backs the listed manifesto goals. */
+  manifestoConfidence?: "direct" | "supporting" | "weak";
   meta: {
     /** Name of the portal / document from which this record was fetched. */
     source: string;
