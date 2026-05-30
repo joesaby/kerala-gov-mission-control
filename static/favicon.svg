@@ -1,13 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#0d9488" />
-  <text
-    x="50%"
-    y="56%"
-    text-anchor="middle"
-    dominant-baseline="middle"
-    font-family="Inter, system-ui, sans-serif"
-    font-weight="700"
-    font-size="36"
-    fill="#ffffff"
-  >K</text>
+  <rect width="64" height="64" rx="14" fill="#0f7a52" />
+  <!-- Pookalam: concentric ring of petals in marigold + coral -->
+  <g transform="translate(32 32)">
+    <g fill="#f2a516">
+      <circle cx="0" cy="-19" r="4.5" />
+      <circle cx="13.4" cy="-13.4" r="4.5" />
+      <circle cx="19" cy="0" r="4.5" />
+      <circle cx="13.4" cy="13.4" r="4.5" />
+      <circle cx="0" cy="19" r="4.5" />
+      <circle cx="-13.4" cy="13.4" r="4.5" />
+      <circle cx="-19" cy="0" r="4.5" />
+      <circle cx="-13.4" cy="-13.4" r="4.5" />
+    </g>
+    <circle r="10.5" fill="#e4572e" />
+    <circle r="4.5" fill="#fffdf8" />
+  </g>
 </svg>

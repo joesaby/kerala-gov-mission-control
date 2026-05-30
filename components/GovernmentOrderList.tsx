@@ -102,13 +102,14 @@ export function GovernmentOrderList(
 
               {/* Subject */}
               <div class="flex-1">
-                <h3
-                  class={`text-sm sm:text-base font-semibold leading-relaxed text-base-content ${
+                <a
+                  href={`/gov/orders/${o.id}`}
+                  class={`text-sm sm:text-base font-semibold leading-relaxed text-base-content hover:text-primary transition ${
                     lang === "ml" ? "ml" : ""
                   }`}
                 >
                   {displaySubject}
-                </h3>
+                </a>
               </div>
 
               <footer class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-base-200">

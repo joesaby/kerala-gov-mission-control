@@ -1,6 +1,7 @@
 import { HttpError, page } from "fresh";
 import type { ComponentChildren } from "preact";
 import { define } from "../../../utils.ts";
+import { t } from "../../../data/lang.ts";
 import {
   getDepartmentBySlug,
   getMinister,
@@ -49,15 +50,15 @@ export default define.page<typeof handler>(function DeptPage(
 
   return (
     <>
-      <Header lang={lang} />
+      <Header lang={lang} path={state.path} />
       <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
         <p class="text-xs">
           <a href="/gov" class="link link-hover text-base-content/60">
-            ← Government
+            ← {t(lang, "Government", "സർക്കാർ")}
           </a>
         </p>
         <h1
-          class={`text-3xl md:text-4xl font-bold mt-2 ${
+          class={`font-display text-3xl md:text-4xl font-bold mt-2 ${
             lang === "ml" ? "ml" : ""
           }`}
         >
@@ -68,7 +69,7 @@ export default define.page<typeof handler>(function DeptPage(
         )}
 
         <section class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <InfoCard label="Minister">
+          <InfoCard label={t(lang, "Minister", "മന്ത്രി")}>
             {minister
               ? (
                 <a
@@ -80,7 +81,11 @@ export default define.page<typeof handler>(function DeptPage(
                     : minister.name}
                 </a>
               )
-              : <span class="italic text-base-content/60">Pending</span>}
+              : (
+                <span class="italic text-base-content/60">
+                  {t(lang, "Pending", "നിശ്ചയിച്ചിട്ടില്ല")}
+                </span>
+              )}
             {minister && lang === "ml" && minister.nameMl && (
               <div class="text-xs text-base-content/50">{minister.name}</div>
             )}
@@ -90,10 +95,12 @@ export default define.page<typeof handler>(function DeptPage(
               </div>
             )}
           </InfoCard>
-          <InfoCard label="Senior bureaucrat">
-            <span class="italic text-base-content/60">Pending</span>
+          <InfoCard label={t(lang, "Senior bureaucrat", "മുതിർന്ന ഉദ്യോഗസ്ഥൻ")}>
+            <span class="italic text-base-content/60">
+              {t(lang, "Pending", "നിശ്ചയിച്ചിട്ടില്ല")}
+            </span>
           </InfoCard>
-          <InfoCard label="Website">
+          <InfoCard label={t(lang, "Website", "വെബ്സൈറ്റ്")}>
             {dept.websiteUrl
               ? (
                 <a
@@ -108,13 +115,21 @@ export default define.page<typeof handler>(function DeptPage(
         </section>
 
         <section class="mt-10">
-          <h2 class="text-xl font-semibold mb-4">
-            KPIs this department is accountable for
+          <h2 class="font-display text-xl font-semibold mb-4">
+            {t(
+              lang,
+              "KPIs this department is accountable for",
+              "ഈ വകുപ്പിന്റെ ഉത്തരവാദിത്തത്തിലുള്ള സൂചകങ്ങൾ",
+            )}
           </h2>
           {kpis.length === 0
             ? (
               <p class="text-base-content/60 text-sm">
-                No headline KPIs are currently mapped to this department.
+                {t(
+                  lang,
+                  "No headline KPIs are currently mapped to this department.",
+                  "ഈ വകുപ്പിലേക്ക് ഇപ്പോൾ പ്രധാന സൂചകങ്ങളൊന്നും ചേർത്തിട്ടില്ല.",
+                )}
               </p>
             )
             : (
@@ -132,7 +147,7 @@ export default define.page<typeof handler>(function DeptPage(
         </section>
 
         <section class="mt-12">
-          <h2 class="text-xl font-semibold mb-4">
+          <h2 class="font-display text-xl font-semibold mb-4">
             {lang === "ml"
               ? "സമീപകാല വകുപ്പ് ഉത്തരവുകളും തീരുമാനങ്ങളും"
               : "Recent Government Orders & Bills"}

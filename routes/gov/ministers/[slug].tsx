@@ -1,5 +1,6 @@
 import { HttpError, page } from "fresh";
 import { define } from "../../../utils.ts";
+import { t } from "../../../data/lang.ts";
 import {
   getGovernment,
   getMinisterBySlug,
@@ -67,21 +68,21 @@ export default define.page<typeof handler>(function MinisterPage(
 
   return (
     <>
-      <Header lang={lang} />
+      <Header lang={lang} path={state.path} />
       <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
         <p class="text-xs">
           <a
             href={govt && govt.termEnd ? `/gov?g=${govt.slug}` : "/gov"}
             class="link link-hover text-base-content/60"
           >
-            ← {govt ? govt.shortName : "Government"}
+            ← {govt ? govt.shortName : t(lang, "Government", "സർക്കാർ")}
           </a>
         </p>
         <header class="mt-3 flex items-start gap-5 flex-wrap">
           <MinisterAvatar minister={minister} size={112} class="shrink-0" />
           <div class="min-w-0 flex-1">
             <h1
-              class={`text-3xl md:text-4xl font-bold ${
+              class={`font-display text-3xl md:text-4xl font-bold ${
                 lang === "ml" ? "ml" : ""
               }`}
             >
@@ -141,13 +142,15 @@ export default define.page<typeof handler>(function MinisterPage(
         </header>
 
         <section class="mt-8">
-          <h2 class="text-xl font-semibold mb-3">Portfolios</h2>
+          <h2 class="font-display text-xl font-semibold mb-3">
+            {t(lang, "Portfolios", "പോർട്ട്ഫോളിയോകൾ")}
+          </h2>
           <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {depts.map((d) => (
               <li>
                 <a
                   href={`/gov/departments/${d.slug}`}
-                  class="block p-3 rounded-lg border border-base-300 bg-base-100 hover:border-primary hover:shadow-sm transition"
+                  class="surface-link block p-3"
                 >
                   <div class="font-medium">{d.name}</div>
                   {d.summary && (
@@ -162,13 +165,21 @@ export default define.page<typeof handler>(function MinisterPage(
         </section>
 
         <section class="mt-10">
-          <h2 class="text-xl font-semibold mb-4">
-            KPIs under this minister's portfolios
+          <h2 class="font-display text-xl font-semibold mb-4">
+            {t(
+              lang,
+              "KPIs under this minister's portfolios",
+              "ഈ മന്ത്രിയുടെ വകുപ്പുകളിലെ സൂചകങ്ങൾ",
+            )}
           </h2>
           {kpis.length === 0
             ? (
               <p class="text-base-content/60 text-sm">
-                No headline KPIs are currently mapped to these portfolios.
+                {t(
+                  lang,
+                  "No headline KPIs are currently mapped to these portfolios.",
+                  "ഈ വകുപ്പുകളിലേക്ക് ഇപ്പോൾ പ്രധാന സൂചകങ്ങളൊന്നും ചേർത്തിട്ടില്ല.",
+                )}
               </p>
             )
             : (
@@ -188,7 +199,7 @@ export default define.page<typeof handler>(function MinisterPage(
         </section>
 
         <section class="mt-10">
-          <h2 class="text-xl font-semibold mb-4">
+          <h2 class="font-display text-xl font-semibold mb-4">
             {lang === "ml"
               ? "വകുപ്പുകളിലെ ഉത്തരവുകൾ"
               : "Orders & Circulars under Portfolio"}
@@ -200,14 +211,14 @@ export default define.page<typeof handler>(function MinisterPage(
 
         {speeches.length > 0 && (
           <section class="mt-10">
-            <h2 class="text-xl font-semibold mb-4">
+            <h2 class="font-display text-xl font-semibold mb-4">
               {lang === "ml" ? "പൊതു പ്രസംഗങ്ങൾ" : "Public Speeches"}
             </h2>
             <ul class="flex flex-col gap-6">
               {speeches.map((s) => (
                 <li
                   key={s.id}
-                  class="rounded-xl border border-base-300 bg-base-100 overflow-hidden"
+                  class="surface-card overflow-hidden"
                 >
                   {/* YouTube embed */}
                   {s.videoId && (
@@ -316,7 +327,8 @@ export default define.page<typeof handler>(function MinisterPage(
 
         {(minister.source || minister.sourceUrl) && (
           <p class="mt-10 text-xs text-base-content/60">
-            Source: {minister.sourceUrl
+            {t(lang, "Source: ", "ഉറവിടം: ")}
+            {minister.sourceUrl
               ? (
                 <a href={minister.sourceUrl} class="link link-hover">
                   {minister.source ?? minister.sourceUrl}

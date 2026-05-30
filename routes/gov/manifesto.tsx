@@ -1,5 +1,6 @@
 import { page } from "fresh";
 import { define } from "../../utils.ts";
+import { t } from "../../data/lang.ts";
 import {
   getCurrentGovernment,
   listGovernmentOrders,
@@ -122,11 +123,11 @@ export default define.page<typeof handler>(function ManifestoPage(
 
   return (
     <>
-      <Header lang={lang} />
+      <Header lang={lang} path={state.path} />
       <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
         {/* ── Header ── */}
         <section class="mb-8">
-          <p class="text-xs uppercase tracking-wider text-base-content/60 font-medium">
+          <p class="eyebrow">
             <a href="/gov" class="hover:text-primary transition">
               {lang === "ml"
                 ? govt?.nameMl ?? govt?.name ?? "സർക്കാർ"
@@ -135,7 +136,7 @@ export default define.page<typeof handler>(function ManifestoPage(
             {" · "}
             {lang === "ml" ? "മ്യാനിഫെസ്റ്റോ" : "Manifesto"}
           </p>
-          <h1 class="text-3xl md:text-4xl font-bold mt-1">
+          <h1 class="font-display text-3xl md:text-4xl font-bold mt-1">
             {lang === "ml" ? "വാഗ്ദാന ട്രാക്കർ" : "Promise Tracker"}
           </h1>
           <p class="text-base-content/70 mt-2 max-w-2xl">
@@ -143,6 +144,28 @@ export default define.page<typeof handler>(function ManifestoPage(
               ? "UDF 2026 തിരഞ്ഞെടുപ്പ് പ്രകടനപത്രിക — ഓരോ വാഗ്ദാനവും അത് ബാക്കപ്പ് ചെയ്യുന്ന സർക്കാർ ഉത്തരവുകൾ സഹിതം."
               : "UDF 2026 election manifesto — every commitment mapped to the government orders that back it."}
           </p>
+
+          {/* Overall progress */}
+          {goals.length > 0 && (
+            <div class="mt-5 max-w-md">
+              <div class="flex items-baseline justify-between mb-1.5 text-sm">
+                <span class="font-medium">
+                  {lang === "ml" ? "മൊത്തം പുരോഗതി" : "Overall progress"}
+                </span>
+                <span class="tabular-nums font-semibold text-primary">
+                  {Math.round((goalsWithAction / goals.length) * 100)}%
+                </span>
+              </div>
+              <div class="h-2.5 w-full rounded-full bg-base-300 overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-primary transition-all"
+                  style={`width: ${
+                    Math.round((goalsWithAction / goals.length) * 100)
+                  }%`}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Summary chips */}
           <div class="mt-5 flex flex-wrap gap-3 text-sm">
@@ -258,7 +281,7 @@ function GoalGroup({
   if (goals.length === 0) return null;
   return (
     <section class="mb-12">
-      <h2 class="text-xl font-semibold mb-1">{title}</h2>
+      <h2 class="font-display text-xl font-semibold mb-1">{title}</h2>
       <p class="text-sm text-base-content/60 mb-4">{description}</p>
       <ul class="flex flex-col gap-4">
         {goals.map((g) => (
@@ -298,7 +321,7 @@ function GoalCard(
 
   return (
     <li
-      class={`card bg-base-100 border border-base-300 border-l-4 ${accentClass} hover:shadow-md transition`}
+      class={`surface-card card border-l-4 ${accentClass}`}
     >
       <div class="card-body p-4 sm:p-5 gap-3">
         {/* Title row */}
@@ -371,20 +394,21 @@ function GoalCard(
                             </span>
                           )}
                         </div>
-                        <p class="text-base-content/80 leading-snug line-clamp-2 text-xs">
+                        <a
+                          href={`/gov/orders/${o.id}`}
+                          class="block text-base-content/80 leading-snug line-clamp-2 text-xs hover:text-primary transition"
+                        >
                           {lang === "ml" && o.subjectMl
                             ? o.subjectMl
                             : o.subject}
-                        </p>
+                        </a>
                       </div>
                       <a
-                        href={o.meta.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={`/gov/orders/${o.id}`}
                         class="btn btn-xs btn-ghost shrink-0"
-                        title="View source PDF"
+                        title={t(lang, "Read order", "ഉത്തരവ് വായിക്കുക")}
                       >
-                        PDF ↗
+                        {t(lang, "Read →", "വായിക്കുക →")}
                       </a>
                     </li>
                   );
@@ -394,10 +418,10 @@ function GoalCard(
           )
           : (
             <div class="pt-2 border-t border-base-200">
-              <p class="text-xs text-base-content/40 italic">
+              <p class="text-xs text-base-content/50 italic">
                 {lang === "ml"
-                  ? "ഇതുവരെ ഉത്തരവുകളൊന്നും ഇല്ല"
-                  : "No government orders recorded yet"}
+                  ? "ഇതുവരെ ഉത്തരവുകളൊന്നും ഇല്ല — ഞങ്ങൾ ദിവസവും പരിശോധിക്കുന്നു."
+                  : "No orders backing this yet — we check every day."}
               </p>
             </div>
           )}

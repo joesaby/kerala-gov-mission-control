@@ -12,7 +12,7 @@ export default define.page(function App({ Component, state }) {
           name="description"
           content="Real-time view of Kerala's promises, money, services and outcomes."
         />
-        <meta name="theme-color" content="#0d9488" />
+        <meta name="theme-color" content="#0f7a52" />
         <link
           rel="preconnect"
           href="https://fonts.googleapis.com"
@@ -24,7 +24,7 @@ export default define.page(function App({ Component, state }) {
           crossorigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Baloo+Chettan+2:wght@600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
