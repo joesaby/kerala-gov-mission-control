@@ -12,7 +12,7 @@
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_MODEL = "qwen/qwen3-32b";
-const MAX_TEXT_CHARS = 40_000;
+const MAX_TEXT_CHARS = 6_000;
 
 export function groqKey(): string | null {
   return Deno.env.get("GROQ_API_KEY") ?? null;
