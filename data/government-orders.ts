@@ -1,193 +1,93 @@
 import type { GovernmentOrder } from "./types.ts";
 
 /**
- * Ingested Kerala Government Orders, Circulars, and Legislative Bills.
- * Populated by the `ingest-go` skill (see .claude/skills/ingest-go/SKILL.md).
+ * Static baseline of Kerala Government Orders seeded into KV on cold start.
  *
- * Every record MUST carry `meta.sourceUrl` — a direct link to the PDF or
- * portal page. No source URL = record does not ship.
+ * Only orders with a verified, resolvable PDF on the official portal ship here.
+ * Fresh orders are added at runtime by the daily Gemini ingest (see lib/ingest.ts
+ * + lib/cron.ts), which writes straight to KV under a durable mirror that
+ * survives reseeds — so this file is intentionally small and need not be hand-
+ * edited to keep the site current.
  *
- * IDs are namespaced: go.<year>-<deptCode lower-case>-<number>
- * Example: go.2021-fin-162
+ * Every record carries meta.sourceUrl — a direct link to the PDF on the official
+ * Kerala Government Document Portal (document.kerala.gov.in).
+ *
+ * IDs: go.<year>-<deptCode>-<number>
  */
 export const GOVERNMENT_ORDERS: GovernmentOrder[] = [
   {
-    id: "go.2026-gad-1",
-    goNumber: "G.O.(P) No.1/2026/GAD",
-    type: "P",
+    id: "go.2026-misc-15",
+    goNumber: "G.O.(Ms)No.15/2026/TRANS",
+    type: "Ms",
     subject:
-      "Swearing-in Ceremony of Council of Ministers - Appointment of Personal Staff and allocation of administrative duties.",
+      "Transport Department - Railways - Thiruvananthapuram - Kasaragod Semi High Speed Silverline Project - Cancelled - Orders issued",
+    deptId: "dept.transport",
+    deptConfidence: "medium",
+    date: "2026-05-21",
+    manifestoGoalIds: ["goal.udf2026-highspeed-rail"],
+    manifestoConfidence: "direct",
+    meta: {
+      source: "Document Portal, Government of Kerala",
+      sourceUrl:
+        "https://document.kerala.gov.in/documents/governmentorders/eofficeorder_134_2305202602:00:43.pdf",
+      retrievedAt: "2026-05-24T12:33:28.768Z",
+    },
+    dataStatus: "verified",
+  },
+  {
+    id: "go.2026-clad-300",
+    goNumber: "G.O.(Rt) No.300/2026/CLAD",
+    type: "Rt",
+    subject:
+      "ഭാരത് ഭവന് - 2026-27- സാമ്പത്തിക വർഷത്തെ പദ്ധതിയേതര വിഹിതത്തില്‍ നിന്ന് ആദ്യ ഗഡു അനുമതി ഉത്തരവ്",
     subjectMl:
-      "മന്ത്രിസഭയുടെ സത്യപ്രതിജ്ഞാ ചടങ്ങ് - പേഴ്സണൽ സ്റ്റാഫ് നിയമനവും ഭരണപരമായ ചുമതലകൾ വിഭജിക്കലും.",
+      "ഭാരത് ഭവന് - 2026-27- സാമ്പത്തിക വർഷത്തെ പദ്ധതിയേതര വിഹിതത്തില്‍ നിന്ന് ആദ്യ ഗഡു അനുമതി ഉത്തരവ്",
     deptId: "dept.cmo",
     deptConfidence: "high",
-    date: "2026-05-19",
-    meta: {
-      source: "Document Portal, Government of Kerala",
-      sourceUrl:
-        "https://document.kerala.gov.in/documents/governmentorders/go-2026-gad-1.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
-    },
-    dataStatus: "verified",
-  },
-  {
-    id: "go.2026-fin-42",
-    goNumber: "G.O.(Ms) No.42/2026/Fin",
-    type: "Ms",
-    subject:
-      "Special audit of public debt, liabilities, and capital expenditures under KIIFB by the Comptroller and Auditor General.",
-    subjectMl:
-      "കിഫ്ബിയുടെ കീഴിലുള്ള പൊതു കടം, ബാധ്യതകൾ, മൂലധനച്ചെലവുകൾ എന്നിവയെക്കുറിച്ച് സി.എ.ജി.യുടെ പ്രത്യേക ഓഡിറ്റ്.",
-    deptId: "dept.finance",
-    deptConfidence: "high",
-    date: "2026-05-20",
-    manifestoGoalIds: ["goal.udf2026-fiscal-transparency"],
-    manifestoConfidence: "direct",
-    meta: {
-      source: "Document Portal, Government of Kerala",
-      sourceUrl:
-        "https://document.kerala.gov.in/documents/governmentorders/go-2026-fin-42.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
-    },
-    dataStatus: "verified",
-  },
-  {
-    id: "go.2026-home-82",
-    goNumber: "G.O.(Rt) No.82/2026/Home",
-    type: "Rt",
-    subject:
-      "Reconstitution of the State Level Police Complaints Authority - Appointment of judicial and independent members.",
-    subjectMl:
-      "സംസ്ഥാന തല പോലീസ് പരാതി പരിഹാര അതോറിറ്റി പുനഃസംഘടിപ്പിക്കൽ - ജുഡീഷ്യൽ, സ്വതന്ത്ര അംഗങ്ങളുടെ നിയമനം.",
-    deptId: "dept.home",
-    deptConfidence: "high",
-    date: "2026-05-20",
-    manifestoGoalIds: ["goal.udf2026-police-accountability"],
-    manifestoConfidence: "direct",
-    meta: {
-      source: "Document Portal, Government of Kerala",
-      sourceUrl:
-        "https://document.kerala.gov.in/documents/governmentorders/go-2026-home-82.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
-    },
-    dataStatus: "verified",
-  },
-  {
-    id: "go.2026-lsg-14",
-    goNumber: "G.O.(P) No.14/2026/LSG",
-    type: "P",
-    subject:
-      "Decentralisation of plan funds - Delegation of higher financial approval powers to Grama Panchayats for local infrastructure projects.",
-    subjectMl:
-      "പ്ലാൻ ഫണ്ടുകളുടെ വികേന്ദ്രീകരണം - പ്രാദേശിക അടിസ്ഥാന സൗകര്യ പദ്ധതികൾക്കായി ഗ്രാമപഞ്ചായത്തുകൾക്ക് ഉയർന്ന സാമ്പത്തിക അനുമതി നൽകൽ.",
-    deptId: "dept.local-self-government",
-    deptConfidence: "high",
-    date: "2026-05-21",
-    manifestoGoalIds: ["goal.udf2026-lsg-decentralisation"],
-    manifestoConfidence: "direct",
-    meta: {
-      source: "LSG Orders portal",
-      sourceUrl: "https://go.lsgkerala.gov.in/files/orders/go-2026-lsg-14.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
-    },
-    dataStatus: "verified",
-  },
-  {
-    id: "go.2026-hedn-3",
-    goNumber: "G.O.(Ms) No.3/2026/HEdn",
-    type: "Ms",
-    subject:
-      "Constitution of High-level Committee for Higher Education Curriculum Reforms to align with global standards.",
-    subjectMl:
-      "ആഗോള നിലവാരത്തിലേക്ക് ഉയർത്തുന്നതിനായി ഉന്നതവിദ്യാഭ്യാസ പാഠ്യപദ്ധതി പരിഷ്കരണങ്ങൾക്കായുള്ള ഉന്നതതല സമിതി രൂപീകരണം.",
-    deptId: "dept.higher-education",
-    deptConfidence: "high",
     date: "2026-05-22",
-    manifestoGoalIds: ["goal.udf2026-global-job-watch"],
-    manifestoConfidence: "supporting",
     meta: {
       source: "Document Portal, Government of Kerala",
       sourceUrl:
-        "https://document.kerala.gov.in/documents/governmentorders/go-2026-hedn-3.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
+        "https://document.kerala.gov.in/documents/governmentorders/govtorder2205202618:58:45.pdf",
+      retrievedAt: "2026-05-24T12:29:07.964Z",
     },
     dataStatus: "verified",
   },
   {
-    id: "go.2026-misc-45",
-    goNumber: "G.O.(Rt) No.45/2026/Misc",
+    id: "go.2026-misc-446",
+    goNumber: "G.O.(Rt) No.446/2026/TAXES",
     type: "Rt",
     subject:
-      "Establishment of digital literacy hubs in tribal panchayats - SC, ST & Backward Communities Development support.",
-    deptId: "dept.scheduled-castes-tribes-bcd",
+      "എക്സൈസ് - ഭരണപരം -21 സംസ്ഥാന എക്സൈസ് കലാകായികമേളയുടെ നടത്തിന് സർക്കാർ സഹായമായി തുക അനുമതി ഉത്തരവ്",
+    subjectMl:
+      "എക്സൈസ് - ഭരണപരം -21 സംസ്ഥാന എക്സൈസ് കലാകായികമേളയുടെ നടത്തിന് സർക്കാർ സഹായമായി തുക അനുമതി ഉത്തരവ്",
+    deptId: "dept.excise",
     deptConfidence: "medium",
     date: "2026-05-22",
-    manifestoGoalIds: ["goal.udf2026-tribal-digital"],
-    manifestoConfidence: "direct",
     meta: {
       source: "Document Portal, Government of Kerala",
       sourceUrl:
-        "https://document.kerala.gov.in/documents/governmentorders/go-2026-misc-45.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
+        "https://document.kerala.gov.in/documents/governmentorders/govtorder2205202619:27:07.pdf",
+      retrievedAt: "2026-05-24T12:29:32.527Z",
     },
     dataStatus: "verified",
   },
   {
-    id: "go.2026-h&fwd-105",
-    goNumber: "G.O.(Rt) No.105/2026/H&FWD",
+    id: "go.2026-home-3",
+    goNumber: "G.O.(Rt)1793/2026/HOME",
     type: "Rt",
     subject:
-      "Implementation of Kerala Health Card system in all public medical colleges and district hospitals for transparent patient tracking.",
+      "നാഷണല്‍ ഇൻവെസ്റ്റിഗേഷൻ എജൻസിയില്‍ അന്യത്രസേവനത്തിനുശേഷം പ്രോസിക്യൂഷൻ വകുപ്പിലേക്ക് തിരികെ പ്രവേശിച്ച ശ്രീമതി ലെനിഎ അസിസ്റ്റന്റ പബ്ലിക് പ്രോസിക്യൂട്ടർ സീനിയർ ഗ്രേഡ് നിയമനത്തിനായി കാത്തിരുന്ന കാലയളവ് ക്രമീകരിച്ചുള്ള ഉത്തരവ്",
     subjectMl:
-      "സുതാര്യമായ രോഗി നിരീക്ഷണത്തിനായി എല്ലാ പൊതു മെഡിക്കൽ കോളേജുകളിലും ജില്ലാ ആശുപത്രികളിലും കേരള ഹെൽത്ത് കാർഡ് സംവിധാനം നടപ്പിലാക്കൽ.",
-    deptId: "dept.health-family-welfare",
+      "നാഷണല്‍ ഇൻവെസ്റ്റിഗേഷൻ എജൻസിയില്‍ അന്യത്രസേവനത്തിനുശേഷം പ്രോസിക്യൂഷൻ വകുപ്പിലേക്ക് തിരികെ പ്രവേശിച്ച ശ്രീമതി ലെനിഎ അസിസ്റ്റന്റ പബ്ലിക് പ്രോസിക്യൂട്ടർ സീനിയർ ഗ്രേഡ് നിയമനത്തിനായി കാത്തിരുന്ന കാലയളവ് ക്രമീകരിച്ചുള്ള ഉത്തരവ്",
+    deptId: "dept.home",
     deptConfidence: "high",
-    date: "2026-05-23",
-    manifestoGoalIds: ["goal.udf2026-health-insurance"],
-    manifestoConfidence: "supporting",
+    date: "2026-05-22",
     meta: {
       source: "Document Portal, Government of Kerala",
       sourceUrl:
-        "https://document.kerala.gov.in/documents/governmentorders/go-2026-hfwd-105.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
-    },
-    dataStatus: "verified",
-  },
-  {
-    id: "go.2026-bill-1",
-    goNumber: "Bill No.1/2026",
-    type: "Bill",
-    subject:
-      "The Kerala Anti-Corruption Commission and Lok Ayukta (Amendment) Bill, 2026 - Restoring statutory oversight.",
-    deptConfidence: "low",
-    date: "2026-05-23",
-    manifestoGoalIds: ["goal.udf2026-anti-corruption"],
-    manifestoConfidence: "direct",
-    meta: {
-      source: "Niyamasabha Bills Passed Portal",
-      sourceUrl: "https://niyamasabha.nic.in/business/bills/bill-2026-1.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
-    },
-    dataStatus: "verified",
-  },
-  {
-    id: "go.2026-gad-12",
-    goNumber: "Circular No.12/2026/GAD",
-    type: "Circular",
-    subject:
-      "Guidelines for energy conservation in government administrative offices - CMO directives.",
-    subjectMl:
-      "സർക്കാർ ഭരണ കാര്യാലയങ്ങളിൽ ഊർജ്ജ സംരക്ഷണത്തിനായുള്ള മാർഗ്ഗനിർദ്ദേശങ്ങൾ - സി.എം.ഒ. നിർദ്ദേശങ്ങൾ.",
-    deptId: "dept.cmo",
-    deptConfidence: "high",
-    date: "2026-05-24",
-    manifestoGoalIds: ["goal.udf2026-energy-conservation"],
-    manifestoConfidence: "direct",
-    meta: {
-      source: "Document Portal, Government of Kerala",
-      sourceUrl:
-        "https://document.kerala.gov.in/documents/circulars/circular-2026-gad-12.pdf",
-      retrievedAt: "2026-05-24T11:37:19.441Z",
+        "https://document.kerala.gov.in/documents/governmentorders/govtorder2305202618:28:54.pdf",
+      retrievedAt: "2026-05-24T12:29:46.669Z",
     },
     dataStatus: "verified",
   },

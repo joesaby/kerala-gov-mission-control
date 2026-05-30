@@ -426,7 +426,14 @@ export interface ManifestoGoal {
  * "SRO" = Statutory Rules & Orders. "Circular" and "Bill" are non-GO document
  * types also processed by the ingest-go skill.
  */
-export type GoOrderType = "P" | "Ms" | "Rt" | "SRO" | "Circular" | "Bill";
+export type GoOrderType =
+  | "P"
+  | "Ms"
+  | "Rt"
+  | "SRO"
+  | "Circular"
+  | "Bill"
+  | "Cabinet";
 
 /**
  * Confidence level of the department tag assigned by the ingest-go skill.

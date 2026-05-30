@@ -4,6 +4,7 @@ import {
   getGovernment,
   getMinisterBySlug,
   listDepartments,
+  listGovernmentOrders,
   listKpis,
   listSpeechesByPerson,
 } from "../../../data/db.ts";
@@ -11,9 +12,11 @@ import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
 import { MinisterAvatar } from "../../../components/MinisterAvatar.tsx";
+import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
 import type {
   Department,
   Government,
+  GovernmentOrder,
   Kpi,
   Minister,
   PublicSpeech,
@@ -25,19 +28,22 @@ interface Data {
   depts: Department[];
   kpis: Kpi[];
   speeches: PublicSpeech[];
+  orders: GovernmentOrder[];
+  allDepts: Department[];
 }
 
 export const handler = define.handlers<Data>({
   async GET(ctx) {
     const minister = await getMinisterBySlug(ctx.params.slug);
     if (!minister) throw new HttpError(404, "Minister not found");
-    const [allDepts, allKpis, govt, speeches] = await Promise.all([
+    const [allDepts, allKpis, govt, speeches, allOrders] = await Promise.all([
       listDepartments(),
       listKpis(),
       minister.governmentId
         ? getGovernment(minister.governmentId)
         : Promise.resolve(null),
       listSpeechesByPerson(minister.personId),
+      listGovernmentOrders(),
     ]);
     const depts = allDepts.filter((d) => minister.departmentIds.includes(d.id));
     const deptIdSet = new Set(minister.departmentIds);
@@ -45,7 +51,10 @@ export const handler = define.handlers<Data>({
       (k.ownerDeptId && deptIdSet.has(k.ownerDeptId)) ||
       k.contributingDeptIds?.some((id) => deptIdSet.has(id))
     );
-    return page({ minister, govt, depts, kpis, speeches });
+    const orders = allOrders.filter(
+      (o) => o.deptId && deptIdSet.has(o.deptId),
+    );
+    return page({ minister, govt, depts, kpis, speeches, orders, allDepts });
   },
 });
 
@@ -53,7 +62,7 @@ export default define.page<typeof handler>(function MinisterPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { minister, govt, depts, kpis, speeches } = data;
+  const { minister, govt, depts, kpis, speeches, orders, allDepts } = data;
   const deptById = new Map(depts.map((d) => [d.id, d]));
 
   return (
@@ -176,6 +185,17 @@ export default define.page<typeof handler>(function MinisterPage(
                 ))}
               </div>
             )}
+        </section>
+
+        <section class="mt-10">
+          <h2 class="text-xl font-semibold mb-4">
+            {lang === "ml"
+              ? "വകുപ്പുകളിലെ ഉത്തരവുകൾ"
+              : "Orders & Circulars under Portfolio"}
+          </h2>
+          <div class="max-w-4xl">
+            <GovernmentOrderList orders={orders} depts={allDepts} lang={lang} />
+          </div>
         </section>
 
         {speeches.length > 0 && (

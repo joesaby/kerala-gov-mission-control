@@ -54,11 +54,14 @@ import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
  *   ["manifesto_goal_by_govt", govtId, goalId]    -> null
  *   ["go_by_manifesto_goal", goalId, orderId]     -> null
  *
+ * Durable mirror (survives reseed — NOT wiped by seed()):
+ *   ["go_ingested", id]      -> GovernmentOrder   (cron-ingested orders)
+ *
  * Bookkeeping:
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 11;
+const SEED_VERSION = 14;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -535,17 +538,102 @@ export async function putSpeech(sp: PublicSpeech): Promise<void> {
   if (!res.ok) throw new Error(`Failed to put speech ${sp.id}`);
 }
 
-export async function putGovernmentOrder(go: GovernmentOrder): Promise<void> {
-  const k = await kv();
-  const atomic = k.atomic().set(["go", go.id], go);
+/** Write a GO + its secondary indexes in one atomic commit. */
+function stageGovernmentOrder(
+  atomic: Deno.AtomicOperation,
+  go: GovernmentOrder,
+): Deno.AtomicOperation {
+  atomic.set(["go", go.id], go);
   if (go.deptId) {
     atomic.set(["go_by_dept", go.deptId, go.id], null);
   }
   for (const goalId of go.manifestoGoalIds ?? []) {
     atomic.set(["go_by_manifesto_goal", goalId, go.id], null);
   }
-  const res = await atomic.commit();
+  return atomic;
+}
+
+export async function putGovernmentOrder(go: GovernmentOrder): Promise<void> {
+  const k = await kv();
+  const res = await stageGovernmentOrder(k.atomic(), go).commit();
   if (!res.ok) throw new Error(`Failed to put government order ${go.id}`);
+}
+
+/**
+ * Persist a GO ingested at runtime (e.g. by the daily cron).
+ *
+ * Writes the primary `["go", id]` record + indexes AND a durable mirror under
+ * `["go_ingested", id]`. The mirror prefix is NOT wiped by `seed()`; on the
+ * next `SEED_VERSION` bump, `seed()` re-hydrates these records back into `["go"]`
+ * so cron-ingested orders survive a reseed (which otherwise repopulates `["go"]`
+ * only from the static fixture). Idempotent: re-ingesting the same id is a no-op
+ * overwrite.
+ */
+export async function putIngestedGovernmentOrder(
+  go: GovernmentOrder,
+): Promise<void> {
+  const k = await kv();
+  const atomic = stageGovernmentOrder(k.atomic(), go);
+  atomic.set(["go_ingested", go.id], go);
+  const res = await atomic.commit();
+  if (!res.ok) throw new Error(`Failed to put ingested order ${go.id}`);
+}
+
+/** Government order ids already present (fixture-seeded or cron-ingested). */
+export async function listGovernmentOrderKeys(): Promise<
+  { ids: Set<string>; goNumbers: Set<string>; sourceUrls: Set<string> }
+> {
+  await ensureSeeded();
+  const orders = await listAll<GovernmentOrder>(["go"]);
+  return {
+    ids: new Set(orders.map((o) => o.id)),
+    goNumbers: new Set(orders.map((o) => o.goNumber)),
+    sourceUrls: new Set(orders.map((o) => o.meta.sourceUrl)),
+  };
+}
+
+/** Ids ingested at runtime (the durable cron mirror), newest first. */
+export async function listIngestedGovernmentOrders(): Promise<
+  GovernmentOrder[]
+> {
+  await ensureSeeded();
+  return (await listAll<GovernmentOrder>(["go_ingested"]))
+    .sort((a, b) => b.meta.retrievedAt.localeCompare(a.meta.retrievedAt));
+}
+
+// ----- Ingest run status (for the status page) ---------------------------
+
+/** Outcome of the most recent ingest run. Stored at ["meta","ingest_status"]. */
+export interface IngestStatus {
+  /** ISO timestamp the run started. */
+  startedAt: string;
+  /** ISO timestamp the run finished. */
+  finishedAt: string;
+  /** Did the run complete without throwing? (Per-document errors may still exist.) */
+  ok: boolean;
+  /** What kicked off the run. */
+  trigger: "cron" | "manual";
+  /** Gemini model used. */
+  model: string;
+  /** Listings scanned across all sources. */
+  scanned: number;
+  /** New orders written this run. */
+  added: number;
+  /** Listings skipped (already present). */
+  skipped: number;
+  /** Per-document error messages (capped). */
+  errors: string[];
+  /** Ids added this run, for display. */
+  addedIds: string[];
+}
+
+export async function getIngestStatus(): Promise<IngestStatus | null> {
+  const res = await (await kv()).get<IngestStatus>(["meta", "ingest_status"]);
+  return res.value;
+}
+
+export async function setIngestStatus(status: IngestStatus): Promise<void> {
+  await (await kv()).set(["meta", "ingest_status"], status);
 }
 
 export async function putManifestoGoal(g: ManifestoGoal): Promise<void> {
@@ -617,4 +705,14 @@ export async function seed(): Promise<void> {
   for (const sp of PUBLIC_SPEECHES) await putSpeech(sp);
   for (const mg of MANIFESTO_GOALS) await putManifestoGoal(mg);
   for (const go of GOVERNMENT_ORDERS) await putGovernmentOrder(go);
+
+  // Re-hydrate cron-ingested orders. The `["go_ingested"]` mirror is never
+  // wiped above, so orders the daily cron added since the last reseed are
+  // restored into `["go"]` + indexes. Fixture records win on id collision
+  // (re-applied first), but in practice ids do not overlap.
+  for await (
+    const entry of k.list<GovernmentOrder>({ prefix: ["go_ingested"] })
+  ) {
+    await putGovernmentOrder(entry.value);
+  }
 }

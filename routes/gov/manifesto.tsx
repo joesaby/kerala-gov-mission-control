@@ -174,6 +174,15 @@ export default define.page<typeof handler>(function ManifestoPage(
               </span>
             </div>
           </div>
+
+          <p class="mt-4 text-xs text-base-content/50">
+            {lang === "ml"
+              ? "ഉത്തരവുകൾ ദിവസേന സ്വയമേവ ശേഖരിക്കുന്നു · "
+              : "Backing orders are ingested automatically each day · "}
+            <a href="/gov/ingest-status" class="link link-hover text-primary">
+              {lang === "ml" ? "പൈപ്പ്‌ലൈൻ നില" : "pipeline status"}
+            </a>
+          </p>
         </section>
 
         {/* ── Indira Guarantees ── */}
