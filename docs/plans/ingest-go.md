@@ -1,6 +1,15 @@
 # Plan — Government Orders Ingestion (`ingest-go`)
 
 > Status: **approved** · 2026-05-18
+>
+> **⚠️ Partly superseded (2026-05-30).** This is the original approved plan,
+> kept for history. Two "out of scope / deferred" decisions below have since
+> been implemented: **LLM-based classification** (now Gemini reads each PDF —
+> see `lib/gemini.ts`) and **fetch automation** (now a daily `Deno.cron` — see
+> `lib/cron.ts`). Storage also moved from a hand-edited fixture to cron-written
+> Deno KV with a durable mirror. The current design is documented in
+> `docs/plans/ingest-go-spec.md` and the README's "Government Orders ingest"
+> section.
 
 ## Problem
 

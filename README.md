@@ -1,10 +1,13 @@
 # Kerala Mission Control
 
 A public accountability dashboard prototype for the Government of Kerala — built
-on Deno Fresh 2 + Tailwind + daisyUI. This first cut ships the **Kerala Today**
-landing screen: 12 headline KPIs across fiscal, health, education, livelihood,
-safety, trust, environment and service delivery, each with definition, source,
-owner, update frequency, last refresh timestamp, trend, target, and comparators.
+on Deno Fresh 2 + Tailwind + daisyUI. It ships the **Kerala Today** landing
+screen (12 headline KPIs across fiscal, health, education, livelihood, safety,
+trust, environment and service delivery, each with definition, source, owner,
+update frequency, last refresh timestamp, trend, target, and comparators), a
+**Government** section (cabinet, departments, ministers), and a **Promise
+Tracker** that maps the UDF 2026 manifesto to the Government Orders that back it
+— with those orders ingested automatically each day (see below).
 
 > ⚠️ Independent prototype, not an official GoK product. KPI values are
 > illustrative mock data shaped exactly like the production schema.
@@ -17,13 +20,26 @@ routes/            file-based pages and API endpoints
   _middleware.ts   reads lang preference cookie
   _404.tsx         not-built-yet page for tier-2 stubs
   index.tsx        Kerala Today landing
+  gov/             government section
+    index.tsx      government overview
+    cabinet.tsx    council of ministers
+    manifesto.tsx  Promise Tracker (manifesto → backing GOs)
+    ingest-status.tsx   daily ingest pipeline health
+    departments/[slug].tsx, ministers/[slug].tsx
   api/kpis.ts      raw KPI JSON (machine-readable)
 islands/           client-side interactive components (Preact)
   LangToggle.tsx   EN ↔ മല toggle
 components/        server-only Preact components
-data/              typed KPI fixtures + i18n helpers
-  types.ts         KPI / metadata schema
-  kpis.ts          headline KPI mock data
+data/              typed fixtures + i18n helpers (seeded into Deno KV)
+  types.ts              KPI / governance / GovernmentOrder schema
+  kpis.ts               headline KPI mock data
+  government-orders.ts  verified GO baseline (cron adds the rest to KV)
+  manifesto-goals.ts    UDF 2026 manifesto commitments
+  db.ts                 Deno KV layer + seeding
+lib/               shared non-route modules
+  gemini.ts        Gemini API client (reads PDFs natively)
+  ingest.ts        GO ingest pipeline (scrape → Gemini → KV)
+  cron.ts          daily Deno.cron registration
 static/            static assets served from /
 ```
 
@@ -78,6 +94,37 @@ paragraph.
 **Tests:** `deno task translate:test` runs the pytest suite for the pure helpers
 (transcript parsing, chunking, header building, paragraph collapse).
 
+## Government Orders ingest (Gemini + daily cron)
+
+Government Orders (GOs) that back manifesto promises are ingested automatically,
+not hand-curated. The pipeline (`lib/ingest.ts`) is runtime-safe — pure
+`fetch` + Deno KV, no subprocess or filesystem — so it runs unchanged inside
+Deno Deploy:
+
+1. **Scrape** GO listings from `document.kerala.gov.in`.
+2. **Extract + map** — each PDF's bytes go straight to **Gemini**
+   (`gemini-flash-latest`), which reads the PDF natively and returns the order's
+   number/type/date/subject (EN + ML) **and** the manifesto goal it backs.
+3. **Persist** to Deno KV under a durable mirror that survives reseeds, so fresh
+   data appears on the site with no redeploy.
+
+`lib/cron.ts` registers a `Deno.cron` that runs this daily at 02:30 IST.
+Pipeline health (last run time, counts, errors) is shown at
+`/gov/ingest-status`.
+
+**Requires `GEMINI_API_KEY`** — set it in the Deno Deploy project env (for the
+cron) and in a local `.env` (for the CLI). Use `gemini-flash-latest`;
+`gemini-2.0-flash` has a zero free-tier quota on some keys. Override with
+`GEMINI_MODEL`.
+
+Manual run / backfill (writes to local KV):
+
+```bash
+deno task ingest-gos                       # all sources, since cabinet formed
+deno task ingest-gos --limit 5 --dry-run   # preview without writing
+deno task ingest-gos --source orders,circulars --since 2026-05-18
+```
+
 ## Deploying to Deno Deploy
 
 Deploys are handled by the **Deno Deploy GitHub App** (Git Integration). The app
@@ -85,7 +132,8 @@ watches the repo, auto-detects Fresh, runs `deno task build`, and serves
 `_fresh/server.js`. No deploy step in CI.
 
 The live URL is set on the project in the
-[Deno Deploy dashboard](https://dash.deno.com/).
+[Deno Deploy dashboard](https://dash.deno.com/). Set `GEMINI_API_KEY` in the
+project's environment variables so the daily ingest cron can run.
 
 `.github/workflows/ci.yml` is for verification only — it runs `deno fmt`,
 `deno lint`, `deno check`, and `deno task build` on every PR and push to `main`.
@@ -113,8 +161,8 @@ direction; here it's hand-set on the fixtures.
 Tier 1 — citizen-facing, mandatory:
 
 - [x] Kerala Today
+- [x] Promise Tracker (manifesto → backing Government Orders)
 - [ ] Where My Money Goes (budget → scheme → district sankey, tender hub)
-- [ ] Promises Tracker (manifesto + budget commitments)
 - [ ] My Panchayat (geo-located LSG view)
 - [ ] Service Clock (citizen service SLA delivery)
 

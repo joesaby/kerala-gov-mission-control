@@ -1,7 +1,8 @@
 # Spec — `GovernmentOrder` Data Model
 
-> Version: 1.0 · 2026-05-18 Companion to: `docs/plans/ingest-go.md`
-> Implementation: `data/types.ts`, `data/government-orders.ts`
+> Version: 1.1 · 2026-05-30 Companion to: `docs/plans/ingest-go.md`
+> Implementation: `data/types.ts`, `data/government-orders.ts`, `lib/ingest.ts`,
+> `lib/gemini.ts`, `lib/cron.ts`
 
 ---
 
@@ -27,7 +28,14 @@ Every record is:
 ```ts
 // data/types.ts
 
-export type GoOrderType = "P" | "Ms" | "Rt" | "SRO" | "Circular" | "Bill";
+export type GoOrderType =
+  | "P"
+  | "Ms"
+  | "Rt"
+  | "SRO"
+  | "Circular"
+  | "Bill"
+  | "Cabinet";
 
 export type DeptTagConfidence = "high" | "medium" | "low";
 
@@ -41,6 +49,8 @@ export interface GovernmentOrder {
   deptConfidence: DeptTagConfidence;
   date: string; // ISO date
   effectiveDate?: string; // ISO date; omit if same as date
+  manifestoGoalIds?: string[]; // FKs → ManifestoGoal.id this order backs
+  manifestoConfidence?: "direct" | "supporting" | "weak";
   meta: {
     source: string; // human-readable portal name
     sourceUrl: string; // direct PDF / page URL — mandatory
@@ -81,12 +91,14 @@ If a GO has no dept code (e.g. some Circulars), use `go.<year>-misc-<n>`.
 | `SRO`      | Statutory Rules & Orders — rules under Acts         |
 | `Circular` | Departmental circular (no formal GO number)         |
 | `Bill`     | Legislative Bill passed by Kerala Niyamasabha       |
+| `Cabinet`  | Cabinet decision published on the document portal   |
 
 ---
 
 ## `deptCode` → `dept.id` Lookup Table
 
-This is the authoritative mapping used in Stage 1 tagging. Update it when a new
+This is the mapping used in Stage 1 tagging. The authoritative copy lives in
+`DEPT_CODE_MAP` in `lib/ingest.ts`; update it there (and here) when a new
 department code appears in a GO.
 
 | deptCode (case-insensitive) | dept.id                            |
@@ -100,7 +112,7 @@ department code appears in a GO.
 | `HEdn`                      | `dept.higher-education`            |
 | `Home`                      | `dept.home`                        |
 | `PWD`                       | `dept.public-works`                |
-| `Tran`                      | `dept.transport`                   |
+| `Tran`, `Trans`             | `dept.transport`                   |
 | `Lab`                       | `dept.labour-skills`               |
 | `For`                       | `dept.forest-wildlife`             |
 | `Ind`                       | `dept.industries-commerce`         |
@@ -113,7 +125,7 @@ department code appears in a GO.
 | `WCD`                       | `dept.women-child-development`     |
 | `Tur`                       | `dept.tourism`                     |
 | `Vig`                       | `dept.vigilance`                   |
-| `Exc`                       | `dept.excise`                      |
+| `Exc`, `Taxes`              | `dept.excise`                      |
 | `Plan`                      | `dept.planning-economic-affairs`   |
 | `Dev`, `Devaswom`           | `dept.devaswom`                    |
 | `Min`                       | `dept.minority-welfare`            |
@@ -158,26 +170,53 @@ No tooltip = no merge.
 
 ---
 
-## Fixture File
+## Storage — fixture baseline + cron-ingested KV
 
-`data/government-orders.ts` exports a single named array:
+Orders live in Deno KV under `["go", id]`. They reach KV two ways:
 
-```ts
-export const GOVERNMENT_ORDERS: GovernmentOrder[] = [];
-```
+1. **Static baseline** — `data/government-orders.ts` exports
+   `GOVERNMENT_ORDERS: GovernmentOrder[]`, seeded on cold start. Only orders
+   with a verified, **resolvable** PDF belong here; do not add speculative
+   records with guessed URLs. When you edit it, bump `SEED_VERSION` in
+   `data/db.ts`.
+2. **Daily ingest** — `lib/ingest.ts` (run by `lib/cron.ts`) writes new orders
+   at runtime via `putIngestedGovernmentOrder`, which also mirrors them to a
+   durable `["go_ingested", id]` prefix. `seed()` never wipes that mirror and
+   re-hydrates it into `["go"]` after a `SEED_VERSION` bump, so cron data
+   survives reseeds.
 
-When records are added, bump `SEED_VERSION` in `data/db.ts`.
+This means the fixture stays small and the site updates without a redeploy.
 
 ---
 
-## Source Portals (registered in `data/sources.ts`)
+## Ingestion pipeline
 
-| `DataSource.id`         | Primary use                      |
-| ----------------------- | -------------------------------- |
-| `src.go-portal-kerala`  | All-department GOs and Circulars |
-| `src.go-lsg-kerala`     | LSG-specific orders              |
-| `src.niyamasabha-bills` | Bills passed by the Legislature  |
-| `src.go-wcd-kerala`     | Women & Child Development orders |
+`lib/ingest.ts` orchestrates: scrape portal listings → download each PDF →
+**Gemini** (`lib/gemini.ts`, `gemini-flash-latest`) reads the PDF natively and
+returns `goNumber/type/date/subject(+Ml)` **plus** the manifesto goal it backs,
+in one call → dept-tag → dedup vs KV → persist. It is pure `fetch` + KV (no
+subprocess/filesystem) so it runs inside Deno Deploy. Requires `GEMINI_API_KEY`.
 
-For department-specific portals not listed above, use the document portal's
-advanced search and filter by the relevant department.
+Run history is recorded at `["meta","ingest_status"]` and surfaced at
+`/gov/ingest-status`. Manual runs:
+`deno task ingest-gos [--since] [--limit]
+[--source] [--dry-run]`.
+
+---
+
+## Source Portals
+
+The ingest scrapes four sub-portals of the **Kerala Document Portal**
+(`document.kerala.gov.in`), defined as `KNOWN_SOURCES` in `lib/ingest.ts`:
+
+| Source key  | Documents                       |
+| ----------- | ------------------------------- |
+| `orders`    | Kerala Government Orders (G.O.) |
+| `cabinet`   | Cabinet decisions               |
+| `circulars` | Government circulars            |
+| `rts`       | Right to Service documents      |
+
+> Note: earlier drafts referenced `go.lsgkerala.gov.in`, `niyamasabha.nic.in`,
+> and `wcd.kerala.gov.in`. Those deep links did not resolve to stable PDFs and
+> were dropped — the unified document portal above is the single source of
+> truth.
