@@ -58,8 +58,8 @@ const SATHEESAN: Minister[] = [
     termStart: "2026-05-18",
     departmentIds: ["dept.cmo", "dept.finance", "dept.law", "dept.ports"],
     photoUrl:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/V-d-satheesan.png/120px-V-d-satheesan.png",
-    photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/VD_Satheesan.jpg/120px-VD_Satheesan.jpg",
+    photoCredit: "Wikimedia Commons / GODL-India",
     wikipediaUrl: "https://en.wikipedia.org/wiki/V._D._Satheesan",
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -97,6 +97,9 @@ const SATHEESAN: Minister[] = [
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
     departmentIds: ["dept.home", "dept.vigilance"],
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Ramesh_chennithala_Feb26.jpg/120px-Ramesh_chennithala_Feb26.jpg",
+    photoCredit: "Wikimedia Commons / CC0",
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",
@@ -129,6 +132,9 @@ const SATHEESAN: Minister[] = [
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
     departmentIds: ["dept.health-family-welfare"],
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/A.P._Anil_Kumar.JPG/120px-A.P._Anil_Kumar.JPG",
+    photoCredit: "Wikimedia Commons / CC BY-SA 3.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",
@@ -161,6 +167,9 @@ const SATHEESAN: Minister[] = [
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
     departmentIds: ["dept.agriculture-farmers-welfare"],
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Shibu-Baby-John.jpg/120px-Shibu-Baby-John.jpg",
+    photoCredit: "Wikimedia Commons / CC BY-SA 3.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",
@@ -323,6 +332,9 @@ const SATHEESAN: Minister[] = [
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
     departmentIds: ["dept.food-civil-supplies"],
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Anoop_jacob.JPG/120px-Anoop_jacob.JPG",
+    photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",
@@ -393,6 +405,9 @@ const SATHEESAN: Minister[] = [
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
     departmentIds: ["dept.industries-commerce", "dept.electronics-it"],
+    photoUrl:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/P._K._Kunhalikutty.jpg/120px-P._K._Kunhalikutty.jpg",
+    photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",

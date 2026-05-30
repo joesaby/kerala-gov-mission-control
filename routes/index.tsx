@@ -1,5 +1,6 @@
 import { page } from "fresh";
 import { define } from "../utils.ts";
+import { t } from "../data/lang.ts";
 import {
   getCurrentGovernment,
   listGovernmentOrders,
@@ -55,6 +56,20 @@ function daysInOffice(termStart: string): number {
   return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
 }
 
+/** Time-aware greeting in IST. */
+function greeting(lang: "en" | "ml"): string {
+  const hour = Number(
+    new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      hour12: false,
+    }),
+  );
+  if (hour < 12) return t(lang, "Good morning", "സുപ്രഭാതം");
+  if (hour < 17) return t(lang, "Good afternoon", "നമസ്കാരം");
+  return t(lang, "Good evening", "ശുഭ സന്ധ്യ");
+}
+
 const ORDER_TYPE_LABEL: Record<string, string> = {
   P: "Policy",
   Ms: "Memo",
@@ -75,6 +90,7 @@ export default define.page<typeof handler>(function Home({ data, state }) {
     },
     { "off-track": 0, "slipping": 0, "on-track": 0, "improving": 0 },
   );
+  const trendingWell = counts["on-track"] + counts["improving"];
 
   const today = new Date().toLocaleDateString("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -99,13 +115,60 @@ export default define.page<typeof handler>(function Home({ data, state }) {
 
   return (
     <>
-      <Header lang={lang} />
+      <Header lang={lang} path={state.path} />
       <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
+        {/* ── Greeting hero ── */}
+        <section class="hero-band rounded-box border border-base-300 p-6 md:p-8 mb-8">
+          <p class="text-xs uppercase tracking-wider text-base-content/60 font-medium tabular-nums">
+            {today} · {t(lang, "India Standard Time", "ഇന്ത്യൻ സമയം")}
+          </p>
+          <h1
+            class={`font-display text-3xl md:text-4xl font-bold mt-1 ${
+              lang === "ml" ? "ml" : ""
+            }`}
+          >
+            {greeting(lang)} —{" "}
+            {lang === "ml" ? "ഇന്നത്തെ കേരളം" : "here's Kerala today"}
+          </h1>
+          <p
+            class={`text-base-content/70 mt-2 max-w-2xl leading-relaxed ${
+              lang === "ml" ? "ml" : ""
+            }`}
+          >
+            {lang === "ml"
+              ? "സംസ്ഥാനത്തിന്റെ പ്രധാന 12 സൂചകങ്ങൾ — സാമ്പത്തികം, ആരോഗ്യം, വിദ്യാഭ്യാസം, സുരക്ഷ, വിശ്വാസ്യത, സേവനങ്ങൾ — ഒറ്റ കാഴ്ചയിൽ. ഓരോ കാർഡിലും നിർവചനവും ഉറവിടവും കാണാം."
+              : "Twelve headline indicators — money, health, education, safety, trust and services — at a glance. Tap any card for what it means and where the number comes from."}
+          </p>
+
+          {/* At-a-glance summary */}
+          <div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <p class={`text-sm font-medium ${lang === "ml" ? "ml" : ""}`}>
+              {lang === "ml"
+                ? `${kpis.length}-ൽ ${trendingWell} സൂചകങ്ങൾ നല്ല ദിശയിലാണ്.`
+                : `${trendingWell} of ${kpis.length} indicators are trending well.`}
+            </p>
+            <dl class="flex flex-wrap items-center gap-3 text-sm">
+              {STATUS_ORDER.map((s) => (
+                <div class="flex items-center gap-1.5">
+                  <StatusBadge status={s} lang={lang} />
+                  <dd class="tabular-nums font-semibold">{counts[s]}</dd>
+                </div>
+              ))}
+            </dl>
+            <a
+              href="/methodology"
+              class="link link-hover text-base-content/60 text-sm ml-auto"
+            >
+              {t(lang, "How we score status →", "സ്കോറിങ് രീതി →")}
+            </a>
+          </div>
+        </section>
+
         {/* ── Government context bar ── */}
         {govt && (
           <a
             href="/gov"
-            class="flex flex-wrap items-center justify-between gap-3 mb-8 p-4 rounded-xl border border-base-300 bg-base-100 hover:border-primary hover:shadow-sm transition group"
+            class="surface-link flex flex-wrap items-center justify-between gap-3 mb-8 p-4 group"
           >
             <div class="flex items-center gap-3">
               <span class="badge badge-sm badge-outline">{govt.coalition}</span>
@@ -122,56 +185,18 @@ export default define.page<typeof handler>(function Home({ data, state }) {
                 </span>{" "}
                 {lang === "ml" ? "ദിവസം അധികാരത്തിൽ" : "days in office"}
               </span>
-              <span class="group-hover:text-primary transition">
+              <span class="group-hover:text-primary transition font-medium">
                 {lang === "ml" ? "മന്ത്രിസഭ കാണുക →" : "View cabinet →"}
               </span>
             </div>
           </a>
         )}
 
-        {/* ── Page heading ── */}
-        <section class="mb-8 md:mb-10">
-          <p class="text-xs uppercase tracking-wider text-base-content/60 font-medium">
-            {today} · India Standard Time
-          </p>
-          <h1
-            class={`text-3xl md:text-4xl font-bold mt-1 ${
-              lang === "ml" ? "ml" : ""
-            }`}
-          >
-            {lang === "ml" ? "ഇന്നത്തെ കേരളം" : "Kerala Today"}
-          </h1>
-          <p
-            class={`text-base-content/70 mt-2 max-w-2xl ${
-              lang === "ml" ? "ml" : ""
-            }`}
-          >
-            {lang === "ml"
-              ? "സംസ്ഥാനത്തിന്റെ പ്രധാന 12 സൂചകങ്ങൾ — സാമ്പത്തികം, ആരോഗ്യം, വിദ്യാഭ്യാസം, സുരക്ഷ, വിശ്വാസ്യത, സേവനങ്ങൾ — ഒറ്റ കാഴ്ചയിൽ."
-              : "Twelve headline indicators — fiscal, health, education, safety, trust, services — at a glance. Click any tile for definition, source, and methodology."}
-          </p>
-
-          <dl class="mt-5 flex flex-wrap items-center gap-4 text-sm">
-            {STATUS_ORDER.map((s) => (
-              <div class="flex items-center gap-2">
-                <StatusBadge status={s} />
-                <dd class="tabular-nums font-semibold">{counts[s]}</dd>
-              </div>
-            ))}
-            <a
-              href="/methodology"
-              class="link link-hover text-base-content/60 ml-auto"
-            >
-              How we score status →
-            </a>
-          </dl>
-        </section>
-
         {/* ── Promise Pulse ── */}
         {goals.length > 0 && (
           <section class="mb-10">
             <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
+              <h2 class="eyebrow">
                 {lang === "ml" ? "വാഗ്ദാന ട്രാക്കർ" : "Promise Pulse"}
               </h2>
               <a
@@ -204,7 +229,7 @@ export default define.page<typeof handler>(function Home({ data, state }) {
                   recentOrders.length > 0 ? recentOrders.length : "–",
                 )}
                 label={lang === "ml" ? "സമീപകാല ഉത്തരവുകൾ" : "Recent orders"}
-                href="/gov"
+                href="/gov/orders"
               />
             </div>
           </section>
@@ -214,12 +239,15 @@ export default define.page<typeof handler>(function Home({ data, state }) {
         {recentOrders.length > 0 && (
           <section class="mb-10">
             <div class="flex items-center justify-between mb-3">
-              <h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
+              <h2 class="eyebrow">
                 {lang === "ml"
                   ? "സമീപകാല സർക്കാർ ഉത്തരവുകൾ"
                   : "Recent Government Orders"}
               </h2>
-              <a href="/gov" class="text-xs link link-hover text-primary">
+              <a
+                href="/gov/orders"
+                class="text-xs link link-hover text-primary"
+              >
                 {lang === "ml" ? "എല്ലാ ഉത്തരവുകളും →" : "All orders →"}
               </a>
             </div>
@@ -229,7 +257,7 @@ export default define.page<typeof handler>(function Home({ data, state }) {
                 return (
                   <li
                     key={o.id}
-                    class="flex flex-wrap items-start gap-3 p-3 rounded-lg border border-base-300 bg-base-100 hover:border-primary/40 transition text-sm"
+                    class="surface-card flex flex-wrap items-start gap-3 p-3 text-sm"
                   >
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 mb-1 flex-wrap">
@@ -247,22 +275,23 @@ export default define.page<typeof handler>(function Home({ data, state }) {
                           )}
                         </time>
                         {goalIds.length > 0 && (
-                          <span class="badge badge-xs badge-warning gap-1">
+                          <span class="badge badge-xs badge-accent gap-1">
                             ✦ {lang === "ml" ? "വാഗ്ദാനം" : "Manifesto linked"}
                           </span>
                         )}
                       </div>
-                      <p class="text-base-content/90 leading-snug line-clamp-2">
+                      <a
+                        href={`/gov/orders/${o.id}`}
+                        class="block text-base-content/90 leading-snug line-clamp-2 hover:text-primary transition"
+                      >
                         {lang === "ml" && o.subjectMl ? o.subjectMl : o.subject}
-                      </p>
+                      </a>
                     </div>
                     <a
-                      href={o.meta.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={`/gov/orders/${o.id}`}
                       class="btn btn-xs btn-ghost shrink-0"
                     >
-                      PDF ↗
+                      {t(lang, "Read →", "വായിക്കുക →")}
                     </a>
                   </li>
                 );
@@ -273,7 +302,7 @@ export default define.page<typeof handler>(function Home({ data, state }) {
 
         {/* ── KPI grid ── */}
         <section
-          aria-label="Headline indicators"
+          aria-label={t(lang, "Headline indicators", "പ്രധാന സൂചകങ്ങൾ")}
           class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           {kpis.map((kpi) => (
@@ -288,43 +317,42 @@ export default define.page<typeof handler>(function Home({ data, state }) {
 
         {/* ── Explore cards ── */}
         <section class="mt-12 grid gap-4 md:grid-cols-3">
-          <a
+          <ExploreCard
             href="/money"
-            class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-md transition"
-          >
-            <div class="card-body p-5">
-              <h3 class="card-title text-base">Where my money goes</h3>
-              <p class="text-sm text-base-content/70">
-                Every rupee from source to scheme to district — sankey + tender
-                drilldown.
-              </p>
-            </div>
-          </a>
-          <a
+            title={t(lang, "Where my money goes", "എന്റെ പണം എവിടെ പോകുന്നു")}
+            body={t(
+              lang,
+              "Every rupee from source to scheme to district — sankey + tender drilldown.",
+              "ഓരോ രൂപയും ഉറവിടം മുതൽ പദ്ധതി, ജില്ല വരെ — വിശദമായ കാഴ്ച.",
+            )}
+            emoji="₹"
+          />
+          <ExploreCard
             href="/gov/manifesto"
-            class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-md transition"
-          >
-            <div class="card-body p-5">
-              <h3 class="card-title text-base">Promises tracker</h3>
-              <p class="text-sm text-base-content/70">
-                {goals.length > 0
-                  ? `${goalsWithAction} of ${goals.length} manifesto commitments have government orders backing them.`
-                  : "Manifesto commitments with live GO evidence — committed, in progress, fulfilled."}
-              </p>
-            </div>
-          </a>
-          <a
+            title={t(lang, "Promises tracker", "വാഗ്ദാന ട്രാക്കർ")}
+            body={goals.length > 0
+              ? t(
+                lang,
+                `${goalsWithAction} of ${goals.length} manifesto commitments have government orders backing them.`,
+                `${goals.length}-ൽ ${goalsWithAction} വാഗ്ദാനങ്ങൾക്ക് സർക്കാർ ഉത്തരവുകളുടെ പിന്തുണയുണ്ട്.`,
+              )
+              : t(
+                lang,
+                "Manifesto commitments with live GO evidence — committed, in progress, fulfilled.",
+                "സർക്കാർ ഉത്തരവുകളുടെ തെളിവോടെ വാഗ്ദാനങ്ങൾ — പ്രതിജ്ഞ, നടന്നുവരുന്നു, നിറവേറ്റി.",
+              )}
+            emoji="✓"
+          />
+          <ExploreCard
             href="/panchayat"
-            class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-md transition"
-          >
-            <div class="card-body p-5">
-              <h3 class="card-title text-base">My panchayat</h3>
-              <p class="text-sm text-base-content/70">
-                Geo-located view of your LSG's budget, projects, gram sabha
-                decisions and grievances.
-              </p>
-            </div>
-          </a>
+            title={t(lang, "My panchayat", "എന്റെ പഞ്ചായത്ത്")}
+            body={t(
+              lang,
+              "Geo-located view of your LSG's budget, projects, gram sabha decisions and grievances.",
+              "നിങ്ങളുടെ തദ്ദേശ സ്ഥാപനത്തിന്റെ ബജറ്റ്, പദ്ധതികൾ, ഗ്രാമസഭാ തീരുമാനങ്ങൾ, പരാതികൾ.",
+            )}
+            emoji="📍"
+          />
         </section>
       </main>
       <Footer lang={lang} />
@@ -336,14 +364,37 @@ function StatChip(
   { value, label, href }: { value: string; label: string; href: string },
 ) {
   return (
-    <a
-      href={href}
-      class="flex flex-col gap-1 p-4 rounded-xl border border-base-300 bg-base-100 hover:border-primary hover:shadow-sm transition"
-    >
-      <span class="text-2xl font-bold tabular-nums text-base-content">
+    <a href={href} class="surface-link flex flex-col gap-1 p-4">
+      <span class="text-2xl font-bold tabular-nums text-base-content font-display">
         {value}
       </span>
       <span class="text-xs text-base-content/60 leading-tight">{label}</span>
+    </a>
+  );
+}
+
+function ExploreCard(
+  { href, title, body, emoji }: {
+    href: string;
+    title: string;
+    body: string;
+    emoji: string;
+  },
+) {
+  return (
+    <a href={href} class="surface-link card">
+      <div class="card-body p-5 gap-2">
+        <div class="flex items-center gap-2">
+          <span
+            class="inline-flex items-center justify-center w-9 h-9 rounded-field bg-primary/10 text-primary text-lg font-bold"
+            aria-hidden="true"
+          >
+            {emoji}
+          </span>
+          <h3 class="card-title text-base">{title}</h3>
+        </div>
+        <p class="text-sm text-base-content/70 leading-relaxed">{body}</p>
+      </div>
     </a>
   );
 }

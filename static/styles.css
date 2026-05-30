@@ -5,61 +5,68 @@
   logs: false;
 }
 
+/* ── Light theme: "Warm & lush" Kerala ──
+   Palm green primary, marigold-gold accent, backwater-sunset coral, on warm
+   off-white surfaces. Vibrant yet calm enough for a public data source. */
 @plugin "daisyui/theme" {
   name: "kerala";
   default: true;
   prefersdark: false;
   color-scheme: light;
-  --color-base-100: #ffffff;
-  --color-base-200: #f8fafc;
-  --color-base-300: #e2e8f0;
-  --color-base-content: #1f2937;
-  --color-primary: #0d9488;
+  --color-base-100: #fffdf8;
+  --color-base-200: #fbf7ee;
+  --color-base-300: #eadfc9;
+  --color-base-content: #27241d;
+  --color-primary: #0f7a52;
   --color-primary-content: #ffffff;
-  --color-secondary: #1e3a8a;
+  --color-secondary: #e4572e;
   --color-secondary-content: #ffffff;
-  --color-accent: #f59e0b;
-  --color-accent-content: #1f2937;
-  --color-neutral: #1f2937;
-  --color-neutral-content: #ffffff;
-  --color-info: #0284c7;
+  --color-accent: #f2a516;
+  --color-accent-content: #2a1c00;
+  --color-neutral: #2b2a26;
+  --color-neutral-content: #f8f5ed;
+  --color-info: #2ba6d9;
   --color-info-content: #ffffff;
-  --color-success: #15803d;
+  --color-success: #1f8a4c;
   --color-success-content: #ffffff;
-  --color-warning: #d97706;
-  --color-warning-content: #ffffff;
-  --color-error: #b91c1c;
+  --color-warning: #e0921a;
+  --color-warning-content: #2a1c00;
+  --color-error: #c8431f;
   --color-error-content: #ffffff;
   --radius-selector: 0.5rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-field: 0.625rem;
+  --radius-box: 1rem;
 }
 
+/* ── Dark theme: warm forest charcoal (not cold slate) ── */
 @plugin "daisyui/theme" {
   name: "keralaDark";
   default: false;
   prefersdark: true;
   color-scheme: dark;
-  --color-base-100: #0b1220;
-  --color-base-200: #0f172a;
-  --color-base-300: #1e293b;
-  --color-base-content: #e2e8f0;
-  --color-primary: #2dd4bf;
-  --color-primary-content: #0f172a;
-  --color-secondary: #93c5fd;
-  --color-secondary-content: #0f172a;
-  --color-accent: #fbbf24;
-  --color-accent-content: #0f172a;
-  --color-neutral: #0f172a;
-  --color-neutral-content: #e2e8f0;
-  --color-info: #38bdf8;
-  --color-info-content: #0f172a;
+  --color-base-100: #15211b;
+  --color-base-200: #101a15;
+  --color-base-300: #25352b;
+  --color-base-content: #ece3cf;
+  --color-primary: #34c98b;
+  --color-primary-content: #06140d;
+  --color-secondary: #ff7e5c;
+  --color-secondary-content: #1a0a04;
+  --color-accent: #f8c24b;
+  --color-accent-content: #1f1500;
+  --color-neutral: #101a15;
+  --color-neutral-content: #ece3cf;
+  --color-info: #5cc6ef;
+  --color-info-content: #06140d;
   --color-success: #4ade80;
-  --color-success-content: #0f172a;
-  --color-warning: #fbbf24;
-  --color-warning-content: #0f172a;
-  --color-error: #f87171;
-  --color-error-content: #0f172a;
+  --color-success-content: #06140d;
+  --color-warning: #f8c24b;
+  --color-warning-content: #1f1500;
+  --color-error: #ff7a5c;
+  --color-error-content: #1a0a04;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 1rem;
 }
 
 @theme {
@@ -67,6 +74,7 @@
     "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji";
   --font-malayalam: "Noto Sans Malayalam", "Manjari", sans-serif;
+  --font-display: "Baloo 2", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -74,16 +82,79 @@
   :lang(ml) .ml {
     font-family: var(--font-malayalam);
   }
+
+  /* Friendly, rounded display type for headings. */
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  :lang(ml) .font-display,
+  .font-display.ml {
+    font-family: "Baloo Chettan 2", var(--font-malayalam);
+    letter-spacing: 0;
+  }
 }
 
 @layer components {
+  /* Generic raised surface — the friendly card used across the app. */
+  .surface-card {
+    @apply bg-base-100 border border-base-300 rounded-box transition;
+    box-shadow: 0 1px 2px rgb(39 36 29 / 0.04);
+  }
+  .surface-card:hover {
+    box-shadow: 0 8px 24px -12px rgb(39 36 29 / 0.18);
+  }
+
+  /* Interactive variant — gentle lift + green border on hover. */
+  .surface-link {
+    @apply bg-base-100 border border-base-300 rounded-box transition;
+    box-shadow: 0 1px 2px rgb(39 36 29 / 0.04);
+  }
+  .surface-link:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 8px 24px -12px rgb(39 36 29 / 0.18);
+    transform: translateY(-2px);
+  }
+
+  /* Kasavu (gold-bordered saree) motif: a warm gold top edge for
+     featured cards (Chief Minister, Indira Guarantees, etc.). */
+  .kasavu-top {
+    border-top: 3px solid var(--color-accent);
+  }
+
+  /* Warm green→gold hero wash. CSS gradient only — no image download. */
+  .hero-band {
+    background:
+      radial-gradient(
+        120% 140% at 0% 0%,
+        color-mix(in oklab, var(--color-primary) 14%, transparent) 0%,
+        transparent 55%
+      ),
+      radial-gradient(
+        120% 140% at 100% 0%,
+        color-mix(in oklab, var(--color-accent) 16%, transparent) 0%,
+        transparent 50%
+      );
+  }
+
+  /* Consistent small section label (replaces ad-hoc uppercase micro-labels). */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-base-content/55;
+  }
+
   .kpi-tile {
-    @apply card bg-base-100 border border-base-300 shadow-sm transition-shadow hover:shadow-md;
+    @apply bg-base-100 border border-base-300 rounded-box transition;
+    box-shadow: 0 1px 2px rgb(39 36 29 / 0.04);
+  }
+  .kpi-tile:hover {
+    box-shadow: 0 8px 24px -12px rgb(39 36 29 / 0.18);
   }
   .status-dot {
     @apply inline-block w-2.5 h-2.5 rounded-full;
   }
   .metric-value {
     @apply text-3xl md:text-4xl font-semibold tracking-tight tabular-nums;
+    font-family: var(--font-display);
   }
 }

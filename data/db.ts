@@ -61,7 +61,7 @@ import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 14;
+const SEED_VERSION = 15;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
