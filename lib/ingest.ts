@@ -35,6 +35,7 @@ import {
   geminiModel,
   parseJsonObject,
 } from "./gemini.ts";
+import { groqExtractFromPdf, groqKey, groqModel } from "./groq.ts";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -257,11 +258,22 @@ async function geminiExtract(
   hint: string,
   goals: ManifestoGoal[],
   goalIds: Set<string>,
-): Promise<Extracted> {
-  const raw = await geminiExtractFromPdf(
-    pdfBytes,
-    buildPrompt(hint, fallback, goals),
-  );
+  log?: (m: string) => void,
+): Promise<{ extracted: Extracted; usedGroq: boolean }> {
+  const prompt = buildPrompt(hint, fallback, goals);
+  let raw: string;
+  let usedGroq = false;
+  try {
+    raw = await geminiExtractFromPdf(pdfBytes, prompt);
+  } catch (geminiErr) {
+    if (!groqKey()) throw geminiErr;
+    const msg = geminiErr instanceof Error
+      ? geminiErr.message
+      : String(geminiErr);
+    log?.(`    [Gemini failed, falling back to GROQ] ${msg}`);
+    raw = await groqExtractFromPdf(pdfBytes, prompt);
+    usedGroq = true;
+  }
   const p = parseJsonObject<Record<string, unknown>>(raw);
 
   const type = VALID_TYPES.has(p.type as GoOrderType)
@@ -278,13 +290,16 @@ async function geminiExtract(
     : (mappedId ? "supporting" : null);
 
   return {
-    goNumber: (p.goNumber as string) || fallback.goNumber,
-    type,
-    date: (p.date as string) || toIso(fallback.dateStr),
-    subject: (p.subject as string) || null,
-    subjectMl: (p.subjectMl as string) || null,
-    manifestoGoalId: mappedId,
-    manifestoConfidence: conf,
+    extracted: {
+      goNumber: (p.goNumber as string) || fallback.goNumber,
+      type,
+      date: (p.date as string) || toIso(fallback.dateStr),
+      subject: (p.subject as string) || null,
+      subjectMl: (p.subjectMl as string) || null,
+      manifestoGoalId: mappedId,
+      manifestoConfidence: conf,
+    },
+    usedGroq,
   };
 }
 
@@ -429,6 +444,7 @@ export async function runIngest(
   const goalIds = new Set(goals.map((g) => g.id));
 
   let runOk = true;
+  let groqFallbackUsed = false;
   try {
     for (const sourceName of sources) {
       const { url, hint } = KNOWN_SOURCES[sourceName];
@@ -456,13 +472,15 @@ export async function runIngest(
           }
           const pdfBytes = new Uint8Array(await r.arrayBuffer());
 
-          const ex = await geminiExtract(
+          const { extracted: ex, usedGroq } = await geminiExtract(
             pdfBytes,
             listing,
             hint,
             goals,
             goalIds,
+            log,
           );
+          if (usedGroq) groqFallbackUsed = true;
           if (!ex.subject && !ex.subjectMl) {
             throw new Error("no subject extracted");
           }
@@ -527,7 +545,9 @@ export async function runIngest(
     finishedAt: new Date().toISOString(),
     ok: runOk,
     trigger,
-    model: geminiModel(),
+    model: groqFallbackUsed
+      ? `${geminiModel()}+groq-fallback(${groqModel()})`
+      : geminiModel(),
     scanned,
     added: addedIds.length,
     skipped,
