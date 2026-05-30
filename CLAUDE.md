@@ -141,7 +141,15 @@ Note: `gemini-2.0-flash` has a zero free-tier quota on the project key — use
 Manual runs / backfills:
 `deno task ingest-gos [--since YYYY-MM-DD] [--limit N]
 [--source orders,cabinet,circulars,rts] [--dry-run]`.
-Pipeline health is visible at `/gov/ingest-status`.
+Public, read-only pipeline health is at `/gov/ingest-status`.
+
+**Admin area (`/admin`)** — hidden, unlinked, `noindex`, gated by HTTP Basic
+Auth (`routes/admin/_middleware.ts`): username `admin`, password from
+`ADMIN_PASSWORD` (503 if unset — never open). It shows full status, run history
+(`getIngestRuns`), captured logs (`getIngestLog`), and a **Force ingest now**
+button (`POST /admin/ingest`, island `AdminIngest`).
+`tryAcquireIngestLock`/`releaseIngestLock` (an auto-expiring KV lock) serialize
+manual + cron runs so they never overlap.
 
 ## Hooks (automatic)
 
