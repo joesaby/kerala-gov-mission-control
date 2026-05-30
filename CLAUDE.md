@@ -109,6 +109,40 @@ KPI.
 | Department      | `dept.<slug>`                        | `dept.finance`                                                             |
 | KPI             | `<domain>.<slug>`                    | `fiscal.debt-to-gsdp`                                                      |
 
+### Government Order ingest (Gemini + daily cron)
+
+Government Orders are ingested automatically, not hand-curated. The pipeline
+(`lib/ingest.ts`) is **runtime-safe** — pure `fetch` + Deno KV, no subprocess or
+filesystem — so it runs unchanged inside Deno Deploy:
+
+1. **Scrape** GO listings from `document.kerala.gov.in` (regex over the portal
+   HTML; see `KNOWN_SOURCES`).
+2. **Extract + map** — each PDF's bytes go straight to **Gemini**
+   (`lib/gemini.ts`, model `gemini-flash-latest`), which reads the PDF natively
+   and returns `goNumber/type/date/subject(+Ml)` **and** the manifesto goal it
+   backs, in one call.
+3. **Persist** via `putIngestedGovernmentOrder` → writes `["go", id]` + indexes
+   **and** a durable mirror `["go_ingested", id]`.
+
+`lib/cron.ts` registers a `Deno.cron` (`daily-go-ingest`, 02:30 IST) that runs
+the ingest in production. It self-disables (logs + returns) when `Deno.cron` or
+`GEMINI_API_KEY` is unavailable, so local dev / CI stay clean.
+
+**Durability:** `seed()` wipes `["go"]` on a `SEED_VERSION` bump but **never**
+wipes `["go_ingested"]`, and re-hydrates it back into `["go"]` after loading the
+fixture. So cron-ingested orders survive reseeds. `data/government-orders.ts` is
+just a small static baseline (only orders with a verified, resolvable PDF) — do
+**not** add speculative records with guessed URLs; the cron fills the rest.
+
+`GEMINI_API_KEY` must be set in Deno Deploy env (and `.env` for local CLI runs).
+Note: `gemini-2.0-flash` has a zero free-tier quota on the project key — use
+`gemini-flash-latest` (the default; override with `GEMINI_MODEL`).
+
+Manual runs / backfills:
+`deno task ingest-gos [--since YYYY-MM-DD] [--limit N]
+[--source orders,cabinet,circulars,rts] [--dry-run]`.
+Pipeline health is visible at `/gov/ingest-status`.
+
 ## Hooks (automatic)
 
 Two hooks run on every file edit:
