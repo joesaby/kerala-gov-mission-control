@@ -22,10 +22,12 @@ import type {
 } from "../data/types.ts";
 import { DEPARTMENTS } from "../data/departments.ts";
 import {
+  appendIngestRun,
   type IngestStatus,
   listGovernmentOrderKeys,
   listManifestoGoals,
   putIngestedGovernmentOrder,
+  setIngestLog,
   setIngestStatus,
 } from "../data/db.ts";
 import {
@@ -404,7 +406,11 @@ export async function runIngest(
   const since = opts.since ?? DEFAULT_SINCE;
   const limit = opts.limit;
   const trigger = opts.trigger ?? "manual";
-  const log = opts.log ?? (() => {});
+  const logLines: string[] = [];
+  const log = (m: string) => {
+    logLines.push(m);
+    opts.log?.(m);
+  };
   const sources =
     (opts.sources?.length ? opts.sources : Object.keys(KNOWN_SOURCES))
       .filter((s) => s in KNOWN_SOURCES);
@@ -528,9 +534,17 @@ export async function runIngest(
     errors,
     addedIds,
   };
-  if (!opts.dryRun) await setIngestStatus(status);
   log(
     `\n✓ Done — ${status.added} added, ${status.skipped} skipped, ${status.errors.length} errors.`,
   );
+  if (!opts.dryRun) {
+    await setIngestStatus(status);
+    await appendIngestRun(status);
+    await setIngestLog({
+      finishedAt: status.finishedAt,
+      trigger,
+      lines: logLines,
+    });
+  }
   return status;
 }

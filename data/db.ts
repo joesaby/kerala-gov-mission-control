@@ -636,6 +636,69 @@ export async function setIngestStatus(status: IngestStatus): Promise<void> {
   await (await kv()).set(["meta", "ingest_status"], status);
 }
 
+const INGEST_LOCK_KEY = ["meta", "ingest_lock"] satisfies Deno.KvKey;
+/** Auto-expire the lock so a crashed/killed run can't wedge the trigger. */
+const INGEST_LOCK_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * Try to claim the ingest lock. Returns false if a run is already in progress.
+ * Atomic + auto-expiring, so it holds across Deno Deploy isolates.
+ */
+export async function tryAcquireIngestLock(): Promise<boolean> {
+  const res = await (await kv()).atomic()
+    .check({ key: INGEST_LOCK_KEY, versionstamp: null })
+    .set(INGEST_LOCK_KEY, new Date().toISOString(), {
+      expireIn: INGEST_LOCK_TTL_MS,
+    })
+    .commit();
+  return res.ok;
+}
+
+export async function releaseIngestLock(): Promise<void> {
+  await (await kv()).delete(INGEST_LOCK_KEY);
+}
+
+export async function isIngestRunning(): Promise<boolean> {
+  return (await (await kv()).get(INGEST_LOCK_KEY)).value !== null;
+}
+
+const MAX_RUN_HISTORY = 20;
+const MAX_LOG_LINES = 500;
+
+/** Captured log output of the most recent run. */
+export interface IngestLog {
+  finishedAt: string;
+  trigger: "cron" | "manual";
+  lines: string[];
+}
+
+/** Prepend a run to the capped history at ["meta","ingest_runs"]. */
+export async function appendIngestRun(status: IngestStatus): Promise<void> {
+  const k = await kv();
+  const cur = (await k.get<IngestStatus[]>(["meta", "ingest_runs"])).value ??
+    [];
+  await k.set(
+    ["meta", "ingest_runs"],
+    [status, ...cur].slice(0, MAX_RUN_HISTORY),
+  );
+}
+
+export async function getIngestRuns(): Promise<IngestStatus[]> {
+  return (await (await kv()).get<IngestStatus[]>(["meta", "ingest_runs"]))
+    .value ?? [];
+}
+
+export async function setIngestLog(log: IngestLog): Promise<void> {
+  await (await kv()).set(["meta", "ingest_log"], {
+    ...log,
+    lines: log.lines.slice(-MAX_LOG_LINES),
+  });
+}
+
+export async function getIngestLog(): Promise<IngestLog | null> {
+  return (await (await kv()).get<IngestLog>(["meta", "ingest_log"])).value;
+}
+
 export async function putManifestoGoal(g: ManifestoGoal): Promise<void> {
   const k = await kv();
   const res = await k.atomic()

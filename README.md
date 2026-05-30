@@ -108,14 +108,24 @@ Deno Deploy:
 3. **Persist** to Deno KV under a durable mirror that survives reseeds, so fresh
    data appears on the site with no redeploy.
 
-`lib/cron.ts` registers a `Deno.cron` that runs this daily at 02:30 IST.
-Pipeline health (last run time, counts, errors) is shown at
+`lib/cron.ts` registers a `Deno.cron` that runs this daily at 02:30 IST. Public,
+read-only pipeline health (last run time, counts, errors) is shown at
 `/gov/ingest-status`.
 
 **Requires `GEMINI_API_KEY`** — set it in the Deno Deploy project env (for the
 cron) and in a local `.env` (for the CLI). Use `gemini-flash-latest`;
 `gemini-2.0-flash` has a zero free-tier quota on some keys. Override with
 `GEMINI_MODEL`.
+
+### Admin area
+
+A hidden, unlinked, `noindex` admin area at **`/admin`** shows full ingest
+status, run history, captured logs, and a **Force ingest now** button. It is
+protected by HTTP Basic Auth — username `admin`, password from the
+**`ADMIN_PASSWORD`** env var (set it in Deno Deploy + local `.env`). If
+`ADMIN_PASSWORD` is unset, `/admin` returns 503 (never open). The force-ingest
+endpoint (`POST /admin/ingest`) shares the same auth and a KV lock that prevents
+it overlapping the daily cron.
 
 Manual run / backfill (writes to local KV):
 
