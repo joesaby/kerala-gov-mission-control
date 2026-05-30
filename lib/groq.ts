@@ -7,11 +7,11 @@
  * instruction prompt are then sent as a standard chat-completion request.
  *
  * Auth: GROQ_API_KEY in env.
- * Model: llama-3.3-70b-versatile by default (override with GROQ_MODEL).
+ * Model: qwen/qwen3-32b by default (override with GROQ_MODEL).
  */
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
-const DEFAULT_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_MODEL = "qwen/qwen3-32b";
 const MAX_TEXT_CHARS = 40_000;
 
 export function groqKey(): string | null {
