@@ -182,35 +182,116 @@ export default define.page<typeof handler>(function OrderDetail(
           </p>
         </section>
 
+        {/* ── Executive Summary / Excerpt ── */}
+        {(order.summary || order.summaryMl) && (
+          <section class="mt-8">
+            <h2 class="eyebrow mb-3">
+              {t(
+                lang,
+                "Executive Summary · Document Excerpt",
+                "കാര്യനിർവ്വഹണ സംഗ്രഹം · രേഖാ സംഗ്രഹം",
+              )}
+            </h2>
+            <div class="card border border-base-200 bg-base-100 shadow-sm rounded-2xl p-5 md:p-6 flex flex-col gap-4">
+              <div class="grid gap-6 md:grid-cols-2">
+                {/* English Summary */}
+                {order.summary && (
+                  <div class="flex flex-col gap-1.5">
+                    <span class="text-[10px] uppercase font-bold text-base-content/40 tracking-wider">
+                      English Summary
+                    </span>
+                    <p class="text-sm text-base-content/85 leading-relaxed font-medium">
+                      {order.summary}
+                    </p>
+                  </div>
+                )}
+                {/* Malayalam Summary */}
+                {order.summaryMl && (
+                  <div class="flex flex-col gap-1.5">
+                    <span class="text-[10px] uppercase font-bold text-base-content/40 tracking-wider">
+                      മലയാളം സംഗ്രഹം
+                    </span>
+                    <p class="text-sm text-base-content/85 leading-relaxed font-medium ml">
+                      {order.summaryMl}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ── Source document ── */}
         <section class="mt-8">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="eyebrow">
-              {t(lang, "Source document", "ഉറവിട രേഖ")}
-            </h2>
+          <h2 class="eyebrow mb-4">
+            {t(lang, "Source document", "ഉറവിട രേഖ")}
+          </h2>
+
+          <div class="card border border-base-200 bg-base-200/25 shadow-sm rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
+            <div class="bg-red-500/10 text-red-500 p-4 rounded-xl border border-red-500/15 shrink-0">
+              <svg
+                class="w-12 h-12"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                />
+              </svg>
+            </div>
+
+            <div class="flex-1 text-center md:text-left">
+              <h3 class="font-display font-bold text-lg text-base-content flex items-center justify-center md:justify-start gap-2">
+                {order.goNumber}
+              </h3>
+              <p class="text-xs text-base-content/50 uppercase font-semibold tracking-wider mt-0.5">
+                {t(lang, "Official PDF Document", "ഔദ്യോഗിക പി.ഡി.എഫ് രേഖ")}
+              </p>
+
+              <div class="mt-3 text-xs md:text-sm text-base-content/60 leading-relaxed max-w-xl">
+                <p class="font-medium text-base-content/75">
+                  {t(
+                    lang,
+                    "Security Notice: Direct embedding of PDFs is restricted by the official Government Document Portal (document.kerala.gov.in) to prevent clickjacking.",
+                    "സുരക്ഷാ മുൻകരുതൽ: ഔദ്യോഗിക സർക്കാർ പോർട്ടലിൽ നിന്നുള്ള രേഖകൾ മറ്റ് വെബ്‌സൈറ്റുകളിൽ നേരിട്ട് പ്രദർശിപ്പിക്കുന്നുന്നത് സുരക്ഷാ കാരണങ്ങളാൽ തടഞ്ഞിരിക്കുന്നു.",
+                  )}
+                </p>
+                <p class="mt-1 text-base-content/45">
+                  {t(
+                    lang,
+                    "Please click the button to open and view the verified PDF document in a new tab.",
+                    "പരിശോധിച്ച പി.ഡി.എഫ് രേഖ പുതിയ ടാബിൽ തുറന്നു കാണുന്നതിനായി താഴെയുള്ള ബട്ടൺ ഉപയോഗിക്കുക.",
+                  )}
+                </p>
+              </div>
+            </div>
+
             <a
               href={order.meta.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              class="btn btn-sm btn-primary gap-1"
+              class="btn btn-primary btn-md md:btn-lg gap-2 shadow-sm shrink-0 w-full md:w-auto"
             >
-              {t(lang, "Open PDF ↗", "പി.ഡി.എഫ് തുറക്കുക ↗")}
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+              {t(lang, "View Official PDF ↗", "പി.ഡി.എഫ് തുറക്കുക ↗")}
             </a>
           </div>
-          <object
-            data={order.meta.sourceUrl}
-            type="application/pdf"
-            class="w-full rounded-box border border-base-300 bg-base-100"
-            style="height: 75vh"
-          >
-            <div class="p-8 text-center text-sm text-base-content/60">
-              {t(
-                lang,
-                "This PDF can't be embedded here. Use the button above to open it in a new tab.",
-                "ഈ പി.ഡി.എഫ് ഇവിടെ കാണിക്കാനാവില്ല. പുതിയ ടാബിൽ തുറക്കാൻ മുകളിലെ ബട്ടൺ ഉപയോഗിക്കുക.",
-              )}
-            </div>
-          </object>
         </section>
 
         {/* ── Provenance ── */}

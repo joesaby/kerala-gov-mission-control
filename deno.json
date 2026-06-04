@@ -2,6 +2,8 @@
   "nodeModulesDir": "auto",
   "tasks": {
     "check": "deno fmt --check . && deno lint . && deno check",
+    "check:sources": "deno run --allow-read scripts/check-sources.ts",
+    "review": "sh scripts/code-review.sh",
     "dev": "deno run -A --unstable-kv --unstable-cron --watch=static/,routes/ dev.ts",
     "build": "deno run -A --unstable-kv --unstable-cron dev.ts build",
     "start": "deno serve -A --unstable-kv --unstable-cron _fresh/server.js",
@@ -17,7 +19,13 @@
       "tags": ["fresh", "recommended"]
     }
   },
-  "exclude": ["**/_fresh/*"],
+  "exclude": [
+    "**/_fresh/*",
+    "**/.antigravitycli/*",
+    "**/.cache/*",
+    "**/.claude/*",
+    "**/.pytest_cache/*"
+  ],
   "imports": {
     "@/": "./",
     "fresh": "jsr:@fresh/core@^2.3.3",
