@@ -178,6 +178,8 @@ interface Extracted {
   date: string;
   subject: string | null;
   subjectMl: string | null;
+  summary: string | null;
+  summaryMl: string | null;
   manifestoGoalId: string | null;
   manifestoConfidence: "direct" | "supporting" | "weak" | null;
 }
@@ -204,6 +206,8 @@ Return ONLY a JSON object with these exact keys:
   date                 - ISO "YYYY-MM-DD"
   subject              - English subject/title line, or null if only Malayalam
   subjectMl            - Malayalam subject/title (Unicode), or null if not present
+  summary              - A brief, one-paragraph English executive summary or body excerpt of the key directives, actions, or decisions in the document body, or null
+  summaryMl            - Same summary translated into Malayalam (Unicode), or null
   manifestoGoalId      - the id of the ONE manifesto goal this order most directly
                          implements or supports, or null if none genuinely apply
   manifestoConfidence  - "direct" (the order enacts the pledge), "supporting"
@@ -296,6 +300,8 @@ async function geminiExtract(
       date: (p.date as string) || toIso(fallback.dateStr),
       subject: (p.subject as string) || null,
       subjectMl: (p.subjectMl as string) || null,
+      summary: (p.summary as string) || null,
+      summaryMl: (p.summaryMl as string) || null,
       manifestoGoalId: mappedId,
       manifestoConfidence: conf,
     },
@@ -498,6 +504,8 @@ export async function runIngest(
             type: ex.type,
             subject,
             subjectMl: ex.subjectMl ?? undefined,
+            summary: ex.summary ?? undefined,
+            summaryMl: ex.summaryMl ?? undefined,
             deptId,
             deptConfidence,
             date: ex.date,

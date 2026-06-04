@@ -1,0 +1,28 @@
+#!/bin/sh
+# ---------------------------------------------------------------------------
+# Pre-commit gate for kerala-gov-mission-control.
+#
+# Enable (opt-in, once per clone):   git config core.hooksPath .githooks
+# Bypass for a single commit:        git commit --no-verify
+# Skip only the advisory review:     SKIP_REVIEW=1 git commit ...
+#
+# BLOCKING gates (must pass to commit):
+#   1. deno task check         — fmt --check + lint + type-check
+#   2. deno task check:sources — every published figure cites a government source
+# ADVISORY (never blocks):
+#   3. headless Claude code review of the staged diff
+# See CONTRIBUTING.md and docs/code-review-guidelines.md.
+# ---------------------------------------------------------------------------
+set -e
+
+echo "▶ deno task check (fmt + lint + type-check)"
+deno task check
+
+echo "▶ deno task check:sources (government-source policy)"
+deno task check:sources
+
+# Advisory, non-blocking: kick off a headless Claude review of the staged diff.
+echo "▶ advisory: Claude code review (non-blocking)"
+sh scripts/code-review.sh || echo "  (advisory review skipped — does not block the commit)"
+
+echo "✓ pre-commit gates passed"

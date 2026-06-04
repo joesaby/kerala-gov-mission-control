@@ -13,6 +13,7 @@ import type {
   Secretary,
   Speaker,
   SpeechType,
+  StatusPaper,
 } from "./types.ts";
 import { HEADLINE_KPIS } from "./kpis.ts";
 import { DEPARTMENTS } from "./departments.ts";
@@ -24,6 +25,7 @@ import { SPEAKERS } from "./speakers.ts";
 import { PUBLIC_SPEECHES } from "./public-speeches.ts";
 import { GOVERNMENT_ORDERS } from "./government-orders.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
+import { STATUS_PAPERS } from "./status-papers.ts";
 
 /**
  * Deno KV layout.
@@ -39,6 +41,7 @@ import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
  *   ["coalition", id]          -> CoalitionMembership
  *   ["speaker", id]            -> Speaker
  *   ["speech", id]             -> PublicSpeech
+ *   ["status_paper", id]       -> StatusPaper
  *
  * Secondary indexes (write under transaction with the primary):
  *   ["kpi_by_dept", deptId, kpiId]                -> null
@@ -61,7 +64,7 @@ import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 15;
+const SEED_VERSION = 19;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -708,6 +711,26 @@ export async function putManifestoGoal(g: ManifestoGoal): Promise<void> {
   if (!res.ok) throw new Error(`Failed to put manifesto goal ${g.id}`);
 }
 
+// ----- Status Paper -------------------------------------------------------
+
+export async function putStatusPaper(p: StatusPaper): Promise<void> {
+  const k = await kv();
+  const res = await k.atomic().set(["status_paper", p.id], p).commit();
+  if (!res.ok) throw new Error(`Failed to put status paper ${p.id}`);
+}
+
+export async function listStatusPapers(): Promise<StatusPaper[]> {
+  await ensureSeeded();
+  return (await listAll<StatusPaper>(["status_paper"]))
+    .sort((a, b) => b.tabledOn.localeCompare(a.tabledOn));
+}
+
+export async function getStatusPaper(id: string): Promise<StatusPaper | null> {
+  await ensureSeeded();
+  const res = await (await kv()).get<StatusPaper>(["status_paper", id]);
+  return res.value;
+}
+
 // ----- Seeding -----------------------------------------------------------
 
 export function ensureSeeded(): Promise<void> {
@@ -751,6 +774,7 @@ export async function seed(): Promise<void> {
       ["go_by_manifesto_goal"],
       ["manifesto_goal"],
       ["manifesto_goal_by_govt"],
+      ["status_paper"],
     ] satisfies Deno.KvKey[]
   ) {
     for await (const entry of k.list({ prefix })) {
@@ -767,6 +791,7 @@ export async function seed(): Promise<void> {
   for (const kpi of HEADLINE_KPIS) await putKpi(kpi);
   for (const sp of PUBLIC_SPEECHES) await putSpeech(sp);
   for (const mg of MANIFESTO_GOALS) await putManifestoGoal(mg);
+  for (const sp of STATUS_PAPERS) await putStatusPaper(sp);
   for (const go of GOVERNMENT_ORDERS) await putGovernmentOrder(go);
 
   // Re-hydrate cron-ingested orders. The `["go_ingested"]` mirror is never

@@ -28,12 +28,16 @@ export const HEADLINE_KPIS: Kpi[] = [
       { label: "All-India avg", value: 28.1 },
       { label: "Tamil Nadu", value: 27.3 },
       { label: "FRBM ceiling", value: 32.0 },
+      { label: "Status Report 2025-26 (Accounts, excl. KIIFB)", value: 33.2 },
     ],
     meta: {
       definition:
-        "Outstanding state public debt including KIIFB borrowings, as a share of Gross State Domestic Product.",
+        "Outstanding state public debt including KIIFB borrowings, as a share of Gross State Domestic Product. The Status Report's headline figure (33.2%, 2025-26 RE) is on a budget-accounts basis that excludes off-budget KIIFB debt; this KPI is the broader measure.",
       definitionMl: "സംസ്ഥാന കടവും കിഫ്ബി കടവും ജി.എസ്.ഡി.പിയുടെ ശതമാനമായി.",
-      source: "Finance Department, CAG State Finances Report",
+      source:
+        "Finance Department, CAG State Finances Report; Status Report 2026, Table 3.1b",
+      sourceUrl:
+        "http://www.niyamasabha.org/codes/16kla/Kerala_Status_Paper_consolidated%20Eng.pdf",
       owner: "Principal Secretary (Finance)",
       updateFrequency: "quarterly",
       lastRefreshed: "2026-05-12T09:30:00+05:30",
@@ -63,11 +67,16 @@ export const HEADLINE_KPIS: Kpi[] = [
     comparators: [
       { label: "FRBM target", value: 1.5 },
       { label: "Last year", value: 2.4 },
+      { label: "Status Report 2025-26 RE (Accounts)", value: 2.58 },
     ],
     meta: {
       definition:
-        "Revenue expenditure minus revenue receipts, as a share of GSDP.",
-      source: "Budget at a Glance 2026-27, Finance Dept.",
+        "Revenue expenditure minus revenue receipts, as a share of GSDP. This headline value is the Budget 2026-27 figure; the Status Report comparator (2.58%) is the 2025-26 RE outturn on a budget-accounts basis, so the two differ by period.",
+      definitionMl: "റവന്യൂ ചെലവിൽനിന്ന് റവന്യൂ വരുമാനം കുറച്ചത്, ജി.എസ്.ഡി.പിയുടെ ശതമാനമായി.",
+      source:
+        "Budget at a Glance 2026-27, Finance Dept.; Status Report 2026, Table 3.1a",
+      sourceUrl:
+        "http://www.niyamasabha.org/codes/16kla/Kerala_Status_Paper_consolidated%20Eng.pdf",
       owner: "Principal Secretary (Finance)",
       updateFrequency: "annual",
       lastRefreshed: "2026-03-31T00:00:00+05:30",

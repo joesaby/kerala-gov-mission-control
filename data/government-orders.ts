@@ -16,6 +16,27 @@ import type { GovernmentOrder } from "./types.ts";
  */
 export const GOVERNMENT_ORDERS: GovernmentOrder[] = [
   {
+    id: "go.2026-fin-42",
+    goNumber: "G.O.(Ms) No.42/2026/Fin",
+    type: "Ms",
+    subject:
+      "Special audit of public debt, liabilities, and capital expenditures under KIIFB by the Comptroller and Auditor General.",
+    subjectMl:
+      "കിഫ്ബിയുടെ കീഴിലുള്ള പൊതു കടം, ബാധ്യതകൾ, മൂലധനച്ചെലവുകൾ എന്നിവയെക്കുറിച്ച് സി.എ.ജി.യുടെ പ്രത്യേക ഓഡിറ്റ്.",
+    deptId: "dept.finance",
+    deptConfidence: "high",
+    date: "2026-05-20",
+    manifestoGoalIds: ["goal.udf2026-fiscal-transparency"],
+    manifestoConfidence: "direct",
+    meta: {
+      source: "Document Portal, Government of Kerala",
+      sourceUrl:
+        "https://document.kerala.gov.in/documents/governmentorders/go-2026-fin-42.pdf",
+      retrievedAt: "2026-06-04T22:29:21Z",
+    },
+    dataStatus: "verified",
+  },
+  {
     id: "go.2026-misc-15",
     goNumber: "G.O.(Ms)No.15/2026/TRANS",
     type: "Ms",

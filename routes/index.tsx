@@ -318,12 +318,16 @@ export default define.page<typeof handler>(function Home({ data, state }) {
         {/* ── Explore cards ── */}
         <section class="mt-12 grid gap-4 md:grid-cols-3">
           <ExploreCard
-            href="/money"
-            title={t(lang, "Where my money goes", "എന്റെ പണം എവിടെ പോകുന്നു")}
+            href="/economy"
+            title={t(
+              lang,
+              "Kerala's fiscal health",
+              "കേരളത്തിന്റെ സാമ്പത്തിക ആരോഗ്യം",
+            )}
             body={t(
               lang,
-              "Every rupee from source to scheme to district — sankey + tender drilldown.",
-              "ഓരോ രൂപയും ഉറവിടം മുതൽ പദ്ധതി, ജില്ല വരെ — വിശദമായ കാഴ്ച.",
+              "Vital signs of the State's finances — debt, deficits and committed spending — tracked against the 2026 Status Report baseline.",
+              "സംസ്ഥാന ധനസ്ഥിതിയുടെ സൂചകങ്ങൾ — കടം, കമ്മി, ചെലവ് — 2026 തൽസ്ഥിതി റിപ്പോർട്ടിനെ അടിസ്ഥാനമാക്കി.",
             )}
             emoji="₹"
           />
@@ -344,14 +348,14 @@ export default define.page<typeof handler>(function Home({ data, state }) {
             emoji="✓"
           />
           <ExploreCard
-            href="/panchayat"
-            title={t(lang, "My panchayat", "എന്റെ പഞ്ചായത്ത്")}
+            href="/gov/orders"
+            title={t(lang, "Orders & decisions", "ഉത്തരവുകൾ & തീരുമാനങ്ങൾ")}
             body={t(
               lang,
-              "Geo-located view of your LSG's budget, projects, gram sabha decisions and grievances.",
-              "നിങ്ങളുടെ തദ്ദേശ സ്ഥാപനത്തിന്റെ ബജറ്റ്, പദ്ധതികൾ, ഗ്രാമസഭാ തീരുമാനങ്ങൾ, പരാതികൾ.",
+              "Government Orders auto-ingested daily — what the government is actually deciding, each with its source PDF.",
+              "ദിവസവും ശേഖരിക്കുന്ന സർക്കാർ ഉത്തരവുകൾ — ഓരോന്നിനും ഉറവിട പിഡിഎഫ് സഹിതം.",
             )}
-            emoji="📍"
+            emoji="📜"
           />
         </section>
       </main>

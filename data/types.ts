@@ -461,6 +461,10 @@ export interface GovernmentOrder {
   subject: string;
   /** Malayalam subject line — add when available; never machine-translate. */
   subjectMl?: string;
+  /** AI-extracted summary or excerpt of the document's body. */
+  summary?: string;
+  /** Malayalam translation of the summary. */
+  summaryMl?: string;
   /** FK → Department.id. Null when tagging is ambiguous (deptConfidence = "low"). */
   deptId?: string;
   /** How the department tag was assigned. */
@@ -479,6 +483,160 @@ export interface GovernmentOrder {
     /** Direct URL to the PDF or portal page — mandatory, no exceptions. */
     sourceUrl: string;
     /** ISO timestamp of when this record was fetched/ingested. */
+    retrievedAt: string;
+  };
+  dataStatus: "verified" | "unverified" | "tbd";
+}
+
+// ===========================================================================
+// Status Paper — long-form economic/fiscal white papers tabled in the Assembly.
+//
+// Unlike a GovernmentOrder (a single dated decision), a StatusPaper is a whole
+// report. We don't render the 195-page PDF; we render a human-friendly digest:
+// a set of fiscal "vital signs", the report's key findings ("the diagnosis"),
+// and its recommendations ("the way forward"), each anchored to the original
+// EN + ML source PDFs. Source: docs/data/data-model.md.
+// ===========================================================================
+
+/** Clinical severity used to colour vital-sign gauges and finding cards. */
+export type FiscalSeverity = "critical" | "warning" | "ok";
+
+/**
+ * One headline fiscal ratio rendered as a colour-coded gauge.
+ *
+ * `baseline` is the value at the report's baseline period — the fixed point the
+ * report was written to be measured against. `latest` is intentionally optional:
+ * it stays undefined until a newer budget / set of actuals lands, at which point
+ * the page shows the baseline → latest delta. This is what makes the page a
+ * living scorecard rather than a static snapshot.
+ */
+export interface FiscalVital {
+  key: string;
+  label: string;
+  labelMl?: string;
+  /** Gauge value (a percentage, 0–100) at the baseline period. */
+  baseline: number;
+  /** Formatted baseline figure, e.g. "33.2%" or "₹5.07L cr". */
+  baselineDisplay: string;
+  /** Baseline period this figure is for, e.g. "2025-26 RE". */
+  period: string;
+  /** Denominator / context, e.g. "of GSDP", "of total revenue". */
+  unit: string;
+  unitMl?: string;
+  /** Which way is good — drives the delta colour once `latest` is set. */
+  direction: "lower-better" | "higher-better";
+  status: FiscalSeverity;
+  /** Short caveat shown under the gauge, e.g. "lowest among Indian states". */
+  note?: string;
+  noteMl?: string;
+  /** Filled when a later budget / actuals update arrives; undefined at baseline. */
+  latest?: number;
+  latestDisplay?: string;
+  /** Period the `latest` figure is for, e.g. "2027-28 BE". */
+  latestPeriod?: string;
+}
+
+/**
+ * An optional time-series attached to a finding, so the diagnosis can be tracked
+ * as a graph and updated each budget. Reuses `KpiTimePoint` (the same actual /
+ * projection / target vocabulary the KPIs use).
+ *
+ * - "histogram" — a per-year level/flow (RBI-advance days, debt-to-GSDP, PSE
+ *   losses, welfare share). Append one `actual` point each budget.
+ * - "burndown"  — a stock to be paid down toward `target` (arrears, KIIFB
+ *   liability). Starts as a single baseline point; the trajectory fills in.
+ */
+export interface FindingChart {
+  kind: "histogram" | "burndown";
+  /** Y-axis caption, e.g. "days / year", "% of GSDP", "₹ crore". */
+  unit: string;
+  unitMl?: string;
+  /** History (and any projections/targets), sorted by year ascending. */
+  points: KpiTimePoint[];
+  /** Reference line — the goal (e.g. FRBM ceiling, or 0 for a burn-down). */
+  target?: number;
+  targetLabel?: string;
+  /** Exact provenance of this series, e.g. "Status Report, Table 2.6". */
+  source: string;
+}
+
+/** A key finding from the report — "the diagnosis". */
+export interface StatusFinding {
+  key: string;
+  heading: string;
+  headingMl?: string;
+  /** Headline number for the card, e.g. "₹48,733 cr". */
+  stat?: string;
+  detail: string;
+  detailMl?: string;
+  severity: FiscalSeverity;
+  /** Report chapter this finding is drawn from. */
+  chapter: number;
+  /** Optional trackable series — rendered as a chart, grows each budget. */
+  chart?: FindingChart;
+}
+
+/**
+ * How far the government has gone in acting on a recommendation. Tracked
+ * separately from manifesto promises — these are advisory, not commitments.
+ * Bump as evidence (typically a Government Order) appears; cite it in `goIds`.
+ */
+export type AdoptionStatus =
+  | "not-started"
+  | "acknowledged"
+  | "go-issued"
+  | "implemented";
+
+/** A recommendation from the report — "the way forward". */
+export interface RecoveryLever {
+  key: string;
+  heading: string;
+  headingMl?: string;
+  detail: string;
+  detailMl?: string;
+  /** Immediate (do now) vs structural (multi-year reform). */
+  horizon: "immediate" | "structural";
+  /** Government's progress in acting on this recommendation. */
+  adoption: AdoptionStatus;
+  /** FKs → GovernmentOrder.id evidencing adoption (drives the status above). */
+  goIds?: string[];
+}
+
+/** A link to one language edition of the original PDF. */
+export interface StatusSource {
+  lang: "en" | "ml";
+  label: string;
+  labelMl?: string;
+  url: string;
+}
+
+/**
+ * A long-form economic / fiscal report tabled in the Assembly, rendered as a
+ * readable digest. IDs: statuspaper.<term>-<slug>.
+ */
+export interface StatusPaper {
+  id: string;
+  title: string;
+  titleMl?: string;
+  subtitle: string;
+  subtitleMl?: string;
+  /** Assembly term, e.g. "16kla". */
+  term: string;
+  /** ISO date the report was tabled / published. */
+  tabledOn: string;
+  /** One-paragraph plain-language summary of what the report is. */
+  summary: string;
+  summaryMl?: string;
+  vitals: FiscalVital[];
+  findings: StatusFinding[];
+  levers: RecoveryLever[];
+  sources: StatusSource[];
+  meta: {
+    /** Publishing body, e.g. "Finance Department, Government of Kerala". */
+    publishedBy: string;
+    /** Portal the PDFs were retrieved from. */
+    source: string;
+    /** ISO timestamp the digest was compiled from source. */
     retrievedAt: string;
   };
   dataStatus: "verified" | "unverified" | "tbd";

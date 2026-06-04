@@ -188,9 +188,9 @@ export const MANIFESTO_GOALS: ManifestoGoal[] = [
       "Publish a white paper exposing the true state of Kerala's public debt and off-budget borrowings; commission a CAG special audit of KIIFB's liabilities and capital expenditures.",
     summaryMl:
       "കേരളത്തിന്റെ ബജറ്റേതര കടം വ്യക്തമാക്കുന്ന വൈറ്റ് പേപ്പർ; KIIFB ബാധ്യതകൾ CAG ഓഡിറ്റിന് വിധേയമാക്കൽ.",
-    status: "in-progress",
+    status: "fulfilled",
     sourceUrl:
-      "https://thesouthfirst.com/kerala/what-the-white-paper-on-kerala-finances-may-reveal-and-why-it-could-shape-udf-governments-first-months/",
+      "http://www.niyamasabha.org/codes/16kla/Kerala_Status_Paper_consolidated%20Eng.pdf",
     dataStatus: "verified",
   },
   {

@@ -11,6 +11,7 @@ const NAV = [
     ml: "ഉത്തരവുകൾ & തീരുമാനങ്ങൾ",
   },
   { href: "/gov/manifesto", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
+  { href: "/economy", en: "Economy", ml: "സമ്പദ്‌വ്യവസ്ഥ" },
 ];
 
 /** The active nav item is the one whose href is the longest prefix of path. */
