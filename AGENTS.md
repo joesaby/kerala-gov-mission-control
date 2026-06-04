@@ -39,10 +39,17 @@ routes/               File-based pages and API endpoints (Fresh convention)
   _middleware.ts      Reads lang preference cookie (EN / ML)
   _404.tsx            Stub page for unbuilt tier-2 routes
   index.tsx           Kerala Today landing (headline KPIs)
-  gov/
+  data.tsx            Data sources & transparency overview
+  economy/            Fiscal Health scorecard & status report
+  gov/                Government section
     index.tsx         Government composition page
+    cabinet.tsx       cabinet section redirect
+    manifesto.tsx     Promise Tracker (manifesto → backing GOs)
+    ingest-status.tsx daily ingest pipeline health
     departments/      Department detail routes
     ministers/        Minister detail routes
+    orders/           Government Orders directory & detail views
+  admin/              HTTP Basic Auth-gated admin control panel
   api/
     kpis.ts           Raw KPI JSON endpoint
     ministers.ts      Raw ministers JSON endpoint
@@ -65,13 +72,21 @@ data/                 Typed fixtures — source of truth for all content
   departments.ts      Department records
   ministers.ts        Minister records
   governments.ts      Government / cabinet records
-  persons.ts          Person records (ministers + officials)
+  persons.ts          Person records (stable identity across tenures)
   parties.ts          Political party records
   speakers.ts         Speaker records
   sources.ts          Source citation records
+  status-papers.ts    Fiscal health status paper records
   db.ts               In-memory seeded DB + query helpers (SEED_VERSION here)
   lang.ts             Language helpers (EN/ML cookie name, default)
   government-orders.ts  Government Orders, Circulars, and Bills
+  manifesto-goals.ts  UDF 2026 manifesto commitments
+
+lib/                  Shared non-route modules
+  gemini.ts           Gemini API client (reads PDFs natively)
+  groq.ts             GROQ API client fallback for GO extraction
+  ingest.ts           GO ingest pipeline (scrape → Gemini/GROQ → KV)
+  cron.ts             daily Deno.cron registration
 
 scripts/
   seed.ts             Re-seeds the in-memory DB (run via `deno task seed`)
