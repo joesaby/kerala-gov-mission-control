@@ -120,7 +120,10 @@ filesystem — so it runs unchanged inside Deno Deploy:
 2. **Extract + map** — each PDF's bytes go straight to **Gemini**
    (`lib/gemini.ts`, model `gemini-flash-latest`), which reads the PDF natively
    and returns `goNumber/type/date/subject(+Ml)` **and** the manifesto goal it
-   backs, in one call.
+   backs, in one call. **Fallback:** If Gemini fails or hits a quota/limit, the
+   pipeline falls back to **GROQ** (`lib/groq.ts` using `qwen/qwen3-32b` or
+   similar via standard chat API) if `GROQ_API_KEY` is provided, after
+   extracting text from the PDF bytes in memory.
 3. **Persist** via `putIngestedGovernmentOrder` → writes `["go", id]` + indexes
    **and** a durable mirror `["go_ingested", id]`.
 
@@ -134,9 +137,11 @@ fixture. So cron-ingested orders survive reseeds. `data/government-orders.ts` is
 just a small static baseline (only orders with a verified, resolvable PDF) — do
 **not** add speculative records with guessed URLs; the cron fills the rest.
 
-`GEMINI_API_KEY` must be set in Deno Deploy env (and `.env` for local CLI runs).
-Note: `gemini-2.0-flash` has a zero free-tier quota on the project key — use
-`gemini-flash-latest` (the default; override with `GEMINI_MODEL`).
+`GEMINI_API_KEY` (and optional `GROQ_API_KEY` for fallback) must be set in Deno
+Deploy env (and `.env` for local CLI runs). Note: `gemini-2.0-flash` has a zero
+free-tier quota on the project key — use `gemini-flash-latest` (the default;
+override with `GEMINI_MODEL`). Override GROQ fallback model using `GROQ_MODEL`
+(defaults to `qwen/qwen3-32b`).
 
 Manual runs / backfills:
 `deno task ingest-gos [--since YYYY-MM-DD] [--limit N]

@@ -194,8 +194,13 @@ This means the fixture stays small and the site updates without a redeploy.
 `lib/ingest.ts` orchestrates: scrape portal listings → download each PDF →
 **Gemini** (`lib/gemini.ts`, `gemini-flash-latest`) reads the PDF natively and
 returns `goNumber/type/date/subject(+Ml)` **plus** the manifesto goal it backs,
-in one call → dept-tag → dedup vs KV → persist. It is pure `fetch` + KV (no
-subprocess/filesystem) so it runs inside Deno Deploy. Requires `GEMINI_API_KEY`.
+in one call. **Fallback:** If Gemini fails or hits a quota, the pipeline falls
+back to **GROQ** (`lib/groq.ts` using `qwen/qwen3-32b` via standard chat API) if
+`GROQ_API_KEY` is configured. GROQ does not read PDFs natively, so the module
+extracts readable text in-memory first. The rest of the pipeline remains the
+same: dept-tag → dedup vs KV → persist. It is pure `fetch` + KV (no
+subprocess/filesystem) so it runs inside Deno Deploy. Requires `GEMINI_API_KEY`
+(and optional `GROQ_API_KEY` for fallback).
 
 Run history is recorded at `["meta","ingest_status"]` and surfaced at
 `/gov/ingest-status`. Manual runs:

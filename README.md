@@ -20,25 +20,38 @@ routes/            file-based pages and API endpoints
   _middleware.ts   reads lang preference cookie
   _404.tsx         not-built-yet page for tier-2 stubs
   index.tsx        Kerala Today landing
+  data.tsx         Data sources & transparency overview
+  economy/         Fiscal Health scorecard & status report
   gov/             government section
     index.tsx      government overview
-    cabinet.tsx    council of ministers
+    cabinet.tsx    cabinet section redirect
     manifesto.tsx  Promise Tracker (manifesto → backing GOs)
     ingest-status.tsx   daily ingest pipeline health
     departments/[slug].tsx, ministers/[slug].tsx
-  api/kpis.ts      raw KPI JSON (machine-readable)
+    orders/        Government Orders directory & detail views
+  admin/           HTTP Basic Auth-gated admin control panel
+  api/             raw JSON API endpoints (kpis, ministers, departments)
 islands/           client-side interactive components (Preact)
   LangToggle.tsx   EN ↔ മല toggle
 components/        server-only Preact components
 data/              typed fixtures + i18n helpers (seeded into Deno KV)
-  types.ts              KPI / governance / GovernmentOrder schema
-  kpis.ts               headline KPI mock data
+  types.ts         KPI / governance / GovernmentOrder schema
+  kpis.ts          headline KPI mock data
+  departments.ts   department records
+  ministers.ts     minister records
+  governments.ts   government / cabinet records
+  persons.ts       person records (stable identity across tenures)
+  parties.ts       political party records
+  speakers.ts      speaker records
+  sources.ts       source citation records
+  status-papers.ts Fiscal health status paper records
   government-orders.ts  verified GO baseline (cron adds the rest to KV)
   manifesto-goals.ts    UDF 2026 manifesto commitments
-  db.ts                 Deno KV layer + seeding
+  db.ts            Deno KV layer + seeding
 lib/               shared non-route modules
   gemini.ts        Gemini API client (reads PDFs natively)
-  ingest.ts        GO ingest pipeline (scrape → Gemini → KV)
+  groq.ts          GROQ API client fallback for GO extraction
+  ingest.ts        GO ingest pipeline (scrape → Gemini/GROQ → KV)
   cron.ts          daily Deno.cron registration
 static/            static assets served from /
 ```
@@ -105,6 +118,10 @@ Deno Deploy:
 2. **Extract + map** — each PDF's bytes go straight to **Gemini**
    (`gemini-flash-latest`), which reads the PDF natively and returns the order's
    number/type/date/subject (EN + ML) **and** the manifesto goal it backs.
+   **Fallback:** If Gemini fails or quota is exhausted, and `GROQ_API_KEY` is
+   set, the pipeline falls back to **GROQ** (`lib/groq.ts` using
+   `qwen/qwen3-32b` or similar) after extracting readable text from the PDF
+   bytes in memory.
 3. **Persist** to Deno KV under a durable mirror that survives reseeds, so fresh
    data appears on the site with no redeploy.
 
@@ -116,6 +133,9 @@ read-only pipeline health (last run time, counts, errors) is shown at
 cron) and in a local `.env` (for the CLI). Use `gemini-flash-latest`;
 `gemini-2.0-flash` has a zero free-tier quota on some keys. Override with
 `GEMINI_MODEL`.
+
+**Optional `GROQ_API_KEY`** — fallback credential for extraction if Gemini
+fails. Set `GROQ_MODEL` to override the default `qwen/qwen3-32b`.
 
 ### Admin area
 
