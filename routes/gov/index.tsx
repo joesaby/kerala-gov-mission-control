@@ -1,5 +1,6 @@
 import { page } from "fresh";
 import { define } from "../../utils.ts";
+import { t } from "../../data/lang.ts";
 import {
   listDepartments,
   listGovernmentOrders,
@@ -78,14 +79,16 @@ export const handler = define.handlers<Data>({
   },
 });
 
-function fmtTerm(g: Government): string {
+function fmtTerm(g: Government, lang: "en" | "ml"): string {
   const start = g.termStart.slice(0, 4);
-  const end = g.termEnd ? g.termEnd.slice(0, 4) : "present";
+  const end = g.termEnd
+    ? g.termEnd.slice(0, 4)
+    : (lang === "ml" ? "തുടരുന്നു" : "present");
   return `${start}–${end}`;
 }
 
-function fmtFullDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", {
+function fmtFullDate(iso: string, lang: "en" | "ml"): string {
+  return new Date(iso).toLocaleDateString(lang === "ml" ? "ml-IN" : "en-IN", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -93,11 +96,13 @@ function fmtFullDate(iso: string): string {
   });
 }
 
-function fmtMinisterTerm(m: Minister): string {
+function fmtMinisterTerm(m: Minister, lang: "en" | "ml"): string {
   const start = m.termStart ? m.termStart.slice(0, 4) : null;
   if (!start) return "";
   const end = m.termEnd ? m.termEnd.slice(0, 4) : null;
-  return end ? `${start}–${end}` : `Since ${start}`;
+  return end
+    ? `${start}–${end}`
+    : (lang === "ml" ? `${start} മുതൽ` : `Since ${start}`);
 }
 
 function daysInOffice(termStart: string, termEnd?: string): number {
@@ -106,18 +111,20 @@ function daysInOffice(termStart: string, termEnd?: string): number {
   return Math.floor((end.getTime() - start.getTime()) / 86_400_000);
 }
 
-const PARTY_LABEL: Record<string, string> = {
-  "CPI(M)": "CPI(M)",
-  "CPI": "CPI",
-  "INC": "Congress",
-  "IUML": "IUML",
-  "KC": "Kerala Congress",
-  "KC(M)": "KC (M)",
-  "RSP": "RSP",
-  "JD(S)": "JD(S)",
-  "NCP": "NCP",
-  "Other": "Other",
-  "Independent": "Independent",
+const PARTY_LABEL: Record<string, { en: string; ml: string }> = {
+  "CPI(M)": { en: "CPI(M)", ml: "സി.പി.ഐ(എം)" },
+  "CPI": { en: "CPI", ml: "സി.പി.ഐ" },
+  "INC": { en: "Congress", ml: "കോൺഗ്രസ്" },
+  "IUML": { en: "IUML", ml: "ഐ.യു.എം.എൽ" },
+  "KC": { en: "Kerala Congress", ml: "കേരള കോൺഗ്രസ്" },
+  "KC(M)": { en: "KC (M)", ml: "കേരള കോൺഗ്രസ് (എം)" },
+  "RSP": { en: "RSP", ml: "ആർ.എസ്.പി" },
+  "JD(S)": { en: "JD(S)", ml: "ജെ.ഡി(എസ്)" },
+  "NCP": { en: "NCP", ml: "എൻ.സി.പി" },
+  "BJP": { en: "BJP", ml: "ബി.ജെ.പി" },
+  "CMP": { en: "CMP", ml: "സി.എം.പി" },
+  "Independent": { en: "Independent", ml: "സ്വതന്ത്രൻ" },
+  "Other": { en: "Other", ml: "മറ്റുള്ളവ" },
 };
 
 export default define.page<typeof handler>(function GovernmentHub(
@@ -168,9 +175,13 @@ export default define.page<typeof handler>(function GovernmentHub(
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
-                  <span class="font-medium">{g.shortName}</span>
+                  <span class="font-medium">
+                    {lang === "ml" && g.shortNameMl
+                      ? g.shortNameMl
+                      : g.shortName}
+                  </span>
                   <span class="text-[11px] opacity-60 tabular-nums">
-                    {fmtTerm(g)}
+                    {fmtTerm(g, lang)}
                   </span>
                 </a>
               );
@@ -186,7 +197,9 @@ export default define.page<typeof handler>(function GovernmentHub(
             )}
             {govt?.assemblyTerm && (
               <span class="badge badge-ghost badge-sm">
-                {govt.assemblyTerm}th Kerala Legislative Assembly
+                {lang === "ml"
+                  ? `${govt.assemblyTerm}-ാം കേരള നിയമസഭ`
+                  : `${govt.assemblyTerm}th Kerala Legislative Assembly`}
               </span>
             )}
             {isIncumbent && (
@@ -204,16 +217,22 @@ export default define.page<typeof handler>(function GovernmentHub(
           </h1>
           {govt && (
             <p class="text-base-content/60 mt-2 text-sm tabular-nums">
-              {fmtFullDate(govt.termStart)}
-              {govt.termEnd ? ` – ${fmtFullDate(govt.termEnd)}` : " – present"}
+              {fmtFullDate(govt.termStart, lang)}
+              {govt.termEnd
+                ? ` – ${fmtFullDate(govt.termEnd, lang)}`
+                : ` – ${t(lang, "present", "ഇതുവരെ")}`}
               <span class="mx-2 text-base-content/30">·</span>
               <span class="font-semibold text-base-content">{days}</span>{" "}
-              {lang === "ml" ? "ദിവസം" : "days"}
+              {lang === "ml" ? "ദിവസങ്ങൾ അധികാരത്തിൽ" : "days in office"}
             </p>
           )}
-          {govt?.summary && (
+          {(lang === "ml" && govt?.summaryMl
+            ? govt.summaryMl
+            : govt?.summary) && (
             <p class="mt-4 text-base-content/70 max-w-2xl leading-relaxed">
-              {govt.summary}
+              {lang === "ml" && govt?.summaryMl
+                ? govt.summaryMl
+                : govt?.summary}
             </p>
           )}
         </section>
@@ -243,7 +262,11 @@ export default define.page<typeof handler>(function GovernmentHub(
                     </h3>
                     {cm.party && (
                       <span class="badge badge-xs badge-ghost mt-1">
-                        {PARTY_LABEL[cm.party] ?? cm.party}
+                        {PARTY_LABEL[cm.party]
+                          ? (lang === "ml"
+                            ? PARTY_LABEL[cm.party].ml
+                            : PARTY_LABEL[cm.party].en)
+                          : cm.party}
                       </span>
                     )}
                     {cm.constituency && (
@@ -291,7 +314,11 @@ export default define.page<typeof handler>(function GovernmentHub(
                     return (
                       <div key={party} class="flex items-center gap-3 text-sm">
                         <span class="w-24 shrink-0 font-medium text-base-content/80 truncate">
-                          {PARTY_LABEL[party] ?? party}
+                          {PARTY_LABEL[party]
+                            ? (lang === "ml"
+                              ? PARTY_LABEL[party].ml
+                              : PARTY_LABEL[party].en)
+                            : party}
                         </span>
                         <div class="flex-1 bg-base-300 rounded-full h-2 overflow-hidden">
                           <div
@@ -444,7 +471,7 @@ export default define.page<typeof handler>(function GovernmentHub(
                       {lang === "ml" && g.nameMl ? g.nameMl : g.name}
                     </span>
                     <span class="tabular-nums text-base-content/50 text-xs">
-                      {fmtTerm(g)}
+                      {fmtTerm(g, lang)}
                     </span>
                   </a>
                 </li>
@@ -459,11 +486,14 @@ export default define.page<typeof handler>(function GovernmentHub(
 
   function MinisterCard({ m }: { m: Minister }) {
     const portfolios = m.departmentIds
-      .map((id) => deptById.get(id)?.name)
+      .map((id) => {
+        const d = deptById.get(id);
+        return d ? (lang === "ml" && d.nameMl ? d.nameMl : d.name) : null;
+      })
       .filter(Boolean);
     const displayName = lang === "ml" && m.nameMl ? m.nameMl : m.name;
     const subName = lang === "ml" && m.nameMl ? m.name : m.nameMl ?? null;
-    const term = fmtMinisterTerm(m);
+    const term = fmtMinisterTerm(m, lang);
     return (
       <a href={`/gov/ministers/${m.slug}`} class="surface-link flex gap-3 p-4">
         <MinisterAvatar minister={m} size={56} class="shrink-0" />
@@ -474,7 +504,11 @@ export default define.page<typeof handler>(function GovernmentHub(
             </h3>
             {m.party && (
               <span class="badge badge-sm badge-ghost shrink-0">
-                {PARTY_LABEL[m.party] ?? m.party}
+                {PARTY_LABEL[m.party]
+                  ? (lang === "ml"
+                    ? PARTY_LABEL[m.party].ml
+                    : PARTY_LABEL[m.party].en)
+                  : m.party}
               </span>
             )}
           </div>

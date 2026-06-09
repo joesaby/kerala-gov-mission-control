@@ -218,6 +218,7 @@ export interface Department {
   nameMl?: string;
   /** Short citizen-facing description. */
   summary?: string;
+  summaryMl?: string;
   /** Primary domains this department contributes to. */
   domains: CivicDomain[];
   /** Department website (if any). */
@@ -307,6 +308,7 @@ export interface Government {
   nameMl?: string;
   /** Short label used in chips / breadcrumbs, e.g. "Pinarayi II". */
   shortName: string;
+  shortNameMl?: string;
   coalition: "LDF" | "UDF" | "Other";
   /** Minister id of the Chief Minister (must be a Minister with rank="CM"). */
   cmMinisterId: string;
@@ -316,6 +318,7 @@ export interface Government {
   /** Undefined if this is the incumbent government. */
   termEnd?: string;
   summary?: string;
+  summaryMl?: string;
   source?: string;
   sourceUrl?: string;
   dataStatus: "verified" | "unverified" | "tbd";

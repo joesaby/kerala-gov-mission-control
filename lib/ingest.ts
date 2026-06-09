@@ -196,18 +196,19 @@ function buildPrompt(
   const goalLines = goals
     .map((g) => `  ${g.id} :: ${g.title}${g.summary ? ` — ${g.summary}` : ""}`)
     .join("\n");
-  return `You are a structured data extractor for Kerala government documents.
+  return `You are a structured data extractor and translator for Kerala government documents.
 Documents may be Malayalam-only, English-only, or bilingual.
-Extract fields exactly as printed; never invent or paraphrase content.
+Every document must have both English and Malayalam versions of the subject (title) and the executive summary.
+If a field is only present in one language in the document, you MUST translate it to the other language so that BOTH the English and Malayalam versions are populated.
 
 Return ONLY a JSON object with these exact keys:
   goNumber             - document/order number as printed, or null
   type                 - one of: "P" | "Ms" | "Rt" | "SRO" | "Circular" | "Bill" | "Cabinet"
   date                 - ISO "YYYY-MM-DD"
-  subject              - English subject/title line, or null if only Malayalam
-  subjectMl            - Malayalam subject/title (Unicode), or null if not present
-  summary              - A brief, one-paragraph English executive summary or body excerpt of the key directives, actions, or decisions in the document body, or null
-  summaryMl            - Same summary translated into Malayalam (Unicode), or null
+  subject              - English subject/title line. If the document subject is in Malayalam only, translate it to English.
+  subjectMl            - Malayalam subject/title (Unicode). If the document subject is in English only, translate it to Malayalam.
+  summary              - A brief, one-paragraph English executive summary of the key directives, actions, or decisions in the document body. If the document body is in Malayalam only, write this summary in English.
+  summaryMl            - Same executive summary translated into Malayalam (Unicode). If the document body is in English only, write this summary in Malayalam.
   manifestoGoalId      - the id of the ONE manifesto goal this order most directly
                          implements or supports, or null if none genuinely apply
   manifestoConfidence  - "direct" (the order enacts the pledge), "supporting"

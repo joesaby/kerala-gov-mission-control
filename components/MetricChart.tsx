@@ -1,5 +1,5 @@
 import type { Lang } from "../data/lang.ts";
-import { t } from "../data/lang.ts";
+import { formatUsdValue, t } from "../data/lang.ts";
 import type { FindingChart, FiscalSeverity } from "../data/types.ts";
 
 /**
@@ -25,10 +25,11 @@ function fmt(n: number): string {
 }
 
 export function MetricChart(
-  { chart, severity, lang }: {
+  { chart, severity, lang, usdRate = 83.5 }: {
     chart: FindingChart;
     severity: FiscalSeverity;
     lang: Lang;
+    usdRate?: number;
   },
 ) {
   const pts = chart.points;
@@ -58,11 +59,28 @@ export function MetricChart(
     pts.map((p) => `${p.year} ${fmt(p.value)}`).join(", ")
   }`;
 
+  const convertUnit = (unit: string, l: Lang): string => {
+    if (unit === "₹ crore") {
+      return l === "ml" ? "₹ കോടി (~$ ബില്യൺ)" : "₹ crore (~$B)";
+    }
+    if (unit === "₹ കോടി") return "₹ കോടി (~$ ബില്യൺ)";
+    if (unit === "accumulated loss, ₹ crore") {
+      return l === "ml"
+        ? "സഞ്ചിത നഷ്ടം, ₹ കോടി (~$ ബില്യൺ)"
+        : "accumulated loss, ₹ crore (~$B)";
+    }
+    if (unit === "സഞ്ചിത നഷ്ടം, ₹ കോടി") return "സഞ്ചിത നഷ്ടം, ₹ കോടി (~$ ബില്യൺ)";
+    return unit;
+  };
+
+  const isCurrency = !!(chart.unit.includes("₹ crore") ||
+    (chart.unitMl && chart.unitMl.includes("₹ കോടി")));
+
   return (
     <figure class="mt-3">
       <figcaption class="flex items-baseline justify-between gap-2 mb-1">
         <span class="text-[11px] font-semibold text-base-content/70">
-          {pick(lang, chart.unit, chart.unitMl)}
+          {convertUnit(pick(lang, chart.unit, chart.unitMl), lang)}
         </span>
         {chart.kind === "burndown" && (
           <span class="text-[10px] text-base-content/50">
@@ -122,6 +140,14 @@ export function MetricChart(
           const y = yOf(p.value);
           const h = padTop + plotH - y;
           const isLast = i === lastIdx;
+          const usdVal = isCurrency
+            ? formatUsdValue(p.value, lang, usdRate)
+            : null;
+          const tooltipText = isCurrency
+            ? `${p.year}: ${fmt(p.value)} (~${usdVal})${
+              p.note ? ` (${p.note})` : ""
+            }`
+            : `${p.year}: ${fmt(p.value)}${p.note ? ` (${p.note})` : ""}`;
           return (
             <g key={p.year}>
               <rect
@@ -133,9 +159,7 @@ export function MetricChart(
                 fill="currentColor"
                 opacity={isLast ? 1 : p.note ? 0.6 : 0.38}
               >
-                <title>
-                  {`${p.year}: ${fmt(p.value)}${p.note ? ` (${p.note})` : ""}`}
-                </title>
+                <title>{tooltipText}</title>
               </rect>
               {isLast && (
                 <text

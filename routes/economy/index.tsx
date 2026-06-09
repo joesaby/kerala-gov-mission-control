@@ -1,6 +1,6 @@
 import { page } from "fresh";
 import { define } from "../../utils.ts";
-import { t } from "../../data/lang.ts";
+import { convertTextInrToUsd, t } from "../../data/lang.ts";
 import type { Lang } from "../../data/lang.ts";
 import { listStatusPapers } from "../../data/db.ts";
 import { Header } from "../../components/Header.tsx";
@@ -15,12 +15,25 @@ import type {
 
 interface Data {
   paper: StatusPaper | null;
+  usdRate: number;
 }
 
 export const handler = define.handlers<Data>({
   async GET() {
     const papers = await listStatusPapers();
-    return page({ paper: papers[0] ?? null });
+    let usdRate = 83.5;
+    try {
+      const res = await fetch("https://open.er-api.com/v6/latest/USD");
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.rates && typeof data.rates.INR === "number") {
+          usdRate = data.rates.INR;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch USD exchange rate on the day:", err);
+    }
+    return page({ paper: papers[0] ?? null, usdRate });
   },
 });
 
@@ -110,11 +123,16 @@ function fmtDate(iso: string, lang: Lang): string {
 /** Baseline → latest delta, or null while we're still at the baseline. */
 function delta(
   v: FiscalVital,
+  lang: Lang,
 ): { txt: string; cls: string; improved: boolean } | null {
   if (v.latest === undefined) return null;
   const diff = Math.round((v.latest - v.baseline) * 10) / 10;
   if (diff === 0) {
-    return { txt: "no change", cls: "text-base-content/60", improved: false };
+    return {
+      txt: lang === "ml" ? "മാറ്റമില്ല" : "no change",
+      cls: "text-base-content/60",
+      improved: false,
+    };
   }
   const improved = v.direction === "lower-better" ? diff < 0 : diff > 0;
   const arrow = diff > 0 ? "▲" : "▼";
@@ -127,7 +145,7 @@ function delta(
 
 function VitalGauge({ v, lang }: { v: FiscalVital; lang: Lang }) {
   const sev = SEV[v.status];
-  const d = delta(v);
+  const d = delta(v, lang);
   // radial-progress expects 0–100; clamp so tiny/large values still render.
   const gauge = Math.max(0, Math.min(100, v.baseline));
   return (
@@ -177,7 +195,7 @@ function VitalGauge({ v, lang }: { v: FiscalVital; lang: Lang }) {
 export default define.page<typeof handler>(
   function EconomyPage({ data, state }) {
     const lang = state.lang;
-    const { paper } = data;
+    const { paper, usdRate = 83.5 } = data;
 
     if (!paper) {
       return (
@@ -280,8 +298,8 @@ export default define.page<typeof handler>(
               <p class="eyebrow mb-3">
                 {t(
                   lang,
-                  "Where each ₹100 of revenue goes",
-                  "ഓരോ ₹100 വരുമാനവും എങ്ങോട്ട്",
+                  "Where each ₹100 (or $100) of revenue goes",
+                  "ഓരോ ₹100 (അല്ലെങ്കിൽ $100) വരുമാനവും എങ്ങോട്ട്",
                 )}
               </p>
               <div class="flex h-9 w-full overflow-hidden rounded-field text-[11px] font-semibold text-white">
@@ -290,38 +308,38 @@ export default define.page<typeof handler>(
                   style={`width:${salaryPension}%`}
                   title="Salaries & pensions"
                 >
-                  ₹{Math.round(salaryPension)}
+                  ₹{Math.round(salaryPension)} / ${Math.round(salaryPension)}
                 </div>
                 <div
                   class="bg-warning flex items-center justify-center"
                   style={`width:${interest}%`}
                   title="Interest"
                 >
-                  ₹{Math.round(interest)}
+                  ₹{Math.round(interest)} / ${Math.round(interest)}
                 </div>
                 <div
                   class="bg-success flex items-center justify-center"
                   style={`width:${free}%`}
                   title="Left for everything else"
                 >
-                  ₹{Math.round(free)}
+                  ₹{Math.round(free)} / ${Math.round(free)}
                 </div>
               </div>
               <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-base-content/70">
                 <span class="flex items-center gap-1.5">
                   <span class="status-dot bg-error"></span>
                   {t(lang, "Salaries & pensions", "ശമ്പളവും പെൻഷനും")}{" "}
-                  · ₹{Math.round(salaryPension)}
+                  · ₹{Math.round(salaryPension)} / ${Math.round(salaryPension)}
                 </span>
                 <span class="flex items-center gap-1.5">
                   <span class="status-dot bg-warning"></span>
                   {t(lang, "Interest on debt", "കടത്തിന്റെ പലിശ")}{" "}
-                  · ₹{Math.round(interest)}
+                  · ₹{Math.round(interest)} / ${Math.round(interest)}
                 </span>
                 <span class="flex items-center gap-1.5">
                   <span class="status-dot bg-success"></span>
                   {t(lang, "Left for everything else", "ബാക്കിയെല്ലാത്തിനും")}{" "}
-                  · ₹{Math.round(free)}
+                  · ₹{Math.round(free)} / ${Math.round(free)}
                 </span>
               </div>
             </div>
@@ -332,8 +350,12 @@ export default define.page<typeof handler>(
               <span>
                 {t(
                   lang,
-                  "These are the baseline. When the next budget is presented, each vital sign will be tracked against this report — so we can measure progress, not just promises.",
-                  "ഇത് അടിസ്ഥാന നിലയാണ്. അടുത്ത ബജറ്റ് അവതരിപ്പിക്കുമ്പോൾ ഓരോ സൂചകവും ഈ റിപ്പോർട്ടിനെതിരെ വിലയിരുത്തും.",
+                  `These are the baseline. When the next budget is presented, each vital sign will be tracked against this report — so we can measure progress, not just promises. Absolute currency figures are shown in both Indian Rupees (₹) and US Dollars ($), converted at a live rate of 1 USD = ₹${
+                    usdRate.toFixed(2)
+                  } on the day of request.`,
+                  `ഇത് അടിസ്ഥാന നിലയാണ്. അടുത്ത ബജറ്റ് അവതരിപ്പിക്കുമ്പോൾ ഓരോ സൂചകവും ഈ റിപ്പോർട്ടിനെതിരെ വിലയിരുത്തും. എല്ലാ കറൻസി മൂല്യങ്ങളും ഇന്ത്യൻ രൂപയിലും (₹) യുഎസ് ഡോളറിലും ($) കാണിച്ചിരിക്കുന്നു (അഭ്യർത്ഥിച്ച ദിവസത്തെ നിരക്കായ 1 USD = ₹${
+                    usdRate.toFixed(2)
+                  } എന്ന നിരക്കിൽ).`,
                 )}
               </span>
             </div>
@@ -359,18 +381,26 @@ export default define.page<typeof handler>(
                   <div key={f.key} class="collapse collapse-arrow surface-card">
                     <input
                       type="checkbox"
-                      aria-label={pick(lang, f.heading, f.headingMl)}
+                      aria-label={convertTextInrToUsd(
+                        pick(lang, f.heading, f.headingMl),
+                        lang,
+                        usdRate,
+                      )}
                     />
                     <div class="collapse-title flex items-center gap-3 pr-10">
                       <span class={`status-dot ${sev.dot} shrink-0`}></span>
                       <span class="font-semibold leading-tight grow">
-                        {pick(lang, f.heading, f.headingMl)}
+                        {convertTextInrToUsd(
+                          pick(lang, f.heading, f.headingMl),
+                          lang,
+                          usdRate,
+                        )}
                       </span>
                       {f.stat && (
                         <span
                           class={`metric-value !text-lg tabular-nums shrink-0 ${sev.text}`}
                         >
-                          {f.stat}
+                          {convertTextInrToUsd(f.stat, lang, usdRate)}
                         </span>
                       )}
                     </div>
@@ -378,7 +408,11 @@ export default define.page<typeof handler>(
                       <div class="md:flex md:items-start md:gap-5">
                         <div class="md:flex-1">
                           <p class="leading-relaxed text-base-content/85">
-                            {pick(lang, f.detail, f.detailMl)}
+                            {convertTextInrToUsd(
+                              pick(lang, f.detail, f.detailMl),
+                              lang,
+                              usdRate,
+                            )}
                           </p>
                           <p class="mt-2 text-[11px] text-base-content/45">
                             {t(lang, "Report chapter", "അധ്യായം")} {f.chapter}
@@ -390,6 +424,7 @@ export default define.page<typeof handler>(
                               chart={f.chart}
                               severity={f.severity}
                               lang={lang}
+                              usdRate={usdRate}
                             />
                           </div>
                         )}
@@ -445,14 +480,22 @@ export default define.page<typeof handler>(
                       <div key={l.key} class="surface-card p-5">
                         <div class="flex items-start justify-between gap-2">
                           <h3 class="font-semibold leading-tight">
-                            {pick(lang, l.heading, l.headingMl)}
+                            {convertTextInrToUsd(
+                              pick(lang, l.heading, l.headingMl),
+                              lang,
+                              usdRate,
+                            )}
                           </h3>
                           <span class={`badge badge-sm ${grp.badge} shrink-0`}>
                             {t(lang, grp.en, grp.ml)}
                           </span>
                         </div>
                         <p class="mt-2 text-sm leading-relaxed text-base-content/80">
-                          {pick(lang, l.detail, l.detailMl)}
+                          {convertTextInrToUsd(
+                            pick(lang, l.detail, l.detailMl),
+                            lang,
+                            usdRate,
+                          )}
                         </p>
                         <div class="mt-3 flex items-center gap-1.5 text-[11px] font-medium">
                           <span

@@ -151,9 +151,12 @@ number. **No tooltip = no merge.**
 ### 3. Bilingual parity
 
 Every user-visible string must exist in both English and Malayalam. The `*Ml`
-fields (`titleMl`, `definitionMl`, `nameMl`, …) are typed as optional so the
-type system won't catch gaps — you must check manually. Never machine-translate
-Malayalam government terminology; wrong term = wrong meaning.
+fields (`titleMl`, `definitionMl`, `nameMl`, `summaryMl`, …) are typed as
+optional so the type system won't catch gaps — you must check manually. Refer to
+the formal
+[Bilingual Localization Specification](file:///Users/josesebastian/git/kerala-gov-mission-control/docs/specs/bilingual-localization.md)
+for comprehensive schema and pipeline rules. Never machine-translate Malayalam
+government terminology; wrong term = wrong meaning.
 
 ### 4. SEED_VERSION bump
 

@@ -28,6 +28,8 @@ export const STATUS_PAPERS: StatusPaper[] = [
     titleMl: "കേരളത്തിന്റെ സാമ്പത്തിക ആരോഗ്യം 2026 — ഒരു തൽസ്ഥിതി റിപ്പോർട്ട്",
     subtitle:
       "The new government's fiscal baseline, tabled before the 16th Kerala Legislative Assembly",
+    subtitleMl:
+      "പതിനാറാം കേരള നിയമസഭയ്ക്ക് മുന്നിൽ സമർപ്പിച്ച, പുതിയ സർക്കാരിന്റെ ധനകാര്യ അടിസ്ഥാന വിവരങ്ങൾ.",
     term: "16kla",
     // Exact tabling date not printed in the report; approximated to the start
     // of the 16th KLA term. Verify against the Assembly bulletin (dataStatus tbd).
@@ -39,6 +41,8 @@ export const STATUS_PAPERS: StatusPaper[] = [
       "media and public can measure the next five years against. Kerala's social " +
       "achievements remain exceptional; the challenge is whether the State's finances can " +
       "sustain them.",
+    summaryMl:
+      "സർക്കാരിന്റെ കാലാവധിയുടെ തുടക്കത്തിൽ പ്രസിദ്ധീകരിച്ച ഈ റിപ്പോർട്ട്, കേരളത്തിന് യഥാർത്ഥത്തിൽ ലഭിക്കുന്നതും ചെലവഴിക്കുന്നതും കടപ്പെട്ടിരിക്കുന്നതുമായ കണക്കുകളുടെ വ്യക്തമായ ചിത്രം നൽകുന്നു. വാർഷിക ബജറ്റിന് പിന്നിലെ യഥാർത്ഥ വിവരങ്ങളിലേക്കുള്ള ഒരു തിരിഞ്ഞുനോട്ടമാണിത്. വരും അഞ്ച് വർഷങ്ങളിൽ നിയമസഭയ്ക്കും മാധ്യമങ്ങൾക്കും പൊതുജനങ്ങൾക്കും അളക്കാനും വിലയിരുത്താനുമുള്ള ഒരു അടിസ്ഥാനരേഖയാണിത്. കേരളത്തിന്റെ സാമൂഹിക നേട്ടങ്ങൾ അസാധാരണമായി തുടരുന്നു; എന്നാൽ ഇവ നിലനിർത്താൻ സംസ്ഥാനത്തിന്റെ സാമ്പത്തിക വ്യവസ്ഥയ്ക്ക് സാധിക്കുമോ എന്നതാണ് പ്രധാന വെല്ലുവിളി.",
     vitals: [
       {
         key: "debt-gsdp",
