@@ -109,13 +109,16 @@ deno task check        # fmt --check + lint + type check (must pass before commi
 deno task build        # Production build into _fresh/
 deno task start        # Serve the production build
 deno task seed         # Re-seed the in-memory DB
+deno task test         # Unit tests in lib/ (runs in CI)
+deno task check:ml     # Foreign-script glyph check on data/ fixtures (runs in CI)
+deno task review       # Headless advisory code review of the staged diff
 deno task translate    # Run Malayalam translation helper
 ```
 
-**CI gate:** `.github/workflows/ci.yml` runs `deno task check` +
-`deno task
-build` on every PR and push to `main`. Both must pass. Deploys are
-handled automatically by Deno Deploy — there is no manual deploy step.
+**CI gate:** `.github/workflows/ci.yml` runs `deno task check`,
+`deno task test`, `deno task check:ml`, and `deno task build` on every PR and
+push to `main`. All must pass. Deploys are handled automatically by Deno Deploy
+— there is no manual deploy step.
 
 ---
 
@@ -173,7 +176,18 @@ this the in-memory DB will not re-seed and changes will not appear.
 ### 5. Check must pass
 
 Run `deno task check` before every commit. fmt + lint + type check must all be
-green. CI will reject the PR otherwise.
+green, along with `deno task test` and `deno task check:ml`. CI will reject the
+PR otherwise.
+
+### 6. Review against the project rubric
+
+The code-review standard — what blocks a merge vs what is a quality
+recommendation — lives in **one** place:
+[`docs/code-review-guidelines.md`](docs/code-review-guidelines.md). When
+reviewing any diff or PR for this repo, apply that rubric via the
+`review-checklist` skill; `deno task review` runs the same standard headlessly
+over the staged diff. Do not restate review rules in other documents — link to
+the guidelines instead, so the standard cannot drift into contradictions.
 
 ---
 
@@ -182,11 +196,12 @@ green. CI will reject the PR otherwise.
 Skills are pre-written instruction sets for common tasks. Run them by invoking
 the skill name in a supported AI coding tool.
 
-| Skill             | Location                                  | Use when                                                                         |
-| ----------------- | ----------------------------------------- | -------------------------------------------------------------------------------- |
-| `add-kpi`         | `.claude/skills/add-kpi/SKILL.md`         | Adding any headline or tier-2 KPI                                                |
-| `bilingual-audit` | `.claude/skills/bilingual-audit/SKILL.md` | Checking EN/ML parity gaps before a PR                                           |
-| `ingest-go`       | `.claude/skills/ingest-go/SKILL.md`       | Fetching, tagging, and storing a Kerala Government Order, Circular, SRO, or Bill |
+| Skill              | Location                                   | Use when                                                                             |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `add-kpi`          | `.claude/skills/add-kpi/SKILL.md`          | Adding any headline or tier-2 KPI                                                    |
+| `bilingual-audit`  | `.claude/skills/bilingual-audit/SKILL.md`  | Checking EN/ML parity gaps before a PR                                               |
+| `review-checklist` | `.claude/skills/review-checklist/SKILL.md` | Reviewing any diff or PR — the actionable pass over `docs/code-review-guidelines.md` |
+| `ingest-go`        | `.claude/skills/ingest-go/SKILL.md`        | Fetching, tagging, and storing a Kerala Government Order, Circular, SRO, or Bill     |
 
 ---
 

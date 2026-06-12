@@ -1,13 +1,13 @@
 ---
 name: review-checklist
-description: Review a change against this project's blocking gates and quality bar — government sources, SEED_VERSION bump, deno check, no machine-translated Malayalam, KPI defensibility. Use before opening a PR or when asked to review the current diff for this repo.
+description: Review a change against this project's blocking gates and quality bar — government sources, SEED_VERSION bump, deno check, translation provenance (machine-draft flags), KPI defensibility. Use before opening a PR or when asked to review the current diff or a PR for this repo.
 ---
 
 # Review checklist
 
 The project-specific review standard. The full rubric lives in
-[`docs/code-review-guidelines.md`](../../../docs/code-review-guidelines.md); this
-skill is the actionable pass. (For generic diff review use the built-in
+[`docs/code-review-guidelines.md`](../../../docs/code-review-guidelines.md);
+this skill is the actionable pass. (For generic diff review use the built-in
 `/code-review`; this one adds the kerala-gov-mission-control rules.)
 
 ## Run the gates first
@@ -15,9 +15,11 @@ skill is the actionable pass. (For generic diff review use the built-in
 ```bash
 deno task check          # fmt --check + lint + type-check  (blocking)
 deno task check:sources  # government-source policy          (blocking)
+deno task check:ml       # foreign-script glyphs in data/    (blocking, in CI)
+deno task test           # unit tests (lib/)                 (blocking, in CI)
 ```
 
-Both must be green. These are the same gates the pre-commit hook runs.
+All must be green. These are the same gates the pre-commit hook and CI run.
 
 ## Blockers — fail the review if any are true
 
@@ -26,15 +28,18 @@ Both must be green. These are the same gates the pre-commit hook runs.
 - [ ] A `data/*.ts` fixture changed but `SEED_VERSION` in `data/db.ts` was
       **not** bumped.
 - [ ] `deno task check` fails (type error / lint / formatting drift).
-- [ ] A Malayalam `*Ml` field was machine-translated / guessed. (Missing is OK
-      with `dataStatus: "tbd"`; wrong is not.)
+- [ ] An LLM-drafted `*Ml` string lacks `translationStatus: "machine-draft"` on
+      its record. Machine translation is allowed **only** as a flagged draft
+      (spec Rule 2.4); unflagged machine Malayalam is a blocker. (Missing
+      entirely is OK with `dataStatus: "tbd"`.)
 - [ ] A new KPI is missing a defensibility field (`ownerDeptId`, `target`, ≥1
       external comparator, `meta.definition`+`definitionMl`, `source`,
       `sourceUrl`, `owner` designation, `lastRefreshed` with `+05:30`).
 
 ## Quality — request changes
 
-- [ ] EN field added without a verified `*Ml` counterpart (`/bilingual-audit`).
+- [ ] EN field added without a `*Ml` counterpart — human-verified or flagged
+      `machine-draft` (`/bilingual-audit`).
 - [ ] New island where a server component would do.
 - [ ] Reinvents an existing type/helper/CSS token instead of reusing it.
 - [ ] A visual without visible provenance (source + retrieval/refresh date).
