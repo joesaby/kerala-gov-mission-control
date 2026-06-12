@@ -11,6 +11,7 @@
 
 import { geminiKey } from "./gemini.ts";
 import { runIngest } from "./ingest.ts";
+import { refreshUsdInrRate } from "./fx.ts";
 
 /** Daily at 02:30 IST (21:00 UTC the previous day). */
 const CRON_SCHEDULE = "0 21 * * *";
@@ -52,4 +53,17 @@ export function registerIngestCron(): void {
     }
   });
   console.log("[cron] daily-go-ingest registered");
+
+  // Daily at 06:00 IST (00:30 UTC) — well after the GO ingest at 02:30 IST.
+  Deno.cron("daily-fx-refresh", "30 0 * * *", async () => {
+    const rate = await refreshUsdInrRate();
+    if (rate) {
+      console.log(`[cron] daily-fx-refresh done — 1 USD = ₹${rate.toFixed(2)}`);
+    } else {
+      console.warn(
+        "[cron] daily-fx-refresh failed — KV unchanged, fallback in use",
+      );
+    }
+  });
+  console.log("[cron] daily-fx-refresh registered");
 }
