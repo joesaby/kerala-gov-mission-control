@@ -17,11 +17,17 @@ merge; "quality" items are strong recommendations.
    `government-orders.ts`, `manifesto-goals.ts`, …) requires bumping
    `SEED_VERSION` in `data/db.ts`. Without it the site serves stale KV data.
 3. **`deno task check` passes** — `deno fmt --check` + `deno lint` +
-   `deno check` are green. No type errors, no formatting drift.
-4. **No machine-translated Malayalam government terminology.** A wrong term is a
-   wrong meaning. If a verified `*Ml` value isn't available, leave it unset and
-   mark the record `dataStatus: "tbd"` — never guess. See the bilingual
-   invariant in [`CLAUDE.md`](../CLAUDE.md).
+   `deno check` are green. No type errors, no formatting drift. `deno task test`
+   and `deno task check:ml` must also pass (both run in CI).
+4. **No unflagged machine-translated Malayalam.** A wrong term is a wrong
+   meaning. LLM-drafted `*Ml` strings are allowed **only** with
+   `translationStatus: "machine-draft"` on the record (see `TranslationStatus`
+   in `data/types.ts`); they graduate after a Malayalam speaker reviews them. If
+   you can't provide even a draft, leave the field unset and mark the record
+   `dataStatus: "tbd"`. `deno task check:ml` (in CI) rejects foreign-script
+   glyph corruption. Full rules:
+   [`docs/specs/bilingual-localization.md`](./specs/bilingual-localization.md)
+   Rule 2.4.
 5. **Defensibility fields on new KPIs.** `ownerDeptId`, `target`,
    `comparators[]` (≥1 external benchmark), `meta.definition` (+`definitionMl`),
    `meta.source`, `meta.sourceUrl`, `meta.owner` (a designation), and
@@ -31,7 +37,8 @@ merge; "quality" items are strong recommendations.
 ## Quality
 
 - **Bilingual parity.** New EN fields ship with their `*Ml` counterpart
-  (verified, not guessed). Run the `/bilingual-audit` skill.
+  (human-verified, or flagged `machine-draft`). Run the `/bilingual-audit`
+  skill.
 - **Server-render by default.** Prefer server components; add an island only for
   genuine client interactivity. New charts/visuals follow the no-JS, SSR +
   daisyUI pattern (see `components/MetricChart.tsx`).
@@ -50,4 +57,10 @@ merge; "quality" items are strong recommendations.
 `scripts/code-review.sh` runs `claude -p` (read-only, `--permission-mode plan`)
 over the staged diff against this file and `CLAUDE.md`. It is **advisory** — it
 prints findings but never blocks the commit. The blocking gates are
-`deno task check` and `deno task check:sources`.
+`deno task check`, `deno task check:sources`, `deno task check:ml`, and
+`deno task test`.
+
+This file is the single source of truth for the review standard; the
+`/review-checklist` skill is its actionable pass, and CLAUDE.md / AGENTS.md only
+point here. When the standard changes, change **this file** (and the skill) —
+don't fork the rules into other documents.

@@ -11,6 +11,10 @@ deno task check        # deno fmt --check + deno lint + deno check (run before e
 deno task build        # production build → _fresh/
 deno task start        # serve the production build
 deno task seed         # wipe and reseed local Deno KV from fixtures
+deno task test         # unit tests in lib/ (runs in CI)
+deno task check:sources  # government-source policy gate
+deno task check:ml     # foreign-script glyph check on data/ fixtures (runs in CI)
+deno task review       # headless advisory code review of the staged diff
 deno task translate    # run scripts/translate.py (uv, needs Python ≥ 3.10)
 deno task translate:test  # pytest for translate.py
 ```
@@ -175,8 +179,16 @@ before making a second edit — the bytes may have changed.
 | -------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `/add-kpi`                       | Adding any new headline or tier-2 KPI — enforces the defensibility checklist                       |
 | `/bilingual-audit`               | Check for EN fields missing their `*Ml` counterpart before a PR                                    |
+| `/review-checklist`              | Review any diff or PR against the project's blocking gates and quality bar — run before every PR   |
 | `kpi-data-reviewer` agent        | Audit `data/kpis.ts` for defensibility gaps before merging                                         |
 | `governance-data-reviewer` agent | Surface every `dataStatus: "unverified"/"tbd"` record with the fields needed to reach `"verified"` |
+
+The review standard lives in `docs/code-review-guidelines.md` — the single
+source of truth for review rules (blockers vs quality). `/review-checklist` is
+its actionable pass and `deno task review` runs a headless advisory review of
+the staged diff against it. When reviewing any change or PR in this repo, apply
+that rubric; when the standard changes, edit that file rather than restating
+rules here.
 
 ## Bilingual invariant
 
