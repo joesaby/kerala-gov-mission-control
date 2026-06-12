@@ -1,0 +1,14 @@
+[      62ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/0ecd8764890099453547d1609334757bd871c55f/chunk-72KCIZPQ.js:192
+[      88ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[      88ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[      89ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[      90ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[      90ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[      90ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[      91ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[   74221ms] [LOG] %c Fresh %c Connection closed. Trying to reconnect... background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/0ecd8764890099453547d1609334757bd871c55f/chunk-72KCIZPQ.js:154
+[   74222ms] [ERROR] WebSocket connection to 'ws://localhost:8000/_frsh/alive' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/_fresh/js/0ecd8764890099453547d1609334757bd871c55f/chunk-72KCIZPQ.js:174
+[   74763ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/e8f02c262274a60e6433b8686b6bb62fc5a2e99d/chunk-O2IYOKIS.js:192
+[   88820ms] [LOG] %c Fresh %c Connection closed. Trying to reconnect... background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/e8f02c262274a60e6433b8686b6bb62fc5a2e99d/chunk-O2IYOKIS.js:154
+[   88820ms] [ERROR] WebSocket connection to 'ws://localhost:8000/_frsh/alive' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/_fresh/js/e8f02c262274a60e6433b8686b6bb62fc5a2e99d/chunk-O2IYOKIS.js:174
+[   89206ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/8c6c062dd803fbf41b9f910af295a861ce6ba44f/chunk-P4YX6XNL.js:192

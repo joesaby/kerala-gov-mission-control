@@ -1,0 +1,19 @@
+[     125ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/e18142758d20c520e3e66648179da1d71b7f5215/chunk-EHUU4V2R.js:192
+[     132ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[     133ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[     133ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[     134ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[     134ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[     135ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[     135ms] [VERBOSE] Rendering was performed in a subtree hidden by content-visibility. @ :3180
+[    3305ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/e18142758d20c520e3e66648179da1d71b7f5215/chunk-EHUU4V2R.js:192
+[    4745ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/e18142758d20c520e3e66648179da1d71b7f5215/chunk-EHUU4V2R.js:192
+[   85283ms] [LOG] %c Fresh %c Connection closed. Trying to reconnect... background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/e18142758d20c520e3e66648179da1d71b7f5215/chunk-EHUU4V2R.js:154
+[   85284ms] [ERROR] WebSocket connection to 'ws://localhost:8000/_frsh/alive' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/_fresh/js/e18142758d20c520e3e66648179da1d71b7f5215/chunk-EHUU4V2R.js:174
+[   85769ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/ee40166a6b0fad45269f2181c4374c6f03fea776/chunk-TMRNGJJU.js:192
+[   89742ms] [LOG] %c Fresh %c Connection closed. Trying to reconnect... background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/ee40166a6b0fad45269f2181c4374c6f03fea776/chunk-TMRNGJJU.js:154
+[   89743ms] [ERROR] WebSocket connection to 'ws://localhost:8000/_frsh/alive' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/_fresh/js/ee40166a6b0fad45269f2181c4374c6f03fea776/chunk-TMRNGJJU.js:174
+[   90155ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/99c1894986f7e7334d441a974604d611ecc97b8b/chunk-TEQ3KY2G.js:192
+[   93578ms] [LOG] %c Fresh %c Connection closed. Trying to reconnect... background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/99c1894986f7e7334d441a974604d611ecc97b8b/chunk-TEQ3KY2G.js:154
+[   93579ms] [ERROR] WebSocket connection to 'ws://localhost:8000/_frsh/alive' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/_fresh/js/99c1894986f7e7334d441a974604d611ecc97b8b/chunk-TEQ3KY2G.js:174
+[   93956ms] [LOG] %c Fresh %c Connected to development server. background-color: #86efac; color: black color: inherit @ http://localhost:8000/_fresh/js/0ecd8764890099453547d1609334757bd871c55f/chunk-72KCIZPQ.js:192
