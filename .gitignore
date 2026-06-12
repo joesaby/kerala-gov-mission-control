@@ -18,3 +18,11 @@ deno.lock
 
 # Translation work-in-progress files
 data/transcripts/*.partial
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local tooling / caches (not part of the repo)
+.antigravitycli/
+.cache/

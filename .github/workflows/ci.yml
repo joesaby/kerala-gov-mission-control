@@ -31,5 +31,11 @@ jobs:
       - name: Type check
         run: deno check
 
+      - name: Test
+        run: deno task test
+
+      - name: Malayalam glyph check
+        run: deno task check:ml
+
       - name: Build
         run: deno task build

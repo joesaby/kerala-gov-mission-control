@@ -151,9 +151,18 @@ number. **No tooltip = no merge.**
 ### 3. Bilingual parity
 
 Every user-visible string must exist in both English and Malayalam. The `*Ml`
-fields (`titleMl`, `definitionMl`, `nameMl`, …) are typed as optional so the
-type system won't catch gaps — you must check manually. Never machine-translate
-Malayalam government terminology; wrong term = wrong meaning.
+fields (`titleMl`, `definitionMl`, `nameMl`, `summaryMl`, …) are typed as
+optional so the type system won't catch gaps — you must check manually. Refer to
+the formal
+[Bilingual Localization Specification](docs/specs/bilingual-localization.md) for
+comprehensive schema and pipeline rules.
+
+Machine translation is allowed only as a **flagged draft**: any LLM-translated
+`*Ml` string must carry `translationStatus: "machine-draft"` on its record and
+is not authoritative until a Malayalam speaker reviews it (then clear the flag
+or set `"human"`). Never let machine-translated government terminology ship
+unflagged — wrong term = wrong meaning. Run `deno task check:ml` to catch
+foreign-script glyph corruption in fixtures.
 
 ### 4. SEED_VERSION bump
 

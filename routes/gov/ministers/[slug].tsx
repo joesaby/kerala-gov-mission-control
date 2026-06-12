@@ -1,6 +1,6 @@
 import { HttpError, page } from "fresh";
 import { define } from "../../../utils.ts";
-import { t } from "../../../data/lang.ts";
+import { t, translateParty } from "../../../data/lang.ts";
 import {
   getGovernment,
   getMinisterBySlug,
@@ -94,9 +94,11 @@ export default define.page<typeof handler>(function MinisterPage(
               <p class="text-base-content/60 text-sm">{minister.name}</p>
             )}
             <p class="text-base-content/70 mt-1">
-              {minister.rank === "CM" ? "Chief Minister · " : "Minister · "}
+              {minister.rank === "CM"
+                ? (lang === "ml" ? "മുഖ്യമന്ത്രി · " : "Chief Minister · ")
+                : (lang === "ml" ? "മന്ത്രി · " : "Minister · ")}
               {minister.constituency}
-              {minister.party && <>· {minister.party}</>}
+              {minister.party && <>· {translateParty(minister.party, lang)}</>}
             </p>
             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/60">
               {govt && (
@@ -105,18 +107,20 @@ export default define.page<typeof handler>(function MinisterPage(
                     href={govt.termEnd ? `/gov?g=${govt.slug}` : "/gov"}
                     class="link link-hover"
                   >
-                    {govt.shortName}
+                    {lang === "ml" && govt.shortNameMl
+                      ? govt.shortNameMl
+                      : govt.shortName}
                   </a>
                   <span class="ml-1 tabular-nums">
                     ({govt.termStart.slice(0, 4)}–{govt.termEnd
                       ? govt.termEnd.slice(0, 4)
-                      : "present"})
+                      : (lang === "ml" ? "ഇതുവരെ" : "present")})
                   </span>
                 </span>
               )}
               {minister.termStart && (
                 <span>
-                  In office:{" "}
+                  {t(lang, "In office: ", "കാലയളവ്: ")}
                   <span class="tabular-nums">{minister.termStart}</span>
                   {minister.termEnd && (
                     <>
@@ -152,10 +156,12 @@ export default define.page<typeof handler>(function MinisterPage(
                   href={`/gov/departments/${d.slug}`}
                   class="surface-link block p-3"
                 >
-                  <div class="font-medium">{d.name}</div>
-                  {d.summary && (
+                  <div class="font-medium">
+                    {lang === "ml" && d.nameMl ? d.nameMl : d.name}
+                  </div>
+                  {(lang === "ml" && d.summaryMl ? d.summaryMl : d.summary) && (
                     <div class="text-xs text-base-content/60 mt-0.5 line-clamp-2">
-                      {d.summary}
+                      {lang === "ml" && d.summaryMl ? d.summaryMl : d.summary}
                     </div>
                   )}
                 </a>

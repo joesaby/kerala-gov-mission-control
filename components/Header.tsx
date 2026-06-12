@@ -12,6 +12,7 @@ const NAV = [
   },
   { href: "/gov/manifesto", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
   { href: "/economy", en: "Economy", ml: "സമ്പദ്‌വ്യവസ്ഥ" },
+  { href: "/research", en: "Research", ml: "ഗവേഷണം" },
 ];
 
 /** The active nav item is the one whose href is the longest prefix of path. */

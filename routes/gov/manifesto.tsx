@@ -95,20 +95,28 @@ const STATUS_META: Record<
 
 const CONFIDENCE_LABEL: Record<
   string,
-  { label: string; cls: string }
+  { en: string; ml: string; cls: string }
 > = {
-  direct: { label: "Direct Action", cls: "text-success" },
-  supporting: { label: "Supporting Action", cls: "text-warning" },
-  weak: { label: "Indirect Link", cls: "text-base-content/40" },
+  direct: { en: "Direct Action", ml: "നേരിട്ടുള്ള നടപടി", cls: "text-success" },
+  supporting: {
+    en: "Supporting Action",
+    ml: "പിന്തുണയ്ക്കുന്ന നടപടി",
+    cls: "text-warning",
+  },
+  weak: {
+    en: "Indirect Link",
+    ml: "പരോക്ഷമായ ബന്ധം",
+    cls: "text-base-content/40",
+  },
 };
 
-const ORDER_TYPE_SHORT: Record<string, string> = {
-  P: "Policy GO",
-  Ms: "Memo GO",
-  Rt: "Routine GO",
-  SRO: "SRO",
-  Circular: "Circular",
-  Bill: "Bill",
+const ORDER_TYPE_SHORT: Record<string, { en: string; ml: string }> = {
+  P: { en: "Policy GO", ml: "നയപരമായ ജി.ഒ" },
+  Ms: { en: "Memo GO", ml: "മെമ്മോറാണ്ടം ജി.ഒ" },
+  Rt: { en: "Routine GO", ml: "സാധാരണ ജി.ഒ" },
+  SRO: { en: "SRO", ml: "എസ്.ആർ.ഒ" },
+  Circular: { en: "Circular", ml: "സർക്കുലർ" },
+  Bill: { en: "Bill", ml: "ബിൽ" },
 };
 
 export default define.page<typeof handler>(function ManifestoPage(
@@ -675,7 +683,11 @@ export default define.page<typeof handler>(function ManifestoPage(
                               <div class="timeline-end bg-base-200/40 p-4 rounded-xl border border-base-200/60 my-1 w-full flex flex-col gap-2">
                                 <div class="flex items-center gap-2 flex-wrap">
                                   <span class="badge badge-xs badge-neutral font-mono font-bold text-[9px] px-1.5 py-1.5">
-                                    {ORDER_TYPE_SHORT[o.type] ?? o.type}
+                                    {ORDER_TYPE_SHORT[o.type]
+                                      ? (lang === "ml"
+                                        ? ORDER_TYPE_SHORT[o.type].ml
+                                        : ORDER_TYPE_SHORT[o.type].en)
+                                      : o.type}
                                   </span>
                                   <span class="text-[10px] text-base-content/40 font-semibold tabular-nums">
                                     {new Date(o.date).toLocaleDateString(
@@ -692,7 +704,7 @@ export default define.page<typeof handler>(function ManifestoPage(
                                     <span
                                       class={`text-[9px] font-extrabold uppercase tracking-wider px-1 bg-base-300/40 rounded ${conf.cls}`}
                                     >
-                                      {conf.label}
+                                      {lang === "ml" ? conf.ml : conf.en}
                                     </span>
                                   )}
                                 </div>

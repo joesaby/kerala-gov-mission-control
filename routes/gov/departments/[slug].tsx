@@ -64,8 +64,10 @@ export default define.page<typeof handler>(function DeptPage(
         >
           {lang === "ml" ? dept.nameMl ?? dept.name : dept.name}
         </h1>
-        {dept.summary && (
-          <p class="text-base-content/70 mt-2 max-w-2xl">{dept.summary}</p>
+        {(lang === "ml" && dept.summaryMl ? dept.summaryMl : dept.summary) && (
+          <p class="text-base-content/70 mt-2 max-w-2xl">
+            {lang === "ml" && dept.summaryMl ? dept.summaryMl : dept.summary}
+          </p>
         )}
 
         <section class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -180,10 +180,15 @@ before making a second edit — the bytes may have changed.
 
 ## Bilingual invariant
 
-This dashboard serves both English and Malayalam. Never machine-translate
-Malayalam government terminology — wrong term = wrong meaning. If a `*Ml` field
-is missing, mark the record `dataStatus: "tbd"` and file a translation request;
-do not guess.
+This dashboard serves both English and Malayalam. Machine-translated Malayalam
+is allowed only as a flagged draft: the record must carry
+`translationStatus: "machine-draft"` (see `TranslationStatus` in
+`data/types.ts`) until a Malayalam speaker reviews it — wrong term = wrong
+meaning, so an unflagged machine translation is never acceptable. If you cannot
+provide even a draft, leave the `*Ml` field out and mark the record
+`dataStatus: "tbd"`. `deno task check:ml` (also in CI) rejects foreign-script
+glyph corruption in `data/` fixtures. Full rules:
+`docs/specs/bilingual-localization.md`.
 
 ## Deployment
 

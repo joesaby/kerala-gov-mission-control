@@ -115,6 +115,8 @@ export const HEADLINE_KPIS: Kpi[] = [
     ],
     meta: {
       definition: "Deaths of infants under 1 year per 1,000 live births.",
+      definitionMl: "ആയിരം സജീവ ജനനങ്ങളിൽ ഒരു വയസ്സിന് താഴെയുള്ള കുട്ടികളുടെ മരണനിരക്ക്.",
+      translationStatus: "machine-draft",
       source: "SRS Bulletin, Registrar General of India",
       owner: "Director, Health Services",
       updateFrequency: "annual",
@@ -150,6 +152,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Total state public spending on health (revenue + capital), as a share of GSDP.",
+      definitionMl:
+        "ആരോഗ്യ മേഖലയിലെ സംസ്ഥാനത്തിന്റെ ആകെ പൊതു ചെലവ് (റവന്യൂ + മൂലധനം), ജി.എസ്.ഡി.പിയുടെ ശതമാനമായി.",
+      translationStatus: "machine-draft",
       source: "Finance Accounts, AG Kerala",
       owner: "Principal Secretary (Health)",
       updateFrequency: "annual",
@@ -194,6 +199,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Share of Grade 3 students reading a Grade 2 level Malayalam paragraph correctly.",
+      definitionMl:
+        "രണ്ടാം ക്ലാസിലെ മലയാളം ഖണ്ഡിക ശരിയായി വായിക്കാൻ കഴിയുന്ന മൂന്നാം ക്ലാസ് വിദ്യാർത്ഥികളുടെ ശതമാനം.",
+      translationStatus: "machine-draft",
       source: "SCERT State Achievement Survey",
       owner: "Director, General Education",
       updateFrequency: "annual",
@@ -234,6 +242,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "PLFS usual status unemployment rate, persons aged 15 and above.",
+      definitionMl:
+        "15 വയസ്സും അതിനുമുകളിലുമുള്ള ആളുകളുടെ സാധാരണ പദവി അടിസ്ഥാനമാക്കിയുള്ള തൊഴിലില്ലായ്മ നിരക്ക് (പി.എൽ.എഫ്.എസ്).",
+      translationStatus: "machine-draft",
       source: "Periodic Labour Force Survey, MoSPI",
       owner: "Director, Economics & Statistics",
       updateFrequency: "quarterly",
@@ -268,6 +279,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "IPC + SLL crimes against women per 100,000 female population.",
+      definitionMl:
+        "ഒരു ലക്ഷം സ്ത്രീകൾക്ക് കണക്കാക്കിയുള്ള സ്ത്രീകൾക്കെതിരായ കുറ്റകൃത്യങ്ങൾ (ഐ.പി.സി + എസ്.എൽ.എൽ).",
+      translationStatus: "machine-draft",
       source: "NCRB Crime in India, State CCTNS feed",
       owner: "Director General of Police",
       updateFrequency: "monthly",
@@ -307,6 +321,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Share of CMO grievances marked resolved within 30 days of receipt.",
+      definitionMl:
+        "മുഖ്യമന്ത്രിയുടെ കാര്യാലയത്തിൽ ലഭിച്ച് 30 ദിവസത്തിനുള്ളിൽ പരിഹരിച്ച പരാതികളുടെ ശതമാനം.",
+      translationStatus: "machine-draft",
       source: "CM's Public Grievance Redressal System",
       owner: "Secretary, CMO",
       updateFrequency: "daily",
@@ -341,6 +358,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Median end-to-end fulfilment time for 12 high-volume citizen services (birth/death/income/community cert., building permit, ration card, etc.).",
+      definitionMl:
+        "12 പ്രധാന ജനസേവനങ്ങൾ നൽകാൻ എടുത്ത ശരാശരി സമയം (ജനന/മരണ/വരുമാന സർട്ടിഫിക്കറ്റ്, കെട്ടിട നിർമ്മാണാനുമതി, റേഷൻ കാർഡ് മുതലായവ).",
+      translationStatus: "machine-draft",
       source: "e-District + K-SMART telemetry",
       owner: "Secretary, Electronics & IT",
       updateFrequency: "daily",
@@ -381,6 +401,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Share of tenders above ₹50 lakh published to the Open Contracting Data Standard within 24 hours of award.",
+      definitionMl:
+        "50 ലക്ഷം രൂപയ്ക്ക് മുകളിലുള്ള ടെൻഡറുകൾ നൽകി 24 മണിക്കൂറിനുള്ളിൽ ഓപ്പൺ കോൺട്രാക്റ്റിംഗ് ഡാറ്റ നിലവാരത്തിൽ പ്രസിദ്ധീകരിച്ചവയുടെ ശതമാനം.",
+      translationStatus: "machine-draft",
       source: "Kerala e-Tenders + OCDS exporter",
       owner: "Secretary, Stores Purchase",
       updateFrequency: "daily",
@@ -415,6 +438,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Population-weighted median 24-hour PM2.5 across CPCB CAAQMS stations in Kerala.",
+      definitionMl:
+        "കേരളത്തിലെ വിവിധ സി.പി.സി.ബി സ്റ്റേഷനുകളിൽ രേഖപ്പെടുത്തിയ 24 മണിക്കൂറിലെ ശരാശരി പി.എം.2.5 തോത്.",
+      translationStatus: "machine-draft",
       source: "CPCB CAAQMS + KSPCB",
       owner: "Member Secretary, KSPCB",
       updateFrequency: "real-time",
@@ -459,6 +485,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Active KIIFB-funded projects with physical progress meeting or exceeding scheduled milestones.",
+      definitionMl:
+        "സമയബന്ധിതമായി നിർമ്മാണം പുരോഗമിക്കുന്ന സജീവമായ കിഫ്ബി ധനസഹായത്തോടെയുള്ള പദ്ധതികൾ.",
+      translationStatus: "machine-draft",
       source: "KIIFB Project Monitoring Cell",
       owner: "CEO, KIIFB",
       updateFrequency: "monthly",
@@ -499,6 +528,9 @@ export const HEADLINE_KPIS: Kpi[] = [
     meta: {
       definition:
         "Road traffic fatalities per 100,000 population (12-month rolling).",
+      definitionMl:
+        "ഒരു ലക്ഷം ജനങ്ങൾക്ക് കണക്കാക്കിയുള്ള റോഡ് അപകട മരണനിരക്ക് (12 മാസത്തെ ശരാശരി).",
+      translationStatus: "machine-draft",
       source: "MoRTH Road Accidents in India + Kerala MVD CCTNS feed",
       owner: "Transport Commissioner",
       updateFrequency: "monthly",
