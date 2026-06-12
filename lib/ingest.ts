@@ -198,8 +198,10 @@ function buildPrompt(
     .join("\n");
   return `You are a structured data extractor and translator for Kerala government documents.
 Documents may be Malayalam-only, English-only, or bilingual.
-Every document must have both English and Malayalam versions of the subject (title) and the executive summary.
-If a field is only present in one language in the document, you MUST translate it to the other language so that BOTH the English and Malayalam versions are populated.
+Extract goNumber, type, and date exactly as printed; never invent, guess, or paraphrase them.
+The subject (title) and executive summary must be populated in BOTH English and Malayalam:
+if the document provides them in only one language, translate to produce the other. Translate
+faithfully — do not embellish, summarize away, or add content that is not in the document.
 
 Return ONLY a JSON object with these exact keys:
   goNumber             - document/order number as printed, or null

@@ -24,8 +24,9 @@ fields for all descriptive text properties.
 - **Departments**: `name` & `nameMl`, `summary` & `summaryMl`.
 - **Governments**: `name` & `nameMl`, `shortName` & `shortNameMl`, `summary` &
   `summaryMl`.
-- **Ministers**: `name` & `nameMl`, `constituency` & `constituencyMl` (when
-  available).
+- **Ministers**: `name` & `nameMl`. (`constituencyMl` does not exist in the
+  schema yet — add it alongside the `Constituency` entity work tracked in
+  CLAUDE.md "Not yet implemented".)
 - **Government Orders**: `subject` & `subjectMl`, `summary` & `summaryMl`.
 - **Manifesto Goals**: `title` & `titleMl`, `summary` & `summaryMl`,
   `featuredLabel` & `featuredLabelMl`.
@@ -56,6 +57,36 @@ No citizen-visible string may be hardcoded in English.
 3. **Date Formatting**: Every date-formatting function must accept the active
    language (`Lang`) and use the correct locale (`ml-IN` for Malayalam, `en-IN`
    for English) and timezone (`Asia/Kolkata`).
+
+**Documented exception:** the Research Hub draft generator
+(`lib/research-drafts.ts`). The "blog" and "factsheet" tones follow the active
+language; the "briefing" tone is intentionally English-only because its audience
+(researchers, journalists, policy analysts) works in English. Revisit if a
+Malayalam briefing format is requested.
+
+### Rule 2.4: Translation Provenance
+
+Machine translation (LLM-drafted Malayalam) is permitted **only as a flagged
+draft**, never as authoritative content:
+
+1. Any fixture record whose `*Ml` strings were produced by an LLM must carry
+   `translationStatus: "machine-draft"` (see `TranslationStatus` in
+   `data/types.ts`).
+2. A machine-draft translation graduates only after a Malayalam speaker reviews
+   it — then set `translationStatus: "human"` or remove the field.
+3. Government Orders ingested via `lib/ingest.ts` are machine-translated by
+   construction (Rule 2.2); their `dataStatus: "unverified"` covers this until
+   reviewed.
+4. Non-fixture machine-drafted Malayalam pending native review: the UI
+   dictionary strings added with the Research Hub
+   (`islands/ResearchExplorer.tsx`, `routes/research.tsx`), the party-label map
+   in `data/lang.ts` (note: "സ്വതന്ത്രൻ" for Independent is gendered — confirm
+   preferred neutral form), and the blog/factsheet draft templates in
+   `lib/research-drafts.ts`.
+5. `deno task check:ml` (run in CI) scans `data/` fixtures for foreign-script
+   glyph corruption — a known failure mode of LLM-drafted Malayalam.
+
+To list the review backlog: `grep -rn 'machine-draft' data/`.
 
 ---
 
@@ -93,5 +124,9 @@ export interface Government {
 
 - Run the custom bilingual audit script to identify and verify missing `*Ml`
   fields.
+- Run `deno task check:ml` to catch foreign-script glyph corruption in fixtures
+  (also enforced in CI).
+- Run `deno task test` — the Research Hub draft generator
+  (`lib/research-drafts.ts`) has unit tests covering both languages.
 - Ensure all CI/CD tasks (`deno task check`) pass cleanly after schema and UI
   updates.

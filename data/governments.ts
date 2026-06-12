@@ -30,6 +30,7 @@ export const GOVERNMENTS: Government[] = [
       "The New Indian Express — 'Who are the new Kerala ministers? Meet the full UDF cabinet under CM Satheesan', 18 May 2026",
     sourceUrl:
       "https://www.newindianexpress.com/states/kerala/2026/May/18/kerala-new-ministers-list-vd-satheesan-udf-cabinet-profiles",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
 
@@ -52,6 +53,7 @@ export const GOVERNMENTS: Government[] = [
       "2021 മെയ് 20-ന് അധികാരമേറ്റ എൽ.ഡി.എഫ് സർക്കാർ. 1977-ന് ശേഷം തുടർച്ചയായി രണ്ടാം തവണയും അധികാരത്തിലെത്തുന്ന ആദ്യ കേരള സർക്കാരാണിത്.",
     source: "Wikipedia",
     sourceUrl: "https://en.wikipedia.org/wiki/Second_Vijayan_ministry",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
 
@@ -74,6 +76,7 @@ export const GOVERNMENTS: Government[] = [
       "പിണറായി വിജയന്റെ നേതൃത്വത്തിലുള്ള ഒന്നാം എൽ.ഡി.എഫ് സർക്കാർ. നിപ പ്രതിരോധം, 2018-ലെ പ്രളയം, കോവിഡ്-19 പ്രതിരോധ മാതൃക എന്നിവയിലൂടെ ശ്രദ്ധേയമായി.",
     source: "Wikipedia",
     sourceUrl: "https://en.wikipedia.org/wiki/First_Pinarayi_Vijayan_ministry",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
 
@@ -96,6 +99,7 @@ export const GOVERNMENTS: Government[] = [
       "ഉമ്മൻ ചാണ്ടിയുടെ (ഐ.എൻ.സി) നേതൃത്വത്തിലുള്ള യു.ഡി.എഫ് സർക്കാർ. മുഖ്യമന്ത്രിയെന്ന നിലയിൽ അദ്ദേഹത്തിന്റെ രണ്ടാമത്തെ കാലാവധി.",
     source: "Wikipedia",
     sourceUrl: "https://en.wikipedia.org/wiki/Second_Chandy_ministry",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
 
@@ -118,6 +122,7 @@ export const GOVERNMENTS: Government[] = [
       "വി.എസ്. അച്യുതാനന്ദന്റെ (സി.പി.ഐ-എം) നേതൃത്വത്തിലുള്ള എൽ.ഡി.എഫ് സർക്കാർ. ഭൂമി പരിഷ്കരണ നടപടികളും കൈയേറ്റ വിരുദ്ധ പ്രവർത്തനങ്ങളും ഇതിന്റെ പ്രത്യേകതകളായിരുന്നു.",
     source: "Wikipedia",
     sourceUrl: "https://en.wikipedia.org/wiki/V._S._Achuthanandan_ministry",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
 ];

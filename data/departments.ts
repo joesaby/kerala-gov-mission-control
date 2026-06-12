@@ -20,6 +20,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["trust", "delivery"],
     websiteUrl: "https://cm.kerala.gov.in",
     ministerId: "min.satheesan",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -33,6 +34,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["fiscal", "delivery", "trust"],
     websiteUrl: "https://finance.kerala.gov.in",
     ministerId: "min.satheesan",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -45,6 +47,7 @@ export const DEPARTMENTS: Department[] = [
       "സർക്കാരിനുള്ള നിയമോപദേശം, ബില്ലുകളുടെയും ചട്ടങ്ങളുടെയും നിർമ്മാണം, പ്രോസിക്യൂഷൻ മാർഗ്ഗനിർദ്ദേശം.",
     domains: ["trust"],
     ministerId: "min.satheesan",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -58,6 +61,7 @@ export const DEPARTMENTS: Department[] = [
       "വിഴിഞ്ഞം പദ്ധതി, ചെറുകിട തുറമുഖങ്ങൾ, തീരദേശ കപ്പൽ ഗതാഗതം, തുറമുഖാധിഷ്ഠിത വികസനം.",
     domains: ["transport", "livelihood"],
     ministerId: "min.satheesan",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -70,6 +74,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl:
       "സംസ്ഥാന പഞ്ചവത്സര പദ്ധതികൾ, മൂലധനച്ചെലവ് മുൻഗണന നിശ്ചയിക്കൽ, സാമ്പത്തിക ശാസ്ത്രവും സ്ഥിതിവിവരക്കണക്കുകളും.",
     domains: ["fiscal", "livelihood"],
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -84,6 +89,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["health"],
     websiteUrl: "https://dhs.kerala.gov.in",
     ministerId: "min.anilkumar",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -98,6 +104,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["education"],
     websiteUrl: "https://education.kerala.gov.in",
     ministerId: "min.samsudheen",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -108,6 +115,7 @@ export const DEPARTMENTS: Department[] = [
     summary: "Universities, colleges, technical education, research funding.",
     summaryMl: "സർവ്വകലാശാലകൾ, കോളേജുകൾ, സാങ്കേതിക വിദ്യാഭ്യാസം, ഗവേഷണ ധനസഹായം.",
     domains: ["education"],
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -121,6 +129,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["delivery", "sustainability"],
     websiteUrl: "https://lsgkerala.gov.in",
     ministerId: "min.shaji",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -134,6 +143,7 @@ export const DEPARTMENTS: Department[] = [
       "വ്യവസായ പ്രോത്സാഹനം, കെ.എസ്.ഐ.ഡി.സി/കിൻഫ്ര, ചെറുകിട സംരംഭങ്ങൾ, പൊതുമേഖലാ സ്ഥാപനങ്ങൾ.",
     domains: ["livelihood"],
     ministerId: "min.kunhalikutty",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -146,6 +156,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "വിള ഉൽപാദനം, തോട്ടവിളകൾ, കർഷക വരുമാന സഹായങ്ങൾ, കാർഷിക വിപണനം.",
     domains: ["livelihood", "sustainability"],
     ministerId: "min.shibu-baby-john",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -154,10 +165,11 @@ export const DEPARTMENTS: Department[] = [
     name: "Public Works",
     nameMl: "പൊതുമരാമത്ത്",
     summary: "State highways, bridges, government buildings.",
-    summaryMl: "സംസ്ഥാന പാതകൾ, പാലങ്ങൾ, സർക്കാർ കെട്ടിដങ്ങൾ.",
+    summaryMl: "സംസ്ഥാന പാതകൾ, പാലങ്ങൾ, സർക്കാർ കെട്ടിടങ്ങൾ.",
     domains: ["transport", "delivery"],
     websiteUrl: "https://pwd.kerala.gov.in",
     ministerId: "min.basheer",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -170,6 +182,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "ഭൂമി രേഖകൾ, നികുതികൾ, ഭൂപരിഷ്കരണം, ദുരന്ത പ്രതികരണ ഏകോപനം.",
     domains: ["delivery", "safety"],
     ministerId: "min.sunny-joseph",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -182,6 +195,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["safety", "trust"],
     websiteUrl: "https://keralapolice.gov.in",
     ministerId: "min.chennithala",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -193,6 +207,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "പൊതുപ്രവർത്തകർക്കിടയിലെ അഴിമതിയും തെറ്റായ പ്രവർത്തനങ്ങളും അന്വേഷിക്കുന്നു.",
     domains: ["trust"],
     ministerId: "min.chennithala",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -206,6 +221,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["transport"],
     websiteUrl: "https://mvd.kerala.gov.in",
     ministerId: "min.roji-john",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -217,6 +233,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "ജലസേചനം, അണക്കെട്ടുകൾ, കുടിവെള്ള വിതരണം, നദീതട മാനേജ്‌മെന്റ്.",
     domains: ["sustainability"],
     ministerId: "min.mons-joseph",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -229,6 +246,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "വൈദ്യുത ഉൽപാദനം, വിതരണം, കെ.എസ്.ഇ.ബി, പുനരുപയോഗ ഊർജ്ജം, ഊർജ്ജ കാര്യക്ഷമത.",
     domains: ["sustainability"],
     ministerId: "min.muraleedharan",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -241,6 +259,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "പ്രധാന ദേവസ്വം ബോർഡുകൾക്ക് കീഴിലുള്ള ഹൈന്ദവ ക്ഷേത്രങ്ങളുടെ ഭരണം.",
     domains: ["other"],
     ministerId: "min.muraleedharan",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -253,6 +272,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "വനവിസ്തൃതി, വന്യജീവി സംരക്ഷണം, ഇക്കോ ടൂറിസം, മനുഷ്യ-വന്യജീവി സംഘർഷങ്ങൾ.",
     domains: ["sustainability", "environment"],
     ministerId: "min.siddique",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -264,6 +284,7 @@ export const DEPARTMENTS: Department[] = [
       "Pollution control board, climate action plan, environmental clearances.",
     summaryMl: "മലിനീകരണ നിയന്ത്രണ ബോർഡ്, കാലാവസ്ഥാ വ്യതിയാന പദ്ധതി, പരിസ്ഥിതി അനുമതികൾ.",
     domains: ["environment", "sustainability"],
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -275,6 +296,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "വിനോദസഞ്ചാര കേന്ദ്രങ്ങളുടെ വികസനം, വിപണനം, ആതിഥേയത്വ നിയന്ത്രണം.",
     domains: ["livelihood"],
     websiteUrl: "https://www.keralatourism.org",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -287,6 +309,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "സഹകരണ സംഘങ്ങളും ബാങ്കുകളും, പ്രാഥമിക സഹകരണ സ്ഥാപനങ്ങൾ, ഗ്രാമീണ വായ്പകൾ.",
     domains: ["livelihood"],
     ministerId: "min.vishnunadh",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -297,6 +320,7 @@ export const DEPARTMENTS: Department[] = [
     summary: "Fisheries, coastal management, fishing harbours, fisher welfare.",
     summaryMl: "മത്സ്യബന്ധനം, തീരദേശ പരിപാലനം, ഫിഷിംഗ് ഹാർബറുകൾ, മത്സ്യത്തൊഴിലാളി ക്ഷേമം.",
     domains: ["livelihood", "sustainability"],
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -311,6 +335,7 @@ export const DEPARTMENTS: Department[] = [
     domains: ["delivery", "livelihood"],
     websiteUrl: "https://itmission.kerala.gov.in",
     ministerId: "min.kunhalikutty",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -324,6 +349,7 @@ export const DEPARTMENTS: Department[] = [
       "തൊഴിലാളി ക്ഷേമം, എംപ്ലോയ്‌മെന്റ് എക്‌സ്‌ചേഞ്ചുകൾ, നൈപുണ്യ വികസനം, ഫാക്ടറീസ് ഇൻസ്‌പെക്ടറേറ്റ്.",
     domains: ["livelihood"],
     ministerId: "min.cp-john",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -336,6 +362,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "പൊതുവിതരണ സമ്പ്രദായം, റേഷൻ കാർഡുകൾ, ഉപഭോക്തൃ സംരക്ഷണം, സപ്ലൈകോ.",
     domains: ["delivery", "livelihood"],
     ministerId: "min.anoop-jacob",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -347,6 +374,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "അംഗൻവാടികൾ, ശിശു സംരക്ഷണം, സ്ത്രീ സുരക്ഷ, ലിംഗ ബജറ്റിംഗ്.",
     domains: ["health", "safety"],
     ministerId: "min.bindhu-krishna",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -359,6 +387,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "പട്ടികജാതി, പട്ടികവർഗ്ഗ, മറ്റ് പിന്നോക്ക വിഭാഗങ്ങളുടെ ക്ഷേമവും വികസനവും.",
     domains: ["livelihood", "education"],
     ministerId: "min.thulasi",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -371,6 +400,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "മതന്യൂനപക്ഷങ്ങൾക്കായുള്ള വിദ്യാഭ്യാസ, സാമ്പത്തിക, ക്ഷേമ പദ്ധതികൾ, വഖഫ് ഭരണം.",
     domains: ["livelihood", "education"],
     ministerId: "min.abdul-gafoor",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -383,6 +413,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "സംഗീത, ലളിതകലാ, സാഹിത്യ അക്കാദമികൾ, ആർക്കൈവുകൾ, മ്യൂസിയങ്ങൾ.",
     domains: ["other"],
     ministerId: "min.vishnunadh",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -395,6 +426,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "മദ്യ, മയക്കുമരുന്ന് നിയന്ത്രണം, അബ്കാരി വരുമാനം, ഡിസ്റ്റിലറി ലൈസൻസിംഗ്.",
     domains: ["safety", "fiscal"],
     ministerId: "min.liju",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
   {
@@ -406,6 +438,7 @@ export const DEPARTMENTS: Department[] = [
     summaryMl: "കായിക, യുവജന കാര്യങ്ങൾ, യുവജന വികസന പദ്ധതികൾ.",
     domains: ["livelihood", "other"],
     ministerId: "min.janeesh",
+    translationStatus: "machine-draft",
     dataStatus: "verified",
   },
 ];

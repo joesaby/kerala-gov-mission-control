@@ -3,6 +3,8 @@
   "tasks": {
     "check": "deno fmt --check . && deno lint . && deno check",
     "check:sources": "deno run --allow-read scripts/check-sources.ts",
+    "check:ml": "deno run --allow-read scripts/check-ml-glyphs.ts",
+    "test": "deno test lib/",
     "review": "sh scripts/code-review.sh",
     "dev": "deno run -A --unstable-kv --unstable-cron --watch=static/,routes/ dev.ts",
     "build": "deno run -A --unstable-kv --unstable-cron dev.ts build",

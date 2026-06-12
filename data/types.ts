@@ -29,9 +29,20 @@ export type CivicDomain =
   | "delivery"
   | "other";
 
+/**
+ * Provenance of a record's `*Ml` strings. "machine-draft" = LLM-translated and
+ * not yet reviewed by a Malayalam speaker; must be cleared (set to "human" or
+ * removed after review) before the translation is treated as authoritative.
+ * Absent = translation was human-authored. See
+ * docs/specs/bilingual-localization.md Rule 2.4.
+ */
+export type TranslationStatus = "human" | "machine-draft";
+
 export interface KpiMetadata {
   definition: string;
   definitionMl?: string;
+  /** Provenance of the Malayalam strings on this KPI. */
+  translationStatus?: TranslationStatus;
   source: string;
   sourceUrl?: string;
   /** Legacy free-text owner label. Prefer `ownerDeptId` going forward. */
@@ -219,6 +230,8 @@ export interface Department {
   /** Short citizen-facing description. */
   summary?: string;
   summaryMl?: string;
+  /** Provenance of the Malayalam strings on this record. */
+  translationStatus?: TranslationStatus;
   /** Primary domains this department contributes to. */
   domains: CivicDomain[];
   /** Department website (if any). */
@@ -319,6 +332,8 @@ export interface Government {
   termEnd?: string;
   summary?: string;
   summaryMl?: string;
+  /** Provenance of the Malayalam strings on this record. */
+  translationStatus?: TranslationStatus;
   source?: string;
   sourceUrl?: string;
   dataStatus: "verified" | "unverified" | "tbd";
@@ -462,7 +477,11 @@ export interface GovernmentOrder {
   type: GoOrderType;
   /** English subject line from the document. */
   subject: string;
-  /** Malayalam subject line — add when available; never machine-translate. */
+  /**
+   * Malayalam subject line. Ingest backfills it via LLM translation when the
+   * document is English-only — such records are machine-drafted translations
+   * pending native review (Rule 2.4 of the bilingual spec).
+   */
   subjectMl?: string;
   /** AI-extracted summary or excerpt of the document's body. */
   summary?: string;
@@ -630,6 +649,8 @@ export interface StatusPaper {
   /** One-paragraph plain-language summary of what the report is. */
   summary: string;
   summaryMl?: string;
+  /** Provenance of the Malayalam strings on this record. */
+  translationStatus?: TranslationStatus;
   vitals: FiscalVital[];
   findings: StatusFinding[];
   levers: RecoveryLever[];

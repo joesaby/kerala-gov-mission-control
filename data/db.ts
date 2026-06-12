@@ -64,7 +64,7 @@ import { STATUS_PAPERS } from "./status-papers.ts";
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 20;
+const SEED_VERSION = 21;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;

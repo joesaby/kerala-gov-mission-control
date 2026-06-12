@@ -2,6 +2,7 @@ import { page } from "fresh";
 import { define } from "../utils.ts";
 import { t } from "../data/lang.ts";
 import { listDepartments, listKpis } from "../data/db.ts";
+import { getUsdInrRate } from "../lib/fx.ts";
 import { Header } from "../components/Header.tsx";
 import { Footer } from "../components/Footer.tsx";
 import ResearchExplorer from "../islands/ResearchExplorer.tsx";
@@ -10,22 +11,24 @@ import type { Department, Kpi } from "../data/types.ts";
 interface Data {
   kpis: Kpi[];
   departments: Department[];
+  usdRate: number;
 }
 
 export const handler = define.handlers<Data>({
   async GET() {
-    const [kpis, departments] = await Promise.all([
+    const [kpis, departments, usdRate] = await Promise.all([
       listKpis(),
       listDepartments(),
+      getUsdInrRate(),
     ]);
-    return page({ kpis, departments });
+    return page({ kpis, departments, usdRate });
   },
 });
 
 export default define.page<typeof handler>(
   function ResearchPage({ data, state }) {
     const lang = state.lang;
-    const { kpis, departments } = data;
+    const { kpis, departments, usdRate } = data;
 
     return (
       <>
@@ -55,7 +58,12 @@ export default define.page<typeof handler>(
           </section>
 
           {/* Core Interactive Island */}
-          <ResearchExplorer kpis={kpis} departments={departments} lang={lang} />
+          <ResearchExplorer
+            kpis={kpis}
+            departments={departments}
+            lang={lang}
+            usdRate={usdRate}
+          />
         </main>
         <Footer lang={lang} />
       </>

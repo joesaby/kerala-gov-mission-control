@@ -3,6 +3,7 @@ import { define } from "../../utils.ts";
 import { convertTextInrToUsd, t } from "../../data/lang.ts";
 import type { Lang } from "../../data/lang.ts";
 import { listStatusPapers } from "../../data/db.ts";
+import { getUsdInrRate } from "../../lib/fx.ts";
 import { Header } from "../../components/Header.tsx";
 import { Footer } from "../../components/Footer.tsx";
 import { MetricChart } from "../../components/MetricChart.tsx";
@@ -20,19 +21,10 @@ interface Data {
 
 export const handler = define.handlers<Data>({
   async GET() {
-    const papers = await listStatusPapers();
-    let usdRate = 83.5;
-    try {
-      const res = await fetch("https://open.er-api.com/v6/latest/USD");
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.rates && typeof data.rates.INR === "number") {
-          usdRate = data.rates.INR;
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch USD exchange rate on the day:", err);
-    }
+    const [papers, usdRate] = await Promise.all([
+      listStatusPapers(),
+      getUsdInrRate(),
+    ]);
     return page({ paper: papers[0] ?? null, usdRate });
   },
 });
@@ -298,8 +290,8 @@ export default define.page<typeof handler>(
               <p class="eyebrow mb-3">
                 {t(
                   lang,
-                  "Where each ₹100 (or $100) of revenue goes",
-                  "ഓരോ ₹100 (അല്ലെങ്കിൽ $100) വരുമാനവും എങ്ങോട്ട്",
+                  "Where each ₹100 of revenue goes",
+                  "ഓരോ ₹100 വരുമാനവും എങ്ങോട്ട്",
                 )}
               </p>
               <div class="flex h-9 w-full overflow-hidden rounded-field text-[11px] font-semibold text-white">
@@ -308,38 +300,38 @@ export default define.page<typeof handler>(
                   style={`width:${salaryPension}%`}
                   title="Salaries & pensions"
                 >
-                  ₹{Math.round(salaryPension)} / ${Math.round(salaryPension)}
+                  ₹{Math.round(salaryPension)}
                 </div>
                 <div
                   class="bg-warning flex items-center justify-center"
                   style={`width:${interest}%`}
                   title="Interest"
                 >
-                  ₹{Math.round(interest)} / ${Math.round(interest)}
+                  ₹{Math.round(interest)}
                 </div>
                 <div
                   class="bg-success flex items-center justify-center"
                   style={`width:${free}%`}
                   title="Left for everything else"
                 >
-                  ₹{Math.round(free)} / ${Math.round(free)}
+                  ₹{Math.round(free)}
                 </div>
               </div>
               <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-base-content/70">
                 <span class="flex items-center gap-1.5">
                   <span class="status-dot bg-error"></span>
                   {t(lang, "Salaries & pensions", "ശമ്പളവും പെൻഷനും")}{" "}
-                  · ₹{Math.round(salaryPension)} / ${Math.round(salaryPension)}
+                  · ₹{Math.round(salaryPension)}
                 </span>
                 <span class="flex items-center gap-1.5">
                   <span class="status-dot bg-warning"></span>
                   {t(lang, "Interest on debt", "കടത്തിന്റെ പലിശ")}{" "}
-                  · ₹{Math.round(interest)} / ${Math.round(interest)}
+                  · ₹{Math.round(interest)}
                 </span>
                 <span class="flex items-center gap-1.5">
                   <span class="status-dot bg-success"></span>
                   {t(lang, "Left for everything else", "ബാക്കിയെല്ലാത്തിനും")}{" "}
-                  · ₹{Math.round(free)} / ${Math.round(free)}
+                  · ₹{Math.round(free)}
                 </span>
               </div>
             </div>

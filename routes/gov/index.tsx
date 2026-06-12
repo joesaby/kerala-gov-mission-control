@@ -1,6 +1,7 @@
 import { page } from "fresh";
 import { define } from "../../utils.ts";
-import { t } from "../../data/lang.ts";
+import { t, translateParty } from "../../data/lang.ts";
+import type { Lang } from "../../data/lang.ts";
 import {
   listDepartments,
   listGovernmentOrders,
@@ -79,7 +80,7 @@ export const handler = define.handlers<Data>({
   },
 });
 
-function fmtTerm(g: Government, lang: "en" | "ml"): string {
+function fmtTerm(g: Government, lang: Lang): string {
   const start = g.termStart.slice(0, 4);
   const end = g.termEnd
     ? g.termEnd.slice(0, 4)
@@ -87,7 +88,7 @@ function fmtTerm(g: Government, lang: "en" | "ml"): string {
   return `${start}–${end}`;
 }
 
-function fmtFullDate(iso: string, lang: "en" | "ml"): string {
+function fmtFullDate(iso: string, lang: Lang): string {
   return new Date(iso).toLocaleDateString(lang === "ml" ? "ml-IN" : "en-IN", {
     day: "numeric",
     month: "long",
@@ -96,7 +97,7 @@ function fmtFullDate(iso: string, lang: "en" | "ml"): string {
   });
 }
 
-function fmtMinisterTerm(m: Minister, lang: "en" | "ml"): string {
+function fmtMinisterTerm(m: Minister, lang: Lang): string {
   const start = m.termStart ? m.termStart.slice(0, 4) : null;
   if (!start) return "";
   const end = m.termEnd ? m.termEnd.slice(0, 4) : null;
@@ -110,22 +111,6 @@ function daysInOffice(termStart: string, termEnd?: string): number {
   const end = termEnd ? new Date(termEnd) : new Date();
   return Math.floor((end.getTime() - start.getTime()) / 86_400_000);
 }
-
-const PARTY_LABEL: Record<string, { en: string; ml: string }> = {
-  "CPI(M)": { en: "CPI(M)", ml: "സി.പി.ഐ(എം)" },
-  "CPI": { en: "CPI", ml: "സി.പി.ഐ" },
-  "INC": { en: "Congress", ml: "കോൺഗ്രസ്" },
-  "IUML": { en: "IUML", ml: "ഐ.യു.എം.എൽ" },
-  "KC": { en: "Kerala Congress", ml: "കേരള കോൺഗ്രസ്" },
-  "KC(M)": { en: "KC (M)", ml: "കേരള കോൺഗ്രസ് (എം)" },
-  "RSP": { en: "RSP", ml: "ആർ.എസ്.പി" },
-  "JD(S)": { en: "JD(S)", ml: "ജെ.ഡി(എസ്)" },
-  "NCP": { en: "NCP", ml: "എൻ.സി.പി" },
-  "BJP": { en: "BJP", ml: "ബി.ജെ.പി" },
-  "CMP": { en: "CMP", ml: "സി.എം.പി" },
-  "Independent": { en: "Independent", ml: "സ്വതന്ത്രൻ" },
-  "Other": { en: "Other", ml: "മറ്റുള്ളവ" },
-};
 
 export default define.page<typeof handler>(function GovernmentHub(
   { data, state },
@@ -262,11 +247,7 @@ export default define.page<typeof handler>(function GovernmentHub(
                     </h3>
                     {cm.party && (
                       <span class="badge badge-xs badge-ghost mt-1">
-                        {PARTY_LABEL[cm.party]
-                          ? (lang === "ml"
-                            ? PARTY_LABEL[cm.party].ml
-                            : PARTY_LABEL[cm.party].en)
-                          : cm.party}
+                        {translateParty(cm.party, lang)}
                       </span>
                     )}
                     {cm.constituency && (
@@ -314,11 +295,7 @@ export default define.page<typeof handler>(function GovernmentHub(
                     return (
                       <div key={party} class="flex items-center gap-3 text-sm">
                         <span class="w-24 shrink-0 font-medium text-base-content/80 truncate">
-                          {PARTY_LABEL[party]
-                            ? (lang === "ml"
-                              ? PARTY_LABEL[party].ml
-                              : PARTY_LABEL[party].en)
-                            : party}
+                          {translateParty(party, lang)}
                         </span>
                         <div class="flex-1 bg-base-300 rounded-full h-2 overflow-hidden">
                           <div
@@ -504,11 +481,7 @@ export default define.page<typeof handler>(function GovernmentHub(
             </h3>
             {m.party && (
               <span class="badge badge-sm badge-ghost shrink-0">
-                {PARTY_LABEL[m.party]
-                  ? (lang === "ml"
-                    ? PARTY_LABEL[m.party].ml
-                    : PARTY_LABEL[m.party].en)
-                  : m.party}
+                {translateParty(m.party, lang)}
               </span>
             )}
           </div>

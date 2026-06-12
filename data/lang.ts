@@ -15,6 +15,13 @@ export function t(lang: Lang, en: string, ml: string): string {
   return lang === "ml" ? ml : en;
 }
 
+/**
+ * Fallback USD→INR rate used when no live rate is available.
+ * The single source of truth — every ₹→$ conversion default points here.
+ * Live rates come from lib/fx.ts (cached, with this as the fallback).
+ */
+export const FALLBACK_USD_INR = 83.5;
+
 const PARTY_MAP: Record<string, { en: string; ml: string }> = {
   "CPI(M)": { en: "CPI(M)", ml: "സി.പി.ഐ(എം)" },
   "CPI": { en: "CPI", ml: "സി.പി.ഐ" },
@@ -44,7 +51,7 @@ export function translateParty(party: string | undefined, lang: Lang): string {
 export function formatUsdValue(
   croreVal: number,
   lang: Lang,
-  usdRate = 83.5,
+  usdRate = FALLBACK_USD_INR,
 ): string {
   const usdInMillions = (croreVal * 10) / usdRate;
   if (usdInMillions >= 1000) {
@@ -65,7 +72,7 @@ export function formatUsdValue(
 export function convertTextInrToUsd(
   text: string,
   lang: Lang,
-  usdRate = 83.5,
+  usdRate = FALLBACK_USD_INR,
 ): string {
   if (!text) return text;
   return text.replace(

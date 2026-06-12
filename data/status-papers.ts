@@ -378,6 +378,7 @@ export const STATUS_PAPERS: StatusPaper[] = [
     },
     // Malayalam prose translation pending verification against the official ML
     // edition; English digest is complete and sourced.
+    translationStatus: "machine-draft",
     dataStatus: "tbd",
   },
 ];
