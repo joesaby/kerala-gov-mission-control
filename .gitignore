@@ -26,3 +26,4 @@ __pycache__/
 # Local tooling / caches (not part of the repo)
 .antigravitycli/
 .cache/
+.playwright-mcp/
