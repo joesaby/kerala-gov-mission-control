@@ -12,6 +12,41 @@ Tracker** that maps the UDF 2026 manifesto to the Government Orders that back it
 > ⚠️ Independent prototype, not an official GoK product. KPI values are
 > illustrative mock data shaped exactly like the production schema.
 
+## For governments and organisations considering adoption
+
+This project is open-source under the [MIT License](LICENSE) and is designed to
+be fully self-hostable and forkable. Governments, municipal bodies, and public
+accountability organizations can adapt it to build their own citizen-facing
+performance dashboards.
+
+Key attributes of this architecture include:
+
+- **No data leaks**: The dashboard only serves public-facing data. No private,
+  restricted, or non-public data is collected, stored, or exposed.
+- **Auditable & traceable**: Every single figure, KPI, and data point is fully
+  auditable. The AI pipeline that maps Government Orders to commitments is
+  designed to be inspectable, with visible fallback behaviors.
+- **Defensible standards**: To prevent propaganda and maintain citizen trust,
+  every single figure displayed on the dashboard must carry:
+  - A clear citizen-readable definition in both English and Malayalam.
+  - A named, official publishing source (with a link to the primary source when
+    available).
+  - An accountable official designation as the owner of the metric.
+  - A defined update frequency.
+  - A clear, public target or external benchmark (comparator).
+
+## How contributions are governed
+
+Proposals, bug reports, and contributions are welcome. To maintain the
+dashboard's credibility and strict standards:
+
+- **Maintainer-curated**: All contributions go through manual maintainer review
+  and must pass automated and human-guided checks. Nothing is automatically
+  merged.
+- **Data integrity & security**: Data accuracy and pipeline safety are strictly
+  enforced. Please review our [Contributing Guidelines](CONTRIBUTING.md) and
+  [Security Policy](SECURITY.md) before submitting code or data updates.
+
 ## What's in here
 
 ```
@@ -71,41 +106,17 @@ On first run Deno will fetch Fresh from JSR and Preact/Tailwind/daisyUI from
 npm. If you're behind a restrictive network, you may need to allow `jsr.io`,
 `deno.land` and the npm registry.
 
-## Translate a Malayalam transcript to English
+## Malayalam transcript translation
 
-After you have a `data/transcripts/<id>.ml.txt` file (produced by the upcoming
-`deno task transcript` pipeline on a separate branch), translate it to English
-locally with NLLB-200:
+For local translation of Malayalam transcripts using NLLB-200 (requires `uv`),
+run:
 
 ```bash
 deno task translate data/transcripts/<id>.ml.txt
 ```
 
-Produces `data/transcripts/<id>.en.txt` alongside the source file. The first run
-downloads the NLLB-200 distilled-600M model (~2.4 GB) from Hugging Face and
-caches it under `~/.cache/huggingface`. Subsequent runs reuse the cache.
-
-**One-time setup:**
-
-```bash
-brew install uv          # or: curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-`uv` manages a Python ≥3.10 interpreter, an isolated virtual environment, and
-the Python dependencies declared inline in `scripts/translate.py`. You do not
-need to manage Python or pip yourself.
-
-**Flags:**
-
-- `--out <dir>` writes the output elsewhere (default: same directory as input).
-- `--force` overwrites an existing `.en.txt` or ignores a stale `.partial`.
-
-**Resume:** The script writes a `.partial` file as it goes. If you Ctrl+C or the
-process dies, re-run the same command and it picks up from the last completed
-paragraph.
-
-**Tests:** `deno task translate:test` runs the pytest suite for the pure helpers
-(transcript parsing, chunking, header building, paragraph collapse).
+This uses the Python translation helper in `scripts/translate.py`. Run tests via
+`deno task translate:test`.
 
 ## Government Orders ingest (Gemini + daily cron)
 
@@ -139,13 +150,12 @@ fails. Set `GROQ_MODEL` to override the default `qwen/qwen3-32b`.
 
 ### Admin area
 
-A hidden, unlinked, `noindex` admin area at **`/admin`** shows full ingest
-status, run history, captured logs, and a **Force ingest now** button. It is
-protected by HTTP Basic Auth — username `admin`, password from the
-**`ADMIN_PASSWORD`** env var (set it in Deno Deploy + local `.env`). If
-`ADMIN_PASSWORD` is unset, `/admin` returns 503 (never open). The force-ingest
-endpoint (`POST /admin/ingest`) shares the same auth and a KV lock that prevents
-it overlapping the daily cron.
+A hidden, unlinked, `noindex` admin area shows full ingest status, run history,
+captured logs, and a **Force ingest now** action. It is protected by HTTP Basic
+Auth via the **`ADMIN_PASSWORD`** env var (set it in Deno Deploy + local
+`.env`). If `ADMIN_PASSWORD` is unset, the admin area returns 503 (never open).
+The force-ingest action shares the same auth and a KV lock that prevents it
+overlapping the daily cron.
 
 Manual run / backfill (writes to local KV):
 
