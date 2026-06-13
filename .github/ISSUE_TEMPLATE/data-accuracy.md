@@ -33,7 +33,11 @@ that is a SECURITY issue — report it privately via SECURITY.md, not here.
      Wikipedia, news articles, blogs, and think-tank reports are not eligible
      and the correction cannot be merged without an official source. -->
 
-**Publishing body:** **Source URL:** **Relevant section / page:**
+**Publishing body:**
+
+**Source URL:**
+
+**Relevant section / page:**
 
 ## Where you saw it
 
