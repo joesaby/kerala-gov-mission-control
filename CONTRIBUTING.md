@@ -1,83 +1,123 @@
 # Contributing
 
 Thanks for working on Kerala Mission Control — a public accountability
-dashboard. The bar is high because the output is public: **every number must be
-defensible.** This guide covers the mechanics; architecture is in
+dashboard. The bar is high because the output is public.
+
+## The overriding principle
+
+**Every number a citizen sees must be traceable to an official source.** A
+figure without a citable, resolvable official source is not merged — no
+exceptions. This single rule outranks everything else in this guide. If you have
+to choose between shipping a number and being able to prove where it came from,
+you keep the proof and drop the number.
+
+The mechanics below serve that principle; the architecture is in
 [`CLAUDE.md`](./CLAUDE.md).
 
-## Setup
+## What's welcome
+
+- **Bug fixes** — anything broken in the app, build, or data pipeline.
+- **Language fixes** — English copy and especially **Malayalam** corrections.
+  Wrong term = wrong meaning, so native-speaker review of `*Ml` fields is
+  valuable.
+- **Accessibility** — keyboard, contrast, screen-reader, and semantic-markup
+  improvements.
+- **New official data sources** — additional KPIs, comparators, or Government
+  Order sources, provided each comes with a verifiable public source (see
+  [Adding a data source](#adding-a-data-source)).
+- **Documentation** — clarifications, fixes, and new specs under `docs/`.
+
+## What's declined
+
+- **Data without a verifiable public source.** No newspaper, Wikipedia, blog,
+  think-tank, or "I heard it from" figures. Enforced by
+  `deno task check:sources`.
+- **Editorialising or political framing.** This project is politically neutral.
+  Copy, labels, or framing that praises or attacks a party, coalition, minister,
+  or person will not be merged. State what the official record says; let readers
+  judge.
+- **Republishing non-public data.** Only data already published by official
+  sources belongs here. Do not add restricted, leaked, or private material.
+- **Committed secrets.** API keys, passwords, or tokens never go in the repo.
+  `.env` is hand-edited and git-ignored; a hook blocks edits to it.
+
+## How changes get merged
+
+Nothing is merged automatically. Every change goes through maintainer review:
+
+1. **Fork** the repository.
+2. **Branch** off `main` (`feat:`, `fix:`, `docs:`, `chore:` …
+   conventional-style names and commit messages).
+3. **Open a pull request** against `main`.
+4. **Maintainer review** — a human reads the diff against the project's rubric
+   ([`docs/code-review-guidelines.md`](./docs/code-review-guidelines.md)),
+   checks sources, neutrality, and bilingual parity.
+5. **Merge** — only after review approval. CI must be green, but green CI alone
+   does not merge anything.
+
+## Local checks before you open a PR
+
+Run both, and make sure they pass:
 
 ```bash
-# Deno ≥ 2 and (for the translate script) uv / Python ≥ 3.10
-deno task dev          # http://localhost:8000 with hot reload
-git config core.hooksPath .githooks   # enable the pre-commit gate (opt-in)
+deno task check    # deno fmt --check + deno lint + deno check
+deno task build    # production build into _fresh/
 ```
 
-## Everyday commands
+`deno fmt` (without `--check`) auto-formats. CI
+([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) runs the same checks
+on every PR.
 
-| Command                    | What it does                                                                  |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| `deno task dev`            | Dev server, hot reload                                                        |
-| `deno task check`          | `deno fmt --check` + `deno lint` + `deno check` — **run before every commit** |
-| `deno task check:sources`  | Government-source policy on data fixtures                                     |
-| `deno task review`         | Advisory headless Claude review of staged changes                             |
-| `deno task build`          | Production build → `_fresh/`                                                  |
-| `deno task seed`           | Wipe + reseed local Deno KV from fixtures                                     |
-| `deno task translate:test` | pytest for `scripts/translate.py`                                             |
+## Adding a data source
 
-`deno fmt` (without `--check`) auto-formats. A Claude Code PostToolUse hook also
-runs `deno fmt` + `deno lint` on each edited `.ts`/`.tsx`.
+Any new figure or document source must arrive with all of the following, or it
+will be sent back:
 
-## The non-negotiables
+| Required                | What it means                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Official source URL** | A resolvable link to the publishing authority's own document or portal.                                                                                                |
+| **Publishing body**     | Which official body publishes it (department, ministry, ECI, etc.).                                                                                                    |
+| **Update frequency**    | How often the source itself is updated (so we know when our copy is stale).                                                                                            |
+| **How it's fetched**    | The source must be **public**. Fetch only what is openly published — no scraping behind logins, paywalls, or access restrictions, and nothing the publisher disallows. |
 
-1. **Government source of record.** Every published figure (KPI, Government
-   Order, Status Paper) cites an official government source with a resolvable
-   `sourceUrl` — never a newspaper, Wikipedia, blog, or think-tank. Enforced by
-   `deno task check:sources`. Policy:
-   [`docs/data/source-policy.md`](./docs/data/source-policy.md).
-2. **Bump `SEED_VERSION`** in `data/db.ts` whenever any `data/*.ts` fixture
-   changes shape or content — otherwise the site serves stale KV data.
-3. **No machine-translated Malayalam.** Wrong term = wrong meaning. Missing
-   `*Ml` is fine with `dataStatus: "tbd"`; guessing is not. Run
-   `/bilingual-audit`.
-4. **`deno task check` is green** before you commit.
-5. **New KPIs** carry the full defensibility set — use the `/add-kpi` skill and
-   the `kpi-data-reviewer` agent.
+For KPIs specifically, the full defensibility set (owner department, target,
+comparators, bilingual definition, source, owner designation, last-refreshed
+timestamp) is required — use the `/add-kpi` skill, which enforces the checklist.
+Source policy: [`docs/data/source-policy.md`](./docs/data/source-policy.md).
 
-Full rubric:
-[`docs/code-review-guidelines.md`](./docs/code-review-guidelines.md).
+## AI components
 
-## Pre-commit hook
+The dashboard uses AI to read Government Orders and map each to the manifesto
+promise it relates to. Two rules are non-negotiable for any change to that
+pipeline:
 
-Version-controlled in [`.githooks/`](./.githooks/), opt-in:
+- **Inspectable.** A human must be able to see _why_ a Government Order was
+  mapped to a given promise. Do not introduce mappings that can't be traced back
+  to the order's own text and the promise it cites.
+- **Fail visibly.** When the model is unsure or extraction fails, the pipeline
+  must surface that — leave the mapping empty, flag it, or mark the record — and
+  must **never** present a silent guess as if it were a confident, sourced fact.
+  A wrong-but-confident mapping is worse than no mapping.
 
-```bash
-git config core.hooksPath .githooks
-```
+Machine-translated Malayalam follows the same spirit: it is allowed only as a
+flagged `translationStatus: "machine-draft"` until a Malayalam speaker reviews
+it. If you can't provide even a draft, leave the `*Ml` field out and mark the
+record `dataStatus: "tbd"`. Run `/bilingual-audit` before a PR.
 
-- **Blocks** on `deno task check` and `deno task check:sources`.
-- **Advisory** (never blocks): a headless Claude code review of the staged diff,
-  using [`docs/code-review-guidelines.md`](./docs/code-review-guidelines.md).
-- Bypass a commit: `git commit --no-verify`. Skip only the review:
-  `SKIP_REVIEW=1 git commit`.
+## Reporting security issues
 
-## Skills & agents (Claude Code)
+Do **not** use a public issue or PR for security problems — including data
+integrity or AI-ingestion manipulation. Report them privately as described in
+[`SECURITY.md`](./SECURITY.md).
 
-| Use                                   | Skill / agent                    |
-| ------------------------------------- | -------------------------------- |
-| Find an official source for a number  | `/data-discovery`                |
-| Understand the codebase               | `/arch-discovery`                |
-| Build a feature the project's way     | `/feature-implementation`        |
-| Add a KPI                             | `/add-kpi`                       |
-| Review a change against project rules | `/review-checklist`              |
-| Contribution mechanics                | `/contributing`                  |
-| Check EN/ML parity                    | `/bilingual-audit`               |
-| Audit KPI defensibility               | `kpi-data-reviewer` agent        |
-| Audit governance records              | `governance-data-reviewer` agent |
+## Code of Conduct
 
-## Pull requests
+This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). By
+participating, you agree to uphold it.
 
-Branch off `main` (never commit straight to it). Conventional-style messages
-(`feat:`, `fix:`, `chore:`, `docs:`). CI (`.github/workflows/ci.yml`) runs
-`check` + `build` on every PR — keep it green. For non-trivial features, add a
-short spec under [`docs/specs/`](./docs/specs/).
+## Licence of contributions
+
+By contributing, you agree your code contributions are licensed under the
+project's [MIT Licence](./LICENSE). The underlying **public data is not covered
+by that licence** — it remains the property of the official body that published
+it and is reproduced here only for accountability and transparency.

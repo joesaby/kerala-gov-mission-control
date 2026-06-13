@@ -152,13 +152,14 @@ Manual runs / backfills:
 [--source orders,cabinet,circulars,rts] [--dry-run]`.
 Public, read-only pipeline health is at `/gov/ingest-status`.
 
-**Admin area (`/admin`)** — hidden, unlinked, `noindex`, gated by HTTP Basic
-Auth (`routes/admin/_middleware.ts`): username `admin`, password from
-`ADMIN_PASSWORD` (503 if unset — never open). It shows full status, run history
-(`getIngestRuns`), captured logs (`getIngestLog`), and a **Force ingest now**
-button (`POST /admin/ingest`, island `AdminIngest`).
-`tryAcquireIngestLock`/`releaseIngestLock` (an auto-expiring KV lock) serialize
-manual + cron runs so they never overlap.
+**Admin area** — hidden, unlinked, `noindex` and gated by HTTP Basic Auth
+(implemented in `routes/admin/_middleware.ts`) using the password defined in the
+`ADMIN_PASSWORD` env var (returns 503 if unset — never open). It shows full
+status, run history (`getIngestRuns`), captured logs (`getIngestLog`), and a
+**Force ingest now** action (using the `AdminIngest` island). The force-ingest
+action shares the same auth and an auto-expiring KV lock
+(`tryAcquireIngestLock`/`releaseIngestLock`) that serializes manual + cron runs
+so they never overlap.
 
 ## Hooks (automatic)
 
