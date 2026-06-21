@@ -167,7 +167,11 @@ already in KV straight from their stored PDF URL (covers orders no longer on the
 listing pages); without `--force` it only touches records whose bilingual fields
 look broken. The admin **Force ingest** endpoint accepts
 `{ "repair": true, "force"?, "limit"? }` to run the same repair against
-production KV (bounded — call repeatedly to chunk the backlog).
+production KV (bounded — call repeatedly to chunk the backlog). For a normal
+scrape run it accepts `{ "limit"?, "since"?, "reprocess"?, "sources"? }` —
+`sources` is a subset of `KNOWN_SOURCES` keys (`orders`, `cabinet`, `circulars`,
+`rts`) to scope the run, e.g. `{ "sources": ["cabinet"] }` to backfill cabinet
+decisions; invalid names are dropped and an empty set falls back to all sources.
 
 **Admin area** — hidden, unlinked, `noindex` and gated by HTTP Basic Auth
 (implemented in `routes/admin/_middleware.ts`) using the password defined in the
