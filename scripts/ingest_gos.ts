@@ -17,11 +17,16 @@ import "@std/dotenv/load";
 import { parseArgs } from "@std/cli/parse-args";
 
 import { geminiKey, geminiModel } from "../lib/gemini.ts";
-import { DEFAULT_SINCE, KNOWN_SOURCES, runIngest } from "../lib/ingest.ts";
+import {
+  DEFAULT_SINCE,
+  KNOWN_SOURCES,
+  repairIngestedOrders,
+  runIngest,
+} from "../lib/ingest.ts";
 
 const args = parseArgs(Deno.args, {
   string: ["since", "limit", "source"],
-  boolean: ["dry-run", "help"],
+  boolean: ["dry-run", "reprocess", "repair", "force", "help"],
   default: { since: DEFAULT_SINCE },
 });
 
@@ -31,9 +36,13 @@ if (args.help) {
 deno task ingest-gos [options]
 
   --since YYYY-MM-DD        Only include docs on or after this date (default: ${DEFAULT_SINCE})
-  --limit N                 Process at most N new documents
+  --limit N                 Process at most N documents
   --source <name[,name]>    Sources to scrape: ${sourceNames} (default: all)
   --dry-run                 Extract + map but do not write to KV
+  --reprocess               Re-scrape listings and re-extract already-seen orders
+  --repair                  Re-extract already-ingested records straight from their stored
+                            PDF URL — fixes broken bilingual fields regardless of pagination
+  --force                   With --repair: re-extract every record, not just broken ones
   --help                    Show this help
 `);
   Deno.exit(0);
@@ -46,16 +55,30 @@ if (!geminiKey()) {
   Deno.exit(1);
 }
 
+console.error(`[i] Model: ${geminiModel()}`);
+
+if (args.repair) {
+  const result = await repairIngestedOrders({
+    limit: args.limit ? Number(args.limit) : undefined,
+    force: args.force as boolean,
+    dryRun: args["dry-run"] as boolean,
+    log: (m) => console.error(m),
+  });
+  console.error(
+    `\n[i] Repair: ${result.repaired}/${result.candidates} repaired, ${result.errors.length} error(s).`,
+  );
+  Deno.exit(result.errors.length > 0 ? 1 : 0);
+}
+
 const sources = (args.source as string | undefined)
   ?.split(",").map((s) => s.trim()).filter(Boolean);
-
-console.error(`[i] Model: ${geminiModel()}`);
 
 const status = await runIngest({
   since: args.since as string,
   limit: args.limit ? Number(args.limit) : undefined,
   sources,
   dryRun: args["dry-run"] as boolean,
+  reprocess: args.reprocess as boolean,
   trigger: "manual",
   log: (m) => console.error(m),
 });

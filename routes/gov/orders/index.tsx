@@ -5,6 +5,7 @@ import { listDepartments, listGovernmentOrders } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
+import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import type { Department, GovernmentOrder } from "../../../data/types.ts";
 
 interface Data {
@@ -102,7 +103,7 @@ export default define.page<typeof handler>(function OrdersPage(
             )}
         </section>
 
-        {/* ── All other government orders ── */}
+        {/* ── All other government orders — searchable, grouped by month ── */}
         <section>
           <h2 class="font-display text-xl font-semibold mb-4">
             {t(lang, "Government orders", "സർക്കാർ ഉത്തരവുകൾ")}
@@ -110,7 +111,16 @@ export default define.page<typeof handler>(function OrdersPage(
               {orders.length}
             </span>
           </h2>
-          <GovernmentOrderList orders={orders} depts={depts} lang={lang} />
+          <OrdersBrowser
+            orders={orders}
+            depts={depts.map((d) => ({
+              id: d.id,
+              name: d.name,
+              nameMl: d.nameMl,
+              slug: d.slug,
+            }))}
+            lang={lang}
+          />
         </section>
       </main>
       <Footer lang={lang} />
