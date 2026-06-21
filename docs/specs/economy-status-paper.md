@@ -1,6 +1,8 @@
 # Spec — Economy section & Fiscal Status Paper
 
-Status: implemented · Term: 16th KLA · Route: `/economy`
+Status: implemented · Term: 16th KLA · Route: `/economy/white-paper` (the
+`/economy` landing is now the fiscal-status snapshot; the section is navigated
+via the `EconomyShell` sidebar — see [budget-report.md](./budget-report.md))
 
 The `/economy` section renders Kerala's official fiscal white paper —
 **"Kerala's Fiscal Health 2026 — A Status Report"** (16th KLA, published EN+ML

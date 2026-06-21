@@ -507,6 +507,13 @@ export interface GovernmentOrder {
     /** ISO timestamp of when this record was fetched/ingested. */
     retrievedAt: string;
   };
+  /**
+   * "machine-draft" whenever ingest produced either language by LLM
+   * translation (the usual case — source GOs are Malayalam-only or
+   * English-only, so the other side is machine-generated). Per Rule 2.4 of
+   * the bilingual spec, such records await native review.
+   */
+  translationStatus?: TranslationStatus;
   dataStatus: "verified" | "unverified" | "tbd";
 }
 
@@ -633,6 +640,46 @@ export interface StatusSource {
 }
 
 /**
+ * One slice of "where every ₹100 of revenue goes" — a part-to-whole framing of
+ * revenue receipts. `paise` values across the segments sum to ≈100.
+ */
+export interface RupeeSegment {
+  key: string;
+  label: string;
+  labelMl?: string;
+  /** Paise out of ₹100 of revenue receipts. */
+  paise: number;
+  /** Drives colour (critical = red, warning = amber, ok = green). */
+  severity: FiscalSeverity;
+  /** Pre-committed (salary / pension / interest) vs discretionary spend. */
+  committed?: boolean;
+  /** Exact provenance, e.g. "Status Report, Table 3.x". */
+  source?: string;
+}
+
+/**
+ * One year of treasury liquidity, rendered as a waffle calendar. A day sits in
+ * exactly one bucket — the deepest RBI support tier it reached that day:
+ * within-means, Ways & Means Advances, or Overdraft. `wmaDays` + `overdraftDays`
+ * + within-means ≈ 365. The day-by-day sequence is not published, so the waffle
+ * shows yearly totals (part-to-whole), never a timeline.
+ */
+export interface TreasuryYear {
+  year: number;
+  /** Days drawing Ways & Means Advances. */
+  wmaDays: number;
+  /** Days in outright Overdraft (the deepest tier). */
+  overdraftDays: number;
+  /** Within-means days; derived as 365 − wma − overdraft when omitted. */
+  normalDays?: number;
+  /** Historical norm for context (≈18 days/yr). */
+  normDays?: number;
+  /** Exact provenance, e.g. "Status Report, Table 2.6". */
+  source: string;
+  sourceUrl?: string;
+}
+
+/**
  * A long-form economic / fiscal report tabled in the Assembly, rendered as a
  * readable digest. IDs: statuspaper.<term>-<slug>.
  */
@@ -652,6 +699,10 @@ export interface StatusPaper {
   /** Provenance of the Malayalam strings on this record. */
   translationStatus?: TranslationStatus;
   vitals: FiscalVital[];
+  /** Optional "where every ₹100 goes" breakdown; falls back to a derived bar. */
+  revenueRupee?: RupeeSegment[];
+  /** Optional treasury-liquidity year for the waffle calendar. */
+  treasury?: TreasuryYear;
   findings: StatusFinding[];
   levers: RecoveryLever[];
   sources: StatusSource[];
@@ -663,5 +714,114 @@ export interface StatusPaper {
     /** ISO timestamp the digest was compiled from source. */
     retrievedAt: string;
   };
+  dataStatus: "verified" | "unverified" | "tbd";
+}
+
+// ===========================================================================
+// Budget — the annual budget rendered as a story (Promise → Reckoning →
+// Response), correlated to the white paper. IDs: budget.<fy>-<govt>.
+// Source: docs/specs/budget-report.md.
+// ===========================================================================
+
+/** One headline budget figure, optionally paired with the compared budget. */
+export interface BudgetVital {
+  key: string;
+  label: string;
+  labelMl?: string;
+  /** ₹ crore (or a % when `unit` says so). */
+  value: number;
+  /** Formatted, e.g. "₹1,69,646 cr" or "2.12%". */
+  display: string;
+  unit: string;
+  unitMl?: string;
+  /** Same metric in the budget being compared against (the LDF original). */
+  comparedValue?: number;
+  comparedDisplay?: string;
+  /** Which way is good — drives the delta colour. */
+  direction?: "lower-better" | "higher-better";
+  source: string;
+}
+
+/** A sector allocation line, in ₹ crore. */
+export interface SectorAllocation {
+  key: string;
+  label: string;
+  labelMl?: string;
+  amountCr: number;
+  note?: string;
+  noteMl?: string;
+  source: string;
+}
+
+/** A flagship scheme announced in the budget. */
+export interface BudgetScheme {
+  key: string;
+  heading: string;
+  headingMl?: string;
+  detail: string;
+  detailMl?: string;
+  /** Headline figure, e.g. "₹25 lakh/family", "₹400 cr". */
+  amount?: string;
+  /** Which government's document announced it. */
+  origin: "ldf" | "udf";
+  /** FK → GovernmentOrder.id evidencing the scheme has started. */
+  goIds?: string[];
+}
+
+/** A revenue / tax measure. */
+export interface TaxMeasure {
+  key: string;
+  heading: string;
+  headingMl?: string;
+  detail: string;
+  detailMl?: string;
+  kind: "relief" | "hike" | "settlement";
+}
+
+/**
+ * How the budget grades against one white-paper item — the report card that
+ * correlates the budget to the `/economy` status paper. `key` matches a
+ * StatusFinding / RecoveryLever / FiscalVital key on the paper.
+ */
+export interface WhitePaperVerdict {
+  key: string;
+  refType: "vital" | "finding" | "lever";
+  verdict: "acted" | "partial" | "not-addressed" | "worsened";
+  note: string;
+  noteMl?: string;
+}
+
+/**
+ * A state budget, rendered as a story and correlated to the white paper.
+ * IDs: budget.<fy>-<govt>, e.g. budget.2026-27-udf.
+ */
+export interface Budget {
+  id: string;
+  /** Financial year, e.g. "2026-27". */
+  fy: string;
+  variant: "original" | "revised";
+  government: "LDF" | "UDF";
+  /** ISO date presented in the Assembly. */
+  presentedOn: string;
+  /** Who presented it, e.g. "V.D. Satheesan (CM, Finance)". */
+  presentedBy: string;
+  title: string;
+  titleMl?: string;
+  summary: string;
+  summaryMl?: string;
+  headlines: BudgetVital[];
+  /** Where every ₹100 of revenue comes from. */
+  rupeeIn?: RupeeSegment[];
+  /** Where every ₹100 of revenue goes. */
+  rupeeOut?: RupeeSegment[];
+  allocations: SectorAllocation[];
+  schemes: BudgetScheme[];
+  taxes: TaxMeasure[];
+  /** The white-paper report card. */
+  verdicts?: WhitePaperVerdict[];
+  /** FK → the budget this one revises / compares against. */
+  vsBudgetId?: string;
+  sources: StatusSource[];
+  translationStatus?: TranslationStatus;
   dataStatus: "verified" | "unverified" | "tbd";
 }

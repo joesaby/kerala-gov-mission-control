@@ -15,7 +15,12 @@ import {
   tryAcquireIngestLock,
 } from "../../data/db.ts";
 import { geminiKey } from "../../lib/gemini.ts";
-import { DEFAULT_SINCE, runIngest } from "../../lib/ingest.ts";
+import {
+  DEFAULT_SINCE,
+  KNOWN_SOURCES,
+  repairIngestedOrders,
+  runIngest,
+} from "../../lib/ingest.ts";
 
 const DEFAULT_LIMIT = 15;
 const MAX_LIMIT = 40;
@@ -38,6 +43,10 @@ export const handler = define.handlers({
 
     let limit = DEFAULT_LIMIT;
     let since = DEFAULT_SINCE;
+    let reprocess = false;
+    let repair = false;
+    let force = false;
+    let sources: string[] | undefined;
     try {
       const body = await ctx.req.json();
       if (typeof body?.limit === "number") {
@@ -49,6 +58,24 @@ export const handler = define.handlers({
       ) {
         since = body.since;
       }
+      // Restrict the run to specific KNOWN_SOURCES (e.g. ["cabinet"] to backfill
+      // a single, low-volume source). Unknown names are dropped; an empty result
+      // falls back to all sources (undefined).
+      if (Array.isArray(body?.sources)) {
+        const valid = body.sources.filter(
+          (s: unknown): s is string =>
+            typeof s === "string" && s in KNOWN_SOURCES,
+        );
+        if (valid.length) sources = valid;
+      }
+      // Re-scrape listings and re-extract already-seen orders (overwrites in
+      // place). Fixes recent legacy mis-translated records.
+      reprocess = body?.reprocess === true;
+      // Repair already-ingested records straight from their stored PDF URL —
+      // covers orders no longer on the listing pages. Bounded by `limit`, so
+      // call repeatedly to chunk through the backlog. `force` re-does all.
+      repair = body?.repair === true;
+      force = body?.force === true;
     } catch {
       // no/invalid body — use defaults
     }
@@ -61,7 +88,17 @@ export const handler = define.handlers({
     }
 
     try {
-      const status = await runIngest({ trigger: "manual", limit, since });
+      if (repair) {
+        const result = await repairIngestedOrders({ limit, force });
+        return Response.json({ ok: true, repair: result });
+      }
+      const status = await runIngest({
+        trigger: "manual",
+        limit,
+        since,
+        reprocess,
+        sources,
+      });
       return Response.json({ ok: true, status });
     } catch (e) {
       return Response.json(

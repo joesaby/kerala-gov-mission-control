@@ -1,4 +1,5 @@
 import type {
+  Budget,
   CivicDomain,
   CoalitionMembership,
   Department,
@@ -26,6 +27,7 @@ import { PUBLIC_SPEECHES } from "./public-speeches.ts";
 import { GOVERNMENT_ORDERS } from "./government-orders.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 import { STATUS_PAPERS } from "./status-papers.ts";
+import { BUDGETS } from "./budgets.ts";
 
 /**
  * Deno KV layout.
@@ -42,6 +44,7 @@ import { STATUS_PAPERS } from "./status-papers.ts";
  *   ["speaker", id]            -> Speaker
  *   ["speech", id]             -> PublicSpeech
  *   ["status_paper", id]       -> StatusPaper
+ *   ["budget", id]             -> Budget
  *
  * Secondary indexes (write under transaction with the primary):
  *   ["kpi_by_dept", deptId, kpiId]                -> null
@@ -64,7 +67,7 @@ import { STATUS_PAPERS } from "./status-papers.ts";
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 21;
+const SEED_VERSION = 24;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -731,6 +734,42 @@ export async function getStatusPaper(id: string): Promise<StatusPaper | null> {
   return res.value;
 }
 
+// ----- Budget -------------------------------------------------------------
+
+export async function putBudget(b: Budget): Promise<void> {
+  const k = await kv();
+  const res = await k.atomic()
+    .set(["budget", b.id], b)
+    .set(["budget_by_fy", b.fy, b.id], null)
+    .commit();
+  if (!res.ok) throw new Error(`Failed to put budget ${b.id}`);
+}
+
+export async function listBudgets(): Promise<Budget[]> {
+  await ensureSeeded();
+  return (await listAll<Budget>(["budget"]))
+    .sort((a, b) => b.presentedOn.localeCompare(a.presentedOn));
+}
+
+export async function getBudget(id: string): Promise<Budget | null> {
+  await ensureSeeded();
+  const res = await (await kv()).get<Budget>(["budget", id]);
+  return res.value;
+}
+
+export async function listBudgetsByFy(fy: string): Promise<Budget[]> {
+  await ensureSeeded();
+  const ids: string[] = [];
+  for await (
+    const e of (await kv()).list<null>({ prefix: ["budget_by_fy", fy] })
+  ) {
+    ids.push(e.key[2] as string);
+  }
+  const rows = await Promise.all(ids.map((id) => getBudget(id)));
+  return rows.filter((b): b is Budget => b !== null)
+    .sort((a, b) => b.presentedOn.localeCompare(a.presentedOn));
+}
+
 // ----- Seeding -----------------------------------------------------------
 
 export function ensureSeeded(): Promise<void> {
@@ -775,6 +814,8 @@ export async function seed(): Promise<void> {
       ["manifesto_goal"],
       ["manifesto_goal_by_govt"],
       ["status_paper"],
+      ["budget"],
+      ["budget_by_fy"],
     ] satisfies Deno.KvKey[]
   ) {
     for await (const entry of k.list({ prefix })) {
@@ -792,6 +833,7 @@ export async function seed(): Promise<void> {
   for (const sp of PUBLIC_SPEECHES) await putSpeech(sp);
   for (const mg of MANIFESTO_GOALS) await putManifestoGoal(mg);
   for (const sp of STATUS_PAPERS) await putStatusPaper(sp);
+  for (const b of BUDGETS) await putBudget(b);
   for (const go of GOVERNMENT_ORDERS) await putGovernmentOrder(go);
 
   // Re-hydrate cron-ingested orders. The `["go_ingested"]` mirror is never

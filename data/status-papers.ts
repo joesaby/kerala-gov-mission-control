@@ -68,6 +68,10 @@ export const STATUS_PAPERS: StatusPaper[] = [
         unitMl: "ആകെ വരുമാനത്തിന്റെ",
         direction: "lower-better",
         status: "critical",
+        // Correlated to the 2026-27 UDF budget: no structural change.
+        latest: 77,
+        latestDisplay: "77%",
+        latestPeriod: "2026-27 BE",
         note:
           "Salary, pension and interest take roughly three-fourths of all receipts.",
       },
@@ -95,10 +99,72 @@ export const STATUS_PAPERS: StatusPaper[] = [
         unitMl: "ജിഎസ്‌ഡിപിയുടെ",
         direction: "higher-better",
         status: "critical",
+        // Correlated to the 2026-27 UDF budget: plan outlay cut, still ~1.3%.
+        latest: 1.3,
+        latestDisplay: "1.3%",
+        latestPeriod: "2026-27 BE",
         note:
           "Among the lowest of all Indian states — too little is invested to grow.",
       },
     ],
+    // "Where every ₹100 of revenue goes". Anchored to the Status Report's
+    // committed-expenditure frame (77% of revenue, interest 20.9%), consistent
+    // with the committed-exp & interest vitals above. The 56.1% salary+pension
+    // block is split by the Budget 2026-27 salary:pension ratio (salaries
+    // ₹57,558 cr : pensions ₹38,669 cr ≈ 59.8:40.2; Budget in Brief, per CPPR
+    // analysis) — i.e. salaries 56.1×0.598 = 33.6, pensions 56.1×0.402 = 22.5.
+    // The ratio is sourced and the arithmetic is shown; not a guessed split.
+    revenueRupee: [
+      {
+        key: "salaries",
+        label: "Salaries",
+        labelMl: "ശമ്പളം",
+        paise: 33.6,
+        severity: "critical",
+        committed: true,
+        source:
+          "Status Report Ch. 2 (committed 77% − interest); split by Budget 2026-27 salaries ₹57,558 cr",
+      },
+      {
+        key: "pensions",
+        label: "Pensions",
+        labelMl: "പെൻഷൻ",
+        paise: 22.5,
+        severity: "critical",
+        committed: true,
+        source:
+          "Status Report Ch. 2 (committed 77% − interest); split by Budget 2026-27 pensions ₹38,669 cr",
+      },
+      {
+        key: "interest",
+        label: "Interest on debt",
+        labelMl: "കടത്തിന്റെ പലിശ",
+        paise: 20.9,
+        severity: "critical",
+        committed: true,
+        source: "Status Report, Ch. 2 (interest = 20.9% of revenue)",
+      },
+      {
+        key: "rest",
+        label: "Left for everything else",
+        labelMl: "ബാക്കിയെല്ലാത്തിനും",
+        paise: 23,
+        severity: "warning",
+        committed: false,
+        source: "Status Report, Ch. 2 (residual after committed expenditure)",
+      },
+    ],
+    // The treasury's 2025 liquidity, for the waffle calendar. 262 days on Ways &
+    // Means Advances + 84 in Overdraft = 346 of 365 on RBI support; norm ≈18.
+    treasury: {
+      year: 2025,
+      wmaDays: 262,
+      overdraftDays: 84,
+      normDays: 18,
+      source: "Status Report, Table 2.6 (Treasury Directorate; RBI records)",
+      sourceUrl:
+        "http://www.niyamasabha.org/codes/16kla/Kerala_Status_Paper_consolidated%20Eng.pdf",
+    },
     findings: [
       {
         key: "arrears",
@@ -283,7 +349,9 @@ export const STATUS_PAPERS: StatusPaper[] = [
         key: "growth",
         heading: "Grow the economy — don't just cut",
         horizon: "structural",
-        adoption: "not-started",
+        // Correlated to the 2026-27 UDF budget: Mission Samudra, Knowledge
+        // Valley signal a growth orientation (structural reforms still pending).
+        adoption: "acknowledged",
         detail:
           "There is a limit to how far belt-tightening can go. The durable fix is growth: " +
           "resolutely encourage private and cooperative investment, let local governments raise " +
