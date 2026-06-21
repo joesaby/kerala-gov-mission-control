@@ -827,7 +827,7 @@ export async function runIngest(
         (seenGoNumbers.has(listing.goNumber) || seenUrls.has(listing.pdfUrl))
       ) {
         skipped++;
-        continue;
+        return;
       }
 
       log(`\n  → ${listing.goNumber} (${listing.dateStr})`);
