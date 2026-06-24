@@ -28,6 +28,7 @@ import { GOVERNMENT_ORDERS } from "./government-orders.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 import { STATUS_PAPERS } from "./status-papers.ts";
 import { BUDGETS } from "./budgets.ts";
+import { buildGraph, syncOrderGraph } from "../lib/graph.ts";
 
 /**
  * Deno KV layout.
@@ -63,11 +64,16 @@ import { BUDGETS } from "./budgets.ts";
  * Durable mirror (survives reseed — NOT wiped by seed()):
  *   ["go_ingested", id]      -> GovernmentOrder   (cron-ingested orders)
  *
+ * Derived knowledge graph (rebuilt from the above by lib/graph.ts buildGraph()):
+ *   ["nodes", id]                            -> GraphNode
+ *   ["edges_out", sourceId, type, targetId]  -> GraphEdge
+ *   ["edges_in",  targetId, type, sourceId]  -> GraphEdge
+ *
  * Bookkeeping:
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 24;
+const SEED_VERSION = 25;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -583,6 +589,15 @@ export async function putIngestedGovernmentOrder(
   atomic.set(["go_ingested", go.id], go);
   const res = await atomic.commit();
   if (!res.ok) throw new Error(`Failed to put ingested order ${go.id}`);
+
+  // Keep the derived graph current. Best-effort: the GO record is already
+  // durably persisted above, and `seed()` rebuilds the whole graph from it on
+  // the next reseed — so a transient graph-write failure must not fail ingest.
+  try {
+    await syncOrderGraph(go);
+  } catch (err) {
+    console.warn(`graph sync skipped for ${go.id}: ${err}`);
+  }
 }
 
 /** Government order ids already present (fixture-seeded or cron-ingested). */
@@ -845,4 +860,8 @@ export async function seed(): Promise<void> {
   ) {
     await putGovernmentOrder(entry.value);
   }
+
+  // Rebuild the derived knowledge graph from everything seeded above (including
+  // the re-hydrated cron orders). Must run last so every endpoint node exists.
+  await buildGraph();
 }

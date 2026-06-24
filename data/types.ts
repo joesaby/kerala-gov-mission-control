@@ -825,3 +825,71 @@ export interface Budget {
   translationStatus?: TranslationStatus;
   dataStatus: "verified" | "unverified" | "tbd";
 }
+
+// ===========================================================================
+// Knowledge graph — a derived projection over the entities above.
+//
+// Nodes and edges are GENERATED from the typed fixtures (and the durable
+// `["go_ingested"]` mirror), never hand-authored in parallel. The authoritative
+// data stays in its own records; the graph just makes the relationships between
+// them traversable (KPI ← department ← minister, GO → manifesto goal, etc.).
+// Spec: docs/plans/kv-graph-spec.md.
+// ===========================================================================
+
+/** The kinds of entity a graph node can stand in for. */
+export type GraphNodeType =
+  | "kpi"
+  | "department"
+  | "person"
+  | "government_order"
+  | "manifesto_goal"
+  | "status_paper_vital";
+
+/**
+ * The relationship vocabulary. Every edge type used in code must appear here.
+ * - `OWNED_BY`   KPI → department primarily accountable for it
+ * - `PORTFOLIO`  person (minister) → department they hold (carries the tenure)
+ * - `ISSUED_BY`  government order → issuing department
+ * - `IMPACTS`    government order → manifesto goal it backs (LLM-derived)
+ * - `BASELINES`  status-paper vital → KPI it establishes a baseline for
+ */
+export type GraphEdgeType =
+  | "OWNED_BY"
+  | "PORTFOLIO"
+  | "ISSUED_BY"
+  | "IMPACTS"
+  | "BASELINES";
+
+/**
+ * A node in the derived graph. `id` is the EXISTING entity id verbatim
+ * (e.g. "dept.finance", "fiscal.debt-to-gsdp") so edges reference real records.
+ */
+export interface GraphNode {
+  id: string;
+  type: GraphNodeType;
+  /** Human-readable display string (EN). */
+  label: string;
+  /** Malayalam display string (bilingual invariant). */
+  labelMl?: string;
+  /** JSON bag of extra display/query properties (may include `*Ml` fields). */
+  properties?: Record<string, unknown>;
+}
+
+/** A directed, typed edge between two nodes. Written to both adjacency indexes. */
+export interface GraphEdge {
+  sourceId: string;
+  targetId: string;
+  type: GraphEdgeType;
+  properties?: {
+    /** Causal weight, 0.0 (negligible) → 1.0 (direct driver). */
+    weight?: number;
+    /** Tagging confidence carried over from the source record. */
+    confidence?: string;
+    /** ISO date the link occurred / the source record is dated. */
+    date?: string;
+    /** Tenure window for PORTFOLIO edges. */
+    termStart?: string;
+    /** Undefined termEnd = still in post (used to find the active holder). */
+    termEnd?: string;
+  };
+}
