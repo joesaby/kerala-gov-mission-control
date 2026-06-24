@@ -1,4 +1,6 @@
 import type {
+  Appointment,
+  AppointmentBranch,
   Budget,
   CivicDomain,
   CoalitionMembership,
@@ -25,12 +27,14 @@ import { PERSONS } from "./persons.ts";
 import { SPEAKERS } from "./speakers.ts";
 import { PUBLIC_SPEECHES } from "./public-speeches.ts";
 import { GOVERNMENT_ORDERS } from "./government-orders.ts";
+import { APPOINTMENTS } from "./appointments.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 import { STATUS_PAPERS } from "./status-papers.ts";
 import { BUDGETS } from "./budgets.ts";
 import {
   buildGraph,
   getNeighborsByType,
+  syncAppointmentGraph,
   syncOrderGraph,
 } from "../lib/graph.ts";
 
@@ -61,6 +65,10 @@ import {
  *   ["speech_by_type",   type, speechId]          -> null
  *   ["manifesto_goal_by_govt", govtId, goalId]    -> null
  *   ["budget_by_fy", fy, budgetId]                -> null
+ *   ["appointment", id]                           -> Appointment
+ *   ["appointment_by_dept",   deptId, id]         -> null
+ *   ["appointment_by_branch", branch, id]         -> null
+ *   ["appointment_by_go",     goId,   id]         -> null
  *
  * Retired entity-to-entity indexes — now served by graph edges (below), still
  * in the seed wipe list to purge legacy entries: kpi_by_dept (OWNED_BY +
@@ -68,7 +76,8 @@ import {
  * dept_by_minister & dept_by_secretary (were unused).
  *
  * Durable mirror (survives reseed — NOT wiped by seed()):
- *   ["go_ingested", id]      -> GovernmentOrder   (cron-ingested orders)
+ *   ["go_ingested", id]          -> GovernmentOrder   (cron-ingested orders)
+ *   ["appointment_ingested", id] -> Appointment       (cron-ingested appointments)
  *
  * Derived knowledge graph (rebuilt from the above by lib/graph.ts buildGraph()):
  *   ["nodes", id]                            -> GraphNode
@@ -79,7 +88,7 @@ import {
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 27;
+const SEED_VERSION = 29;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -430,6 +439,24 @@ export async function listGovernmentOrdersByDept(
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/**
+ * Government orders that cite the given order in their body — the inbound side
+ * of the REFERENCES edge (e.g. the later order that supersedes this one). Served
+ * by the graph's `["edges_in", goId, "REFERENCES", ...]` adjacency.
+ */
+export async function listOrdersReferencing(
+  goId: string,
+): Promise<GovernmentOrder[]> {
+  await ensureSeeded();
+  const k = await kv();
+  const edges = await getNeighborsByType(goId, "REFERENCES", "in");
+  const results = await Promise.all(
+    edges.map((e) => k.get<GovernmentOrder>(["go", e.sourceId])),
+  );
+  return (results.map((r) => r.value).filter(Boolean) as GovernmentOrder[])
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
 export async function listGovernmentOrdersByManifestoGoal(
   goalId: string,
 ): Promise<GovernmentOrder[]> {
@@ -615,6 +642,133 @@ export async function listIngestedGovernmentOrders(): Promise<
   await ensureSeeded();
   return (await listAll<GovernmentOrder>(["go_ingested"]))
     .sort((a, b) => b.meta.retrievedAt.localeCompare(a.meta.retrievedAt));
+}
+
+// ----- Appointments ------------------------------------------------------
+
+export async function listAppointments(): Promise<Appointment[]> {
+  await ensureSeeded();
+  return (await listAll<Appointment>(["appointment"]))
+    .sort((a, b) => b.termStart.localeCompare(a.termStart));
+}
+
+export async function getAppointment(id: string): Promise<Appointment | null> {
+  await ensureSeeded();
+  const res = await (await kv()).get<Appointment>(["appointment", id]);
+  return res.value;
+}
+
+async function listAppointmentsByIndex(
+  prefix: Deno.KvKey,
+): Promise<Appointment[]> {
+  await ensureSeeded();
+  const k = await kv();
+  const ids: string[] = [];
+  for await (const e of k.list<null>({ prefix })) {
+    ids.push(e.key[e.key.length - 1] as string);
+  }
+  const rows = await Promise.all(
+    ids.map((id) => k.get<Appointment>(["appointment", id])),
+  );
+  return (rows.map((r) => r.value).filter(Boolean) as Appointment[])
+    .sort((a, b) => b.termStart.localeCompare(a.termStart));
+}
+
+export function listAppointmentsByDept(deptId: string): Promise<Appointment[]> {
+  return listAppointmentsByIndex(["appointment_by_dept", deptId]);
+}
+
+export function listAppointmentsByBranch(
+  branch: AppointmentBranch,
+): Promise<Appointment[]> {
+  return listAppointmentsByIndex(["appointment_by_branch", branch]);
+}
+
+export function listAppointmentsByGo(goId: string): Promise<Appointment[]> {
+  return listAppointmentsByIndex(["appointment_by_go", goId]);
+}
+
+/** Ids ingested at runtime (the durable mirror), newest first. */
+export async function listIngestedAppointments(): Promise<Appointment[]> {
+  await ensureSeeded();
+  return (await listAll<Appointment>(["appointment_ingested"]))
+    .sort((a, b) => b.termStart.localeCompare(a.termStart));
+}
+
+/** Write an appointment primary record + its secondary indexes. */
+function stageAppointment(
+  atomic: Deno.AtomicOperation,
+  a: Appointment,
+): Deno.AtomicOperation {
+  atomic.set(["appointment", a.id], a);
+  if (a.deptId) atomic.set(["appointment_by_dept", a.deptId, a.id], null);
+  atomic.set(["appointment_by_branch", a.branch, a.id], null);
+  atomic.set(["appointment_by_go", a.goId, a.id], null);
+  return atomic;
+}
+
+export async function putAppointment(a: Appointment): Promise<void> {
+  const res = await stageAppointment((await kv()).atomic(), a).commit();
+  if (!res.ok) throw new Error(`Failed to put appointment ${a.id}`);
+}
+
+/**
+ * Normalized key identifying "the same office" for supersession: branch + dept +
+ * court + the office title squashed to alphanumerics. A later appointment to the
+ * same office closes the prior open one.
+ */
+export function officeKey(a: Appointment): string {
+  const office = a.office.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return [a.branch, a.deptId ?? "", a.court ?? "", office].join("|");
+}
+
+/**
+ * Persist an appointment ingested at runtime: primary `["appointment", id]` +
+ * indexes AND a durable mirror under `["appointment_ingested", id]` (NOT wiped by
+ * `seed()`, re-hydrated on the next `SEED_VERSION` bump — same contract as
+ * `putIngestedGovernmentOrder`). Idempotent: re-ingesting the same id overwrites.
+ *
+ * Supersession: when this appointment opens an office (`termEnd` undefined) that
+ * a prior record still holds open with an earlier `termStart`, that prior record
+ * is closed (`termEnd` set to this one's `termStart`) so the office has a single
+ * current holder — the same dated-tenure model used for `Minister`/`Speaker`.
+ */
+export async function putIngestedAppointment(a: Appointment): Promise<void> {
+  const k = await kv();
+
+  // Close any prior open holder of the same office.
+  if (a.termEnd === undefined) {
+    const key = officeKey(a);
+    const peers = await listAppointmentsByIndex([
+      "appointment_by_branch",
+      a.branch,
+    ]);
+    for (const prior of peers) {
+      if (prior.id === a.id) continue;
+      if (prior.termEnd !== undefined) continue;
+      if (officeKey(prior) !== key) continue;
+      if (prior.termStart >= a.termStart) continue;
+      const closed: Appointment = { ...prior, termEnd: a.termStart };
+      await putAppointment(closed);
+      try {
+        await syncAppointmentGraph(closed);
+      } catch (err) {
+        console.warn(`graph sync skipped for ${closed.id}: ${err}`);
+      }
+    }
+  }
+
+  const atomic = stageAppointment(k.atomic(), a);
+  atomic.set(["appointment_ingested", a.id], a);
+  const res = await atomic.commit();
+  if (!res.ok) throw new Error(`Failed to put ingested appointment ${a.id}`);
+
+  // Keep the derived graph current. Best-effort, as with GO ingest.
+  try {
+    await syncAppointmentGraph(a);
+  } catch (err) {
+    console.warn(`graph sync skipped for ${a.id}: ${err}`);
+  }
 }
 
 // ----- Ingest run status (for the status page) ---------------------------
@@ -826,6 +980,10 @@ export async function seed(): Promise<void> {
       ["status_paper"],
       ["budget"],
       ["budget_by_fy"],
+      ["appointment"],
+      ["appointment_by_dept"],
+      ["appointment_by_branch"],
+      ["appointment_by_go"],
     ] satisfies Deno.KvKey[]
   ) {
     for await (const entry of k.list({ prefix })) {
@@ -845,6 +1003,7 @@ export async function seed(): Promise<void> {
   for (const sp of STATUS_PAPERS) await putStatusPaper(sp);
   for (const b of BUDGETS) await putBudget(b);
   for (const go of GOVERNMENT_ORDERS) await putGovernmentOrder(go);
+  for (const a of APPOINTMENTS) await putAppointment(a);
 
   // Re-hydrate cron-ingested orders. The `["go_ingested"]` mirror is never
   // wiped above, so orders the daily cron added since the last reseed are
@@ -856,7 +1015,18 @@ export async function seed(): Promise<void> {
     await putGovernmentOrder(entry.value);
   }
 
+  // Re-hydrate cron-ingested appointments the same way — the
+  // `["appointment_ingested"]` mirror is never wiped, so appointments extracted
+  // since the last reseed are restored into `["appointment"]` + indexes. Must run
+  // before buildGraph() so their nodes exist for the graph projection.
+  for await (
+    const entry of k.list<Appointment>({ prefix: ["appointment_ingested"] })
+  ) {
+    await putAppointment(entry.value);
+  }
+
   // Rebuild the derived knowledge graph from everything seeded above (including
-  // the re-hydrated cron orders). Must run last so every endpoint node exists.
+  // the re-hydrated cron orders + appointments). Must run last so every endpoint
+  // node exists.
   await buildGraph();
 }

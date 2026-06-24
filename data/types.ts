@@ -462,6 +462,34 @@ export type GoOrderType =
 export type DeptTagConfidence = "high" | "medium" | "low";
 
 /**
+ * How a Government Order relates to another order it cites in its body. Set by
+ * the ingest extractor when the PDF references a prior GO.
+ * - "amends"      this order modifies the cited order
+ * - "supersedes"  this order replaces / cancels the cited order
+ * - "references"  this order cites the prior order for context (no change to it)
+ * - "implements"  this order operationalises a cited framework / sanction order
+ */
+export type GoRelation = "amends" | "supersedes" | "references" | "implements";
+
+/**
+ * A cross-reference from one Government Order to another, extracted from the PDF
+ * body during ingest. `goNumber` is always the raw cited number; `goId` is set
+ * only when the cited order resolves to a known `GovernmentOrder.id` (derived
+ * from the number). Unresolved citations still display, but draw no graph edge.
+ */
+export interface GoReference {
+  /** Raw GO number exactly as cited in the document body. */
+  goNumber: string;
+  /** FK → GovernmentOrder.id when the cited order is known to us. */
+  goId?: string;
+  relation: GoRelation;
+  /** Short English gloss of why the order is cited. */
+  note?: string;
+  /** Malayalam gloss (machine-draft, like the rest of the ingested record). */
+  noteMl?: string;
+}
+
+/**
  * A single Kerala Government Order, Circular, or Legislative Bill.
  * Every record must carry `meta.sourceUrl` — a direct link to the PDF or
  * page on the official portal. No source URL = record does not ship.
@@ -495,10 +523,23 @@ export interface GovernmentOrder {
   date: string;
   /** ISO date the GO comes into force, if different from issue date. */
   effectiveDate?: string;
+  /**
+   * Semantic class of the order, orthogonal to `type` (the suffix code). Set by
+   * the ingest extractor. "appointment" GOs spawn one or more `Appointment`
+   * records and surface on /gov/appointments; absent ⇒ treat as "general".
+   */
+  category?: "appointment" | "general";
   /** FKs → ManifestoGoal.id — one GO may serve multiple goals. */
   manifestoGoalIds?: string[];
   /** How strongly this GO backs the listed manifesto goals. */
   manifestoConfidence?: "direct" | "supporting" | "weak";
+  /**
+   * Other Government Orders this one cites in its body (amendments,
+   * supersessions, sanction orders it builds on). LLM-extracted during ingest;
+   * each entry keeps the raw cited number and, when resolvable, the FK to the
+   * cited order. Drives the order's relationship graph.
+   */
+  references?: GoReference[];
   meta: {
     /** Name of the portal / document from which this record was fetched. */
     source: string;
@@ -513,6 +554,84 @@ export interface GovernmentOrder {
    * English-only, so the other side is machine-generated). Per Rule 2.4 of
    * the bilingual spec, such records await native review.
    */
+  translationStatus?: TranslationStatus;
+  dataStatus: "verified" | "unverified" | "tbd";
+}
+
+// ── Appointments ─────────────────────────────────────────────────────────────
+
+/**
+ * Which arm of the state an appointment sits in. Drives grouping on
+ * /gov/appointments and the graph projection target.
+ * - "executive"    — political / ministerial (rare in GOs; usually gazetted)
+ * - "bureaucratic" — IAS/IPS/IFS, secretaries, Heads of Department, deputations
+ * - "judiciary"    — High Court + district / subordinate judiciary (carries `court`)
+ * - "board"        — boards, corporations, commissions, universities (VC / chair)
+ */
+export type AppointmentBranch =
+  | "executive"
+  | "bureaucratic"
+  | "judiciary"
+  | "board";
+
+/** What the order does to the office holder. */
+export type AppointmentAction =
+  | "appointment"
+  | "transfer"
+  | "promotion"
+  | "additional-charge"
+  | "extension"
+  | "deputation"
+  | "reinstatement"
+  | "relieved";
+
+/**
+ * One person taking (or leaving) one office, evidenced by a Government Order.
+ *
+ * `Appointment` is a tenure record in the same spirit as `Minister` / `Speaker`:
+ * the holder of an office changes by date, so a transfer or fresh appointment to
+ * the same office closes the prior open record (`termEnd` set) and opens a new
+ * one. One GO may yield several appointments (a batch posting list).
+ *
+ * Ingested records are machine-extracted drafts: `translationStatus:
+ * "machine-draft"` and `dataStatus: "unverified"` until a human reviews them.
+ * `appointeeName` is always text; `personId` is set ONLY on a confident match to
+ * an existing `Person` — ingest never auto-creates `Person` records.
+ *
+ * IDs are derived from the source GO id for idempotent re-extraction:
+ * `appt.<go-suffix>-<n>`, e.g. go.2026-fin-162 → appt.2026-fin-162-0.
+ */
+export interface Appointment {
+  id: string;
+  /** FK → GovernmentOrder.id — the order that made this appointment. */
+  goId: string;
+  /** Appointee display name (English / transliterated). */
+  appointeeName: string;
+  /** Malayalam appointee name (names usually appear in Malayalam at source). */
+  appointeeNameMl?: string;
+  /** FK → Person.id — set only on a confident match to a known person. */
+  personId?: string;
+  /** Office / designation, English, e.g. "Principal Secretary (Finance)". */
+  office: string;
+  officeMl?: string;
+  branch: AppointmentBranch;
+  action: AppointmentAction;
+  /** FK → Department.id. Reuses the GO department tagging. */
+  deptId?: string;
+  /** Court name for judiciary appointments, e.g. "High Court of Kerala". */
+  court?: string;
+  courtMl?: string;
+  /** ISO — effective date of the appointment (GO effectiveDate ?? issue date). */
+  termStart: string;
+  /** ISO — set when superseded by a later holder or relieved; undefined = current. */
+  termEnd?: string;
+  /** Confidence of the structured extraction (mirrors DeptTagConfidence). */
+  confidence: "high" | "medium" | "low";
+  /** Portal / document the record was fetched from. */
+  source: string;
+  /** Direct PDF URL (mirrors the source GO's meta.sourceUrl). */
+  sourceUrl: string;
+  /** Provenance of the Malayalam strings. "machine-draft" for ingested records. */
   translationStatus?: TranslationStatus;
   dataStatus: "verified" | "unverified" | "tbd";
 }
@@ -843,7 +962,8 @@ export type GraphNodeType =
   | "person"
   | "government_order"
   | "manifesto_goal"
-  | "status_paper_vital";
+  | "status_paper_vital"
+  | "appointment";
 
 /**
  * The relationship vocabulary. Every edge type used in code must appear here.
@@ -852,7 +972,11 @@ export type GraphNodeType =
  * - `PORTFOLIO`      person (minister) → department they hold (carries tenure)
  * - `ISSUED_BY`      government order → issuing department
  * - `IMPACTS`        government order → manifesto goal it backs (LLM-derived)
+ * - `REFERENCES`     government order → another order it cites (relation in props)
  * - `BASELINES`      status-paper vital → KPI it establishes a baseline for
+ * - `APPOINTED_TO`   appointment → department it places the holder in (carries tenure)
+ * - `APPOINTEE`      appointment → the person appointed (only on a confident match)
+ * - `EVIDENCED_BY`   appointment → the government order that made it (provenance)
  */
 export type GraphEdgeType =
   | "OWNED_BY"
@@ -860,7 +984,11 @@ export type GraphEdgeType =
   | "PORTFOLIO"
   | "ISSUED_BY"
   | "IMPACTS"
-  | "BASELINES";
+  | "REFERENCES"
+  | "BASELINES"
+  | "APPOINTED_TO"
+  | "APPOINTEE"
+  | "EVIDENCED_BY";
 
 /**
  * A node in the derived graph. `id` is the EXISTING entity id verbatim
@@ -889,9 +1017,13 @@ export interface GraphEdge {
     confidence?: string;
     /** ISO date the link occurred / the source record is dated. */
     date?: string;
-    /** Tenure window for PORTFOLIO edges. */
+    /** Tenure window for PORTFOLIO / APPOINTED_TO edges. */
     termStart?: string;
     /** Undefined termEnd = still in post (used to find the active holder). */
     termEnd?: string;
+    /** Branch of state for APPOINTED_TO edges (AppointmentBranch). */
+    branch?: string;
+    /** Relation kind for REFERENCES edges (GoRelation). */
+    relation?: string;
   };
 }

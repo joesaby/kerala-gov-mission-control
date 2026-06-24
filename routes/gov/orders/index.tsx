@@ -10,6 +10,7 @@ import type { Department, GovernmentOrder } from "../../../data/types.ts";
 
 interface Data {
   cabinet: GovernmentOrder[];
+  appointments: GovernmentOrder[];
   orders: GovernmentOrder[];
   depts: Department[];
 }
@@ -21,8 +22,15 @@ export const handler = define.handlers<Data>({
       listDepartments(),
     ]);
     const cabinet = all.filter((o) => o.type === "Cabinet");
-    const orders = all.filter((o) => o.type !== "Cabinet");
-    return page({ cabinet, orders, depts });
+    // Appointment orders get their own lane (and a dedicated /gov/appointments
+    // page); everything else stays in the general orders browser.
+    const appointments = all.filter((o) =>
+      o.type !== "Cabinet" && o.category === "appointment"
+    );
+    const orders = all.filter((o) =>
+      o.type !== "Cabinet" && o.category !== "appointment"
+    );
+    return page({ cabinet, appointments, orders, depts });
   },
 });
 
@@ -30,8 +38,8 @@ export default define.page<typeof handler>(function OrdersPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { cabinet, orders, depts } = data;
-  const total = cabinet.length + orders.length;
+  const { cabinet, appointments, orders, depts } = data;
+  const total = cabinet.length + appointments.length + orders.length;
 
   return (
     <>
@@ -97,6 +105,50 @@ export default define.page<typeof handler>(function OrdersPage(
                     lang,
                     "No cabinet decisions recorded yet — we check every day.",
                     "ഇതുവരെ മന്ത്രിസഭാ തീരുമാനങ്ങളൊന്നും ഇല്ല — ഞങ്ങൾ ദിവസവും പരിശോധിക്കുന്നു.",
+                  )}
+                </p>
+              </div>
+            )}
+        </section>
+
+        {/* ── Appointments lane — teaser linking to the dedicated page ── */}
+        <section class="mb-10">
+          <div class="flex items-baseline justify-between mb-1">
+            <h2 class="font-display text-xl font-semibold">
+              {t(lang, "Appointments", "നിയമനങ്ങൾ")}
+              <span class="ml-2 text-sm font-normal text-base-content/40 tabular-nums">
+                {appointments.length}
+              </span>
+            </h2>
+            <a
+              href="/gov/appointments"
+              class="text-sm link link-hover text-primary"
+            >
+              {t(lang, "View all →", "എല്ലാം കാണുക →")}
+            </a>
+          </div>
+          <p class="text-sm text-base-content/60 mb-4">
+            {t(
+              lang,
+              "Appointments, transfers, and postings — who holds which office, across the executive, bureaucracy, judiciary, and public bodies.",
+              "നിയമനങ്ങൾ, സ്ഥലംമാറ്റങ്ങൾ, പോസ്റ്റിംഗുകൾ — ആരാണ് ഏത് പദവിയിൽ.",
+            )}
+          </p>
+          {appointments.length > 0
+            ? (
+              <GovernmentOrderList
+                orders={appointments.slice(0, 5)}
+                depts={depts}
+                lang={lang}
+              />
+            )
+            : (
+              <div class="text-center py-8 px-4 rounded-box border border-dashed border-base-300 bg-base-100/50">
+                <p class="text-sm text-base-content/50">
+                  {t(
+                    lang,
+                    "No appointment orders recorded yet — we check every day.",
+                    "ഇതുവരെ നിയമന ഉത്തരവുകളൊന്നും ഇല്ല — ഞങ്ങൾ ദിവസവും പരിശോധിക്കുന്നു.",
                   )}
                 </p>
               </div>

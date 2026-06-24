@@ -88,6 +88,23 @@ undefined = currently in post. Durations can be as short as one day
 
 Full spec: `docs/data/data-model.md`.
 
+### Knowledge graph (derived projection)
+
+`lib/graph.ts` maintains a small graph over the entities — `["nodes", id]` plus
+`["edges_out|in", …]` typed `GraphNode`/`GraphEdge` — so pages can answer
+relational questions (GOs impacting a KPI, the active portfolio holder, the
+office an appointment filled) with a one-hop lookup. It is a **derived
+projection, never a second source of truth**: `buildGraph()` rebuilds it from
+the fixtures + durable mirrors on every `SEED_VERSION` bump, and the ingest
+pipeline keeps it current at runtime via `syncOrderGraph` /
+`syncAppointmentGraph`. Tenure edges (`PORTFOLIO`, `APPOINTED_TO`) use
+`termEnd === undefined` to mark the current holder.
+
+When you add a new entity that relates to existing ones, project it into the
+graph too — node/edge builders + a `sync*` + `buildGraph` wiring.
+`docs/specs/knowledge-graph.md` is the source of truth for the model and the
+extension recipe.
+
 ### KPI defensibility rules
 
 Every KPI in `data/kpis.ts` must have: `ownerDeptId`, `target`, `comparators[]`
@@ -123,13 +140,19 @@ filesystem — so it runs unchanged inside Deno Deploy:
    HTML; see `KNOWN_SOURCES`).
 2. **Extract + map** — each PDF's bytes go straight to **Gemini**
    (`lib/gemini.ts`, model `gemini-flash-latest`), which reads the PDF natively
-   and returns `goNumber/type/date/subject(+Ml)` **and** the manifesto goal it
-   backs, in one call. **Fallback:** If Gemini fails or hits a quota/limit, the
-   pipeline falls back to **GROQ** (`lib/groq.ts` using `qwen/qwen3-32b` or
-   similar via standard chat API) if `GROQ_API_KEY` is provided, after
-   extracting text from the PDF bytes in memory.
+   and returns `goNumber/type/date/subject(+Ml)`, the manifesto goal it backs,
+   **and** a `category` (`appointment` vs `general`) with a structured
+   `appointments[]` list when the order appoints/transfers/posts named office
+   holders — all in one call. **Fallback:** If Gemini fails or hits a
+   quota/limit, the pipeline falls back to **GROQ** (`lib/groq.ts` using
+   `qwen/qwen3-32b` or similar via standard chat API) if `GROQ_API_KEY` is
+   provided, after extracting text from the PDF bytes in memory.
 3. **Persist** via `putIngestedGovernmentOrder` → writes `["go", id]` + indexes
-   **and** a durable mirror `["go_ingested", id]`.
+   **and** a durable mirror `["go_ingested", id]`. Appointment GOs additionally
+   spawn `Appointment` records (`putIngestedAppointment`, dept-mapped + tenure
+   supersession) that surface on `/gov/appointments` and feed the knowledge
+   graph; appointee names are matched to an existing `Person` only on a
+   confident match (never auto-created).
 
 `lib/cron.ts` registers a `Deno.cron` (`daily-go-ingest`, 02:30 IST) that runs
 the ingest in production. It self-disables (logs + returns) when `Deno.cron` or
@@ -165,7 +188,9 @@ drops echoes, translates the missing side) and every ingested record is flagged
 [--limit N]` re-extracts records
 already in KV straight from their stored PDF URL (covers orders no longer on the
 listing pages); without `--force` it only touches records whose bilingual fields
-look broken. The admin **Force ingest** endpoint accepts
+look broken **or that predate appointment categorization** (`category` unset) —
+so a repair pass also retro-classifies appointment GOs and backfills their
+`Appointment` records. The admin **Force ingest** endpoint accepts
 `{ "repair": true, "force"?, "limit"? }` to run the same repair against
 production KV (bounded — call repeatedly to chunk the backlog). For a normal
 scrape run it accepts `{ "limit"?, "since"?, "reprocess"?, "sources"? }` —

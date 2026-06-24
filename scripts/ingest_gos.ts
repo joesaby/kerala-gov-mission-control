@@ -41,7 +41,9 @@ deno task ingest-gos [options]
   --dry-run                 Extract + map but do not write to KV
   --reprocess               Re-scrape listings and re-extract already-seen orders
   --repair                  Re-extract already-ingested records straight from their stored
-                            PDF URL — fixes broken bilingual fields regardless of pagination
+                            PDF URL — fixes broken bilingual fields, and backfills the
+                            appointment category + Appointment records on older orders,
+                            regardless of pagination
   --force                   With --repair: re-extract every record, not just broken ones
   --help                    Show this help
 `);

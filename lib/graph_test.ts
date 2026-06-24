@@ -1,4 +1,6 @@
 import {
+  appointmentEdges,
+  appointmentNode,
   deptNode,
   kpiEdges,
   kpiNode,
@@ -7,6 +9,7 @@ import {
   orderNode,
 } from "./graph.ts";
 import type {
+  Appointment,
   Department,
   GovernmentOrder,
   Kpi,
@@ -181,4 +184,111 @@ Deno.test("orderEdges omits ISSUED_BY when department tagging is ambiguous", () 
     manifestoGoalIds: [],
   });
   assert(edges.length === 0, "no edges expected without dept or goals");
+});
+
+Deno.test("orderEdges emits REFERENCES only for resolved, non-self citations", () => {
+  const edges = orderEdges({
+    ...ORDER,
+    deptId: undefined,
+    manifestoGoalIds: [],
+    references: [
+      {
+        goNumber: "G.O.(P) No.45/2020/Fin",
+        goId: "go.2020-fin-45",
+        relation: "supersedes",
+      },
+      {
+        goNumber: "G.O.(P) No.98/2026/Fin",
+        goId: "go.2026-fin-98",
+        relation: "amends",
+      }, // self → dropped
+      { goNumber: "Some untraceable circular", relation: "references" }, // unresolved → no edge
+    ],
+  });
+  assert(edges.length === 1, "expected exactly one REFERENCES edge");
+  const ref = edges[0];
+  assert(ref.type === "REFERENCES", "wrong edge type");
+  assert(ref.targetId === "go.2020-fin-45", "wrong reference target");
+  assert(ref.properties?.relation === "supersedes", "relation not carried");
+  assert(ref.properties?.date === "2026-04-10", "edge date not carried");
+});
+
+const APPOINTMENT: Appointment = {
+  id: "appt.2026-fin-162-0",
+  goId: "go.2026-fin-162",
+  appointeeName: "A. Jayathilak",
+  appointeeNameMl: "എ. ജയതിലക്",
+  personId: "person.kn-balagopal",
+  office: "Additional Chief Secretary, Finance",
+  officeMl: "അഡീഷണൽ ചീഫ് സെക്രട്ടറി, ധനകാര്യം",
+  branch: "bureaucratic",
+  action: "appointment",
+  deptId: "dept.finance",
+  termStart: "2026-06-01",
+  confidence: "high",
+  source: "Document Portal, Government of Kerala",
+  sourceUrl: "https://document.kerala.gov.in/162.pdf",
+  translationStatus: "machine-draft",
+  dataStatus: "unverified",
+};
+
+Deno.test("appointmentNode carries id, type, bilingual label, and office", () => {
+  const n = appointmentNode(APPOINTMENT);
+  assert(n.id === "appt.2026-fin-162-0", "id must be verbatim");
+  assert(n.type === "appointment", "wrong node type");
+  assert(n.label === "A. Jayathilak", "wrong EN label");
+  assert(n.labelMl === "എ. ജയതിലക്", "missing Malayalam label");
+  assert(
+    n.properties?.office === "Additional Chief Secretary, Finance",
+    "office not projected",
+  );
+  assert(n.properties?.branch === "bureaucratic", "branch not projected");
+});
+
+Deno.test("appointmentEdges yields APPOINTED_TO + APPOINTEE + EVIDENCED_BY", () => {
+  const edges = appointmentEdges(APPOINTMENT);
+  assert(edges.length === 3, "expected 3 edges when person is matched");
+  const appointedTo = edges.find((e) => e.type === "APPOINTED_TO");
+  assert(
+    !!appointedTo && appointedTo.targetId === "dept.finance",
+    "missing APPOINTED_TO to dept",
+  );
+  assert(
+    appointedTo!.properties?.termEnd === undefined,
+    "open tenure must leave termEnd undefined (active holder)",
+  );
+  assert(
+    appointedTo!.properties?.branch === "bureaucratic",
+    "branch not carried on edge",
+  );
+  const appointee = edges.find((e) => e.type === "APPOINTEE");
+  assert(
+    !!appointee && appointee.targetId === "person.kn-balagopal",
+    "missing APPOINTEE to person",
+  );
+  const evidenced = edges.find((e) => e.type === "EVIDENCED_BY");
+  assert(
+    !!evidenced && evidenced.targetId === "go.2026-fin-162",
+    "missing EVIDENCED_BY to source order",
+  );
+});
+
+Deno.test("appointmentEdges omits APPOINTEE when no person matched, omits APPOINTED_TO when no dept", () => {
+  const edges = appointmentEdges({
+    ...APPOINTMENT,
+    personId: undefined,
+    deptId: undefined,
+  });
+  assert(
+    edges.every((e) => e.type !== "APPOINTEE"),
+    "no APPOINTEE edge without a matched person",
+  );
+  assert(
+    edges.every((e) => e.type !== "APPOINTED_TO"),
+    "no APPOINTED_TO edge without a department",
+  );
+  assert(
+    edges.some((e) => e.type === "EVIDENCED_BY"),
+    "EVIDENCED_BY must always link to the source order",
+  );
 });
