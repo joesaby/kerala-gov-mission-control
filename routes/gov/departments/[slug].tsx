@@ -13,6 +13,8 @@ import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
 import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
+import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
+import type { EgoGroup } from "../../../lib/ego-layout.ts";
 import type {
   Department,
   GovernmentOrder,
@@ -47,6 +49,46 @@ export default define.page<typeof handler>(function DeptPage(
 ) {
   const lang = state.lang;
   const { dept, minister, kpis, orders, allDepts } = data;
+
+  // Department hub: who runs it, what it's measured on, what it's been issuing.
+  const deptGroups: EgoGroup[] = [];
+  if (minister) {
+    deptGroups.push({
+      id: "cat.minister",
+      label: t(lang, "Minister", "മന്ത്രി"),
+      leaves: [{
+        id: minister.id,
+        label: lang === "ml" && minister.nameMl
+          ? minister.nameMl
+          : minister.name,
+        href: `/gov/ministers/${minister.slug}`,
+      }],
+    });
+  }
+  if (kpis.length > 0) {
+    deptGroups.push({
+      id: "cat.kpis",
+      label: t(lang, "Indicators", "സൂചകങ്ങൾ"),
+      leaves: kpis.map((k) => ({
+        id: k.id,
+        label: lang === "ml" ? k.titleMl : k.title,
+        href: `/kpi/${k.id}`,
+        tone: k.status,
+      })),
+    });
+  }
+  if (orders.length > 0) {
+    deptGroups.push({
+      id: "cat.orders",
+      label: t(lang, "Government Orders", "ഉത്തരവുകൾ"),
+      leaves: orders.slice(0, 6).map((o) => ({
+        id: o.id,
+        label: lang === "ml" && o.subjectMl ? o.subjectMl : o.subject,
+        href: `/gov/orders/${o.id}`,
+      })),
+    });
+  }
+  const hasDeptMap = deptGroups.some((g) => g.leaves.length > 0);
 
   return (
     <>
@@ -115,6 +157,30 @@ export default define.page<typeof handler>(function DeptPage(
               : <span class="italic text-base-content/60">—</span>}
           </InfoCard>
         </section>
+
+        {hasDeptMap && (
+          <section class="mt-10">
+            <h2 class="font-display text-xl font-semibold mb-1">
+              {t(lang, "Department map", "വകുപ്പ് ഭൂപടം")}
+            </h2>
+            <p class="text-sm text-base-content/60 mb-4">
+              {t(
+                lang,
+                "Who runs this department, what it is measured on, and what it has been issuing.",
+                "ഈ വകുപ്പിന്റെ ചുമതലക്കാരൻ, അളക്കുന്ന സൂചകങ്ങൾ, പുറപ്പെടുവിച്ച ഉത്തരവുകൾ.",
+              )}
+            </p>
+            <div class="surface-card p-4">
+              <EgoNetwork
+                center={{
+                  label: lang === "ml" && dept.nameMl ? dept.nameMl : dept.name,
+                }}
+                groups={deptGroups}
+                lang={lang}
+              />
+            </div>
+          </section>
+        )}
 
         <section class="mt-10">
           <h2 class="font-display text-xl font-semibold mb-4">
