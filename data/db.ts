@@ -28,6 +28,11 @@ import { GOVERNMENT_ORDERS } from "./government-orders.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 import { STATUS_PAPERS } from "./status-papers.ts";
 import { BUDGETS } from "./budgets.ts";
+import {
+  buildGraph,
+  getNeighborsByType,
+  syncOrderGraph,
+} from "../lib/graph.ts";
 
 /**
  * Deno KV layout.
@@ -46,11 +51,8 @@ import { BUDGETS } from "./budgets.ts";
  *   ["status_paper", id]       -> StatusPaper
  *   ["budget", id]             -> Budget
  *
- * Secondary indexes (write under transaction with the primary):
- *   ["kpi_by_dept", deptId, kpiId]                -> null
+ * Secondary indexes (by-attribute lookups; written with the primary):
  *   ["kpi_by_domain", domain, kpiId]              -> null
- *   ["dept_by_minister", ministerId, deptId]      -> null
- *   ["dept_by_secretary", secretaryId, deptId]    -> null
  *   ["minister_by_govt", governmentId, ministerId] -> null
  *   ["minister_by_person", personId, ministerId]  -> null
  *   ["coalition_by_party", partyId, coalitionId]  -> null
@@ -58,16 +60,26 @@ import { BUDGETS } from "./budgets.ts";
  *   ["speech_by_person", personId, speechId]      -> null
  *   ["speech_by_type",   type, speechId]          -> null
  *   ["manifesto_goal_by_govt", govtId, goalId]    -> null
- *   ["go_by_manifesto_goal", goalId, orderId]     -> null
+ *   ["budget_by_fy", fy, budgetId]                -> null
+ *
+ * Retired entity-to-entity indexes — now served by graph edges (below), still
+ * in the seed wipe list to purge legacy entries: kpi_by_dept (OWNED_BY +
+ * CONTRIBUTES_TO), go_by_dept (ISSUED_BY), go_by_manifesto_goal (IMPACTS),
+ * dept_by_minister & dept_by_secretary (were unused).
  *
  * Durable mirror (survives reseed — NOT wiped by seed()):
  *   ["go_ingested", id]      -> GovernmentOrder   (cron-ingested orders)
+ *
+ * Derived knowledge graph (rebuilt from the above by lib/graph.ts buildGraph()):
+ *   ["nodes", id]                            -> GraphNode
+ *   ["edges_out", sourceId, type, targetId]  -> GraphEdge
+ *   ["edges_in",  targetId, type, sourceId]  -> GraphEdge
  *
  * Bookkeeping:
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 24;
+const SEED_VERSION = 27;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -102,12 +114,15 @@ export async function getKpi(id: string): Promise<Kpi | null> {
 export async function listKpisByDept(deptId: string): Promise<Kpi[]> {
   await ensureSeeded();
   const k = await kv();
-  const ids: string[] = [];
-  for await (
-    const entry of k.list<unknown>({ prefix: ["kpi_by_dept", deptId] })
-  ) {
-    ids.push(entry.key[entry.key.length - 1] as string);
-  }
+  // Owner (OWNED_BY) + secondary contributing (CONTRIBUTES_TO) KPIs via the
+  // graph's edges_in, replacing the ["kpi_by_dept"] index that conflated both.
+  // Sorted by KPI id to preserve the previous index-order output.
+  const [owned, contrib] = await Promise.all([
+    getNeighborsByType(deptId, "OWNED_BY", "in"),
+    getNeighborsByType(deptId, "CONTRIBUTES_TO", "in"),
+  ]);
+  const ids = [...new Set([...owned, ...contrib].map((e) => e.sourceId))]
+    .sort();
   const results = await Promise.all(ids.map((id) => k.get<Kpi>(["kpi", id])));
   return results.map((r) => r.value).filter(Boolean) as Kpi[];
 }
@@ -404,14 +419,12 @@ export async function listGovernmentOrdersByDept(
 ): Promise<GovernmentOrder[]> {
   await ensureSeeded();
   const k = await kv();
-  const ids: string[] = [];
-  for await (
-    const entry of k.list<unknown>({ prefix: ["go_by_dept", deptId] })
-  ) {
-    ids.push(entry.key[entry.key.length - 1] as string);
-  }
+  // Served by the graph's ISSUED_BY edges (GO -> issuing dept). The legacy
+  // ["go_by_dept"] secondary index is retired in favour of this single
+  // adjacency layer — same one-hop lookup, one fewer thing to keep in sync.
+  const edges = await getNeighborsByType(deptId, "ISSUED_BY", "in");
   const results = await Promise.all(
-    ids.map((id) => k.get<GovernmentOrder>(["go", id])),
+    edges.map((e) => k.get<GovernmentOrder>(["go", e.sourceId])),
   );
   return (results.map((r) => r.value).filter(Boolean) as GovernmentOrder[])
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -422,16 +435,11 @@ export async function listGovernmentOrdersByManifestoGoal(
 ): Promise<GovernmentOrder[]> {
   await ensureSeeded();
   const k = await kv();
-  const ids: string[] = [];
-  for await (
-    const entry of k.list<unknown>({
-      prefix: ["go_by_manifesto_goal", goalId],
-    })
-  ) {
-    ids.push(entry.key[entry.key.length - 1] as string);
-  }
+  // Served by the graph's IMPACTS edges (GO -> manifesto goal), replacing the
+  // ["go_by_manifesto_goal"] index. Same date-desc ordering.
+  const edges = await getNeighborsByType(goalId, "IMPACTS", "in");
   const results = await Promise.all(
-    ids.map((id) => k.get<GovernmentOrder>(["go", id])),
+    edges.map((e) => k.get<GovernmentOrder>(["go", e.sourceId])),
   );
   return (results.map((r) => r.value).filter(Boolean) as GovernmentOrder[])
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -461,29 +469,24 @@ export async function getManifestoGoal(
 
 export async function putKpi(kpi: Kpi): Promise<void> {
   const k = await kv();
-  const atomic = k.atomic()
+  // KPI -> dept relationships (owner + contributing) are served by the graph's
+  // OWNED_BY / CONTRIBUTES_TO edges, rebuilt by buildGraph from the ["kpi"]
+  // records during seed — so the ["kpi_by_dept"] index is no longer written.
+  // kpi_by_domain stays: a by-attribute index the graph doesn't model.
+  const res = await k.atomic()
     .set(["kpi", kpi.id], kpi)
-    .set(["kpi_by_domain", kpi.domain, kpi.id], null);
-  if (kpi.ownerDeptId) {
-    atomic.set(["kpi_by_dept", kpi.ownerDeptId, kpi.id], null);
-  }
-  for (const cd of kpi.contributingDeptIds ?? []) {
-    atomic.set(["kpi_by_dept", cd, kpi.id], null);
-  }
-  const res = await atomic.commit();
+    .set(["kpi_by_domain", kpi.domain, kpi.id], null)
+    .commit();
   if (!res.ok) throw new Error(`Failed to put kpi ${kpi.id}`);
 }
 
 export async function putDepartment(dept: Department): Promise<void> {
-  const k = await kv();
-  const atomic = k.atomic().set(["dept", dept.id], dept);
-  if (dept.ministerId) {
-    atomic.set(["dept_by_minister", dept.ministerId, dept.id], null);
-  }
-  if (dept.secretaryId) {
-    atomic.set(["dept_by_secretary", dept.secretaryId, dept.id], null);
-  }
-  const res = await atomic.commit();
+  // The dept_by_minister / dept_by_secretary indexes were write-only (no reader
+  // anywhere) — retired. The dept<->minister relationship lives in the graph's
+  // PORTFOLIO edges; pages read the minister via dept.ministerId directly.
+  const res = await (await kv()).atomic()
+    .set(["dept", dept.id], dept)
+    .commit();
   if (!res.ok) throw new Error(`Failed to put dept ${dept.id}`);
 }
 
@@ -544,18 +547,16 @@ export async function putSpeech(sp: PublicSpeech): Promise<void> {
   if (!res.ok) throw new Error(`Failed to put speech ${sp.id}`);
 }
 
-/** Write a GO + its secondary indexes in one atomic commit. */
+/** Write a GO primary record. Its relationships live in the graph. */
 function stageGovernmentOrder(
   atomic: Deno.AtomicOperation,
   go: GovernmentOrder,
 ): Deno.AtomicOperation {
+  // GO -> dept and GO -> manifesto goal are served by the graph's ISSUED_BY and
+  // IMPACTS edges (written by buildGraph at seed time and syncOrderGraph at
+  // ingest time), so the ["go_by_dept"] / ["go_by_manifesto_goal"] indexes are
+  // no longer written. They stay in the seed wipe list to purge legacy entries.
   atomic.set(["go", go.id], go);
-  if (go.deptId) {
-    atomic.set(["go_by_dept", go.deptId, go.id], null);
-  }
-  for (const goalId of go.manifestoGoalIds ?? []) {
-    atomic.set(["go_by_manifesto_goal", goalId, go.id], null);
-  }
   return atomic;
 }
 
@@ -583,6 +584,15 @@ export async function putIngestedGovernmentOrder(
   atomic.set(["go_ingested", go.id], go);
   const res = await atomic.commit();
   if (!res.ok) throw new Error(`Failed to put ingested order ${go.id}`);
+
+  // Keep the derived graph current. Best-effort: the GO record is already
+  // durably persisted above, and `seed()` rebuilds the whole graph from it on
+  // the next reseed — so a transient graph-write failure must not fail ingest.
+  try {
+    await syncOrderGraph(go);
+  } catch (err) {
+    console.warn(`graph sync skipped for ${go.id}: ${err}`);
+  }
 }
 
 /** Government order ids already present (fixture-seeded or cron-ingested). */
@@ -845,4 +855,8 @@ export async function seed(): Promise<void> {
   ) {
     await putGovernmentOrder(entry.value);
   }
+
+  // Rebuild the derived knowledge graph from everything seeded above (including
+  // the re-hydrated cron orders). Must run last so every endpoint node exists.
+  await buildGraph();
 }
