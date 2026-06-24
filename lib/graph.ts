@@ -444,16 +444,40 @@ export async function syncAppointmentGraph(a: Appointment): Promise<void> {
  * from inside `seed()` after those records are written. Nodes are written
  * first, then edges with `requireNodes: false` since every endpoint is present.
  */
+/** Max mutations per atomic commit on the bulk graph-rebuild path (KV cap is
+ * 1000; stay well under to keep each commit's total size within limits). */
+const GRAPH_BATCH = 100;
+
+/**
+ * Apply a list of atomic stagers in batched commits. One awaited write per
+ * node/edge blows the per-request budget once the graph grows with the daily
+ * cron corpus, so the whole rebuild is chunked into `GRAPH_BATCH`-sized commits.
+ */
+async function batchCommit(
+  k: Deno.Kv,
+  stagers: Array<(a: Deno.AtomicOperation) => Deno.AtomicOperation>,
+  size: number,
+): Promise<void> {
+  for (let i = 0; i < stagers.length; i += size) {
+    let atomic = k.atomic();
+    for (const stage of stagers.slice(i, i + size)) atomic = stage(atomic);
+    const res = await atomic.commit();
+    if (!res.ok) throw new Error("Graph batch commit failed");
+  }
+}
+
 export async function buildGraph(): Promise<void> {
   const k = await kv();
-  // Wipe any prior projection.
+  // Wipe any prior projection (batched — the graph scales with the GO corpus).
+  const stale: Deno.KvKey[] = [];
   for (
     const prefix of [["nodes"], ["edges_out"], [
       "edges_in",
     ]] satisfies Deno.KvKey[]
   ) {
-    for await (const entry of k.list({ prefix })) await k.delete(entry.key);
+    for await (const entry of k.list({ prefix })) stale.push(entry.key);
   }
+  await batchCommit(k, stale.map((key) => (a) => a.delete(key)), GRAPH_BATCH);
 
   const [kpis, depts, persons, ministers, goals, orders, appointments] =
     await Promise.all([
@@ -467,19 +491,36 @@ export async function buildGraph(): Promise<void> {
     ]);
 
   // Nodes.
-  for (const kpi of kpis) await putNode(kpiNode(kpi));
-  for (const d of depts) await putNode(deptNode(d));
-  for (const p of persons) await putNode(personNode(p));
-  for (const g of goals) await putNode(goalNode(g));
-  for (const go of orders) await putNode(orderNode(go));
-  for (const a of appointments) await putNode(appointmentNode(a));
+  const nodes = [
+    ...kpis.map(kpiNode),
+    ...depts.map(deptNode),
+    ...persons.map(personNode),
+    ...goals.map(goalNode),
+    ...orders.map(orderNode),
+    ...appointments.map(appointmentNode),
+  ];
+  await batchCommit(
+    k,
+    nodes.map((n) => (a) => a.set(["nodes", n.id], n)),
+    GRAPH_BATCH,
+  );
 
   // Edges — every endpoint node is written above, so skip the existence check.
+  // Each edge stages both adjacency indexes in the same commit so the pair can
+  // never split across a batch boundary (preserving the out/in sync invariant).
   const edges = [
     ...kpis.flatMap(kpiEdges),
     ...ministers.flatMap(ministerEdges),
     ...orders.flatMap(orderEdges),
     ...appointments.flatMap(appointmentEdges),
   ];
-  for (const e of edges) await putEdge(e, { requireNodes: false });
+  await batchCommit(
+    k,
+    edges.map((e) => (a) =>
+      a
+        .set(["edges_out", e.sourceId, e.type, e.targetId], e)
+        .set(["edges_in", e.targetId, e.type, e.sourceId], e)
+    ),
+    Math.floor(GRAPH_BATCH / 2),
+  );
 }
