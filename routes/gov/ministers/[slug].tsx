@@ -14,6 +14,8 @@ import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
 import { MinisterAvatar } from "../../../components/MinisterAvatar.tsx";
 import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
+import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
+import type { EgoGroup } from "../../../lib/ego-layout.ts";
 import type {
   Department,
   Government,
@@ -65,6 +67,25 @@ export default define.page<typeof handler>(function MinisterPage(
   const lang = state.lang;
   const { minister, govt, depts, kpis, speeches, orders, allDepts } = data;
   const deptById = new Map(depts.map((d) => [d.id, d]));
+
+  // Minister → departments → KPIs, the relationships the flat lists below
+  // flatten. A KPI contributing to several portfolios appears under each.
+  const portfolioGroups: EgoGroup[] = depts.map((d) => ({
+    id: d.id,
+    label: lang === "ml" && d.nameMl ? d.nameMl : d.name,
+    href: `/gov/departments/${d.slug}`,
+    leaves: kpis
+      .filter((k) =>
+        k.ownerDeptId === d.id || k.contributingDeptIds?.includes(d.id)
+      )
+      .map((k) => ({
+        id: k.id,
+        label: lang === "ml" ? k.titleMl : k.title,
+        href: `/kpi/${k.id}`,
+        tone: k.status,
+      })),
+  }));
+  const hasPortfolioMap = portfolioGroups.some((g) => g.leaves.length > 0);
 
   return (
     <>
@@ -169,6 +190,32 @@ export default define.page<typeof handler>(function MinisterPage(
             ))}
           </ul>
         </section>
+
+        {hasPortfolioMap && (
+          <section class="mt-10">
+            <h2 class="font-display text-xl font-semibold mb-1">
+              {t(lang, "Portfolio map", "പോർട്ട്ഫോളിയോ ഭൂപടം")}
+            </h2>
+            <p class="text-sm text-base-content/60 mb-4">
+              {t(
+                lang,
+                "How this minister's departments connect to the indicators they answer for.",
+                "ഈ മന്ത്രിയുടെ വകുപ്പുകൾ അവർ ഉത്തരവാദികളായ സൂചകങ്ങളുമായി എങ്ങനെ ബന്ധപ്പെട്ടിരിക്കുന്നു.",
+              )}
+            </p>
+            <div class="surface-card p-4">
+              <EgoNetwork
+                center={{
+                  label: lang === "ml" && minister.nameMl
+                    ? minister.nameMl
+                    : minister.name,
+                }}
+                groups={portfolioGroups}
+                lang={lang}
+              />
+            </div>
+          </section>
+        )}
 
         <section class="mt-10">
           <h2 class="font-display text-xl font-semibold mb-4">
