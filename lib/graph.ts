@@ -265,11 +265,23 @@ export function orderNode(go: GovernmentOrder): GraphNode {
 //
 // Pure projections — exported so the derivation can be unit-tested without KV.
 
-/** KPI -[OWNED_BY]-> its accountable department (empty until ownership set). */
+/**
+ * KPI -[OWNED_BY]-> its accountable department, plus -[CONTRIBUTES_TO]-> each
+ * secondary contributing department. Empty until ownership is assigned.
+ */
 export function kpiEdges(kpi: Kpi): GraphEdge[] {
-  return kpi.ownerDeptId
-    ? [{ sourceId: kpi.id, targetId: kpi.ownerDeptId, type: "OWNED_BY" }]
-    : [];
+  const edges: GraphEdge[] = [];
+  if (kpi.ownerDeptId) {
+    edges.push({
+      sourceId: kpi.id,
+      targetId: kpi.ownerDeptId,
+      type: "OWNED_BY",
+    });
+  }
+  for (const deptId of kpi.contributingDeptIds ?? []) {
+    edges.push({ sourceId: kpi.id, targetId: deptId, type: "CONTRIBUTES_TO" });
+  }
+  return edges;
 }
 
 /** Person (minister) -[PORTFOLIO {tenure}]-> each department they hold. */

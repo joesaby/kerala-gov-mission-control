@@ -115,6 +115,27 @@ Deno.test("kpiEdges is empty when ownership is unassigned", () => {
   );
 });
 
+Deno.test("kpiEdges emits OWNED_BY for owner + CONTRIBUTES_TO per contributor", () => {
+  const edges = kpiEdges({
+    ...KPI,
+    contributingDeptIds: ["dept.planning", "dept.lsg"],
+  });
+  assert(edges.length === 3, "expected 1 owner + 2 contributor edges");
+  const owned = edges.filter((e) => e.type === "OWNED_BY");
+  assert(
+    owned.length === 1 && owned[0].targetId === "dept.finance",
+    "owner edge wrong",
+  );
+  const contrib = edges.filter((e) => e.type === "CONTRIBUTES_TO").map((e) =>
+    e.targetId
+  );
+  assert(
+    contrib.length === 2 && contrib.includes("dept.planning") &&
+      contrib.includes("dept.lsg"),
+    "contributor edges wrong",
+  );
+});
+
 Deno.test("ministerEdges emits one PORTFOLIO edge per department with tenure", () => {
   const edges = ministerEdges(MINISTER);
   assert(edges.length === 2, "expected one edge per department");

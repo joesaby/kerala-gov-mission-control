@@ -847,14 +847,16 @@ export type GraphNodeType =
 
 /**
  * The relationship vocabulary. Every edge type used in code must appear here.
- * - `OWNED_BY`   KPI → department primarily accountable for it
- * - `PORTFOLIO`  person (minister) → department they hold (carries the tenure)
- * - `ISSUED_BY`  government order → issuing department
- * - `IMPACTS`    government order → manifesto goal it backs (LLM-derived)
- * - `BASELINES`  status-paper vital → KPI it establishes a baseline for
+ * - `OWNED_BY`       KPI → department primarily accountable for it
+ * - `CONTRIBUTES_TO` KPI → a secondary department that also contributes to it
+ * - `PORTFOLIO`      person (minister) → department they hold (carries tenure)
+ * - `ISSUED_BY`      government order → issuing department
+ * - `IMPACTS`        government order → manifesto goal it backs (LLM-derived)
+ * - `BASELINES`      status-paper vital → KPI it establishes a baseline for
  */
 export type GraphEdgeType =
   | "OWNED_BY"
+  | "CONTRIBUTES_TO"
   | "PORTFOLIO"
   | "ISSUED_BY"
   | "IMPACTS"
