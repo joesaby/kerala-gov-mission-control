@@ -28,7 +28,11 @@ import { GOVERNMENT_ORDERS } from "./government-orders.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 import { STATUS_PAPERS } from "./status-papers.ts";
 import { BUDGETS } from "./budgets.ts";
-import { buildGraph, syncOrderGraph } from "../lib/graph.ts";
+import {
+  buildGraph,
+  getNeighborsByType,
+  syncOrderGraph,
+} from "../lib/graph.ts";
 
 /**
  * Deno KV layout.
@@ -73,7 +77,7 @@ import { buildGraph, syncOrderGraph } from "../lib/graph.ts";
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 25;
+const SEED_VERSION = 26;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -410,14 +414,12 @@ export async function listGovernmentOrdersByDept(
 ): Promise<GovernmentOrder[]> {
   await ensureSeeded();
   const k = await kv();
-  const ids: string[] = [];
-  for await (
-    const entry of k.list<unknown>({ prefix: ["go_by_dept", deptId] })
-  ) {
-    ids.push(entry.key[entry.key.length - 1] as string);
-  }
+  // Served by the graph's ISSUED_BY edges (GO -> issuing dept). The legacy
+  // ["go_by_dept"] secondary index is retired in favour of this single
+  // adjacency layer — same one-hop lookup, one fewer thing to keep in sync.
+  const edges = await getNeighborsByType(deptId, "ISSUED_BY", "in");
   const results = await Promise.all(
-    ids.map((id) => k.get<GovernmentOrder>(["go", id])),
+    edges.map((e) => k.get<GovernmentOrder>(["go", e.sourceId])),
   );
   return (results.map((r) => r.value).filter(Boolean) as GovernmentOrder[])
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -556,9 +558,10 @@ function stageGovernmentOrder(
   go: GovernmentOrder,
 ): Deno.AtomicOperation {
   atomic.set(["go", go.id], go);
-  if (go.deptId) {
-    atomic.set(["go_by_dept", go.deptId, go.id], null);
-  }
+  // GO -> dept is now served by the graph's ISSUED_BY edge (written by
+  // buildGraph at seed time and syncOrderGraph at ingest time), so the
+  // ["go_by_dept"] index is no longer written here. It stays in the seed wipe
+  // list to purge any entries left by an earlier seed version.
   for (const goalId of go.manifestoGoalIds ?? []) {
     atomic.set(["go_by_manifesto_goal", goalId, go.id], null);
   }
