@@ -130,6 +130,13 @@ export default define.page<typeof handler>(function IngestStatusPage(
                   value={status.errors.length}
                   accent={status.errors.length > 0 ? "text-error" : undefined}
                 />
+                {status.deferred && status.deferred.length > 0 && (
+                  <Stat
+                    label={lang === "ml" ? "മാറ്റിവച്ചവ" : "Deferred"}
+                    value={status.deferred.length}
+                    accent="text-warning"
+                  />
+                )}
               </dl>
 
               <div class="mt-5 grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm">
@@ -168,6 +175,21 @@ export default define.page<typeof handler>(function IngestStatusPage(
                   <ul class="mt-2 flex flex-col gap-1 text-xs font-mono text-base-content/70">
                     {status.errors.map((e, i) => (
                       <li key={i} class="break-words">{e}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+
+              {status.deferred && status.deferred.length > 0 && (
+                <details class="mt-4">
+                  <summary class="text-sm font-medium text-warning cursor-pointer">
+                    {lang === "ml"
+                      ? `${status.deferred.length} മാറ്റിവച്ചവ (അടുത്ത റണിൽ വീണ്ടും ശ്രമിക്കും)`
+                      : `${status.deferred.length} deferred (Gemini overloaded — retried next run)`}
+                  </summary>
+                  <ul class="mt-2 flex flex-col gap-1 text-xs font-mono text-base-content/70">
+                    {status.deferred.map((d, i) => (
+                      <li key={i} class="break-words">{d}</li>
                     ))}
                   </ul>
                 </details>
