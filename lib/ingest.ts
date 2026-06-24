@@ -1216,7 +1216,7 @@ export async function runIngest(
         }
         const pdfBytes = new Uint8Array(await r.arrayBuffer());
 
-        const { extracted: ex, usedGroq } = await geminiExtract(
+        const { extracted: ex, provider } = await geminiExtract(
           pdfBytes,
           listing,
           hint,
@@ -1224,7 +1224,8 @@ export async function runIngest(
           goalIds,
           log,
         );
-        if (usedGroq) groqFallbackUsed = true;
+        if (provider === "groq") groqFallbackUsed = true;
+        if (provider === "nvidia") nvidiaFallbackUsed = true;
 
         // Re-slot mis-placed languages, drop GO-number echoes, and translate
         // the missing side so `subject`/`summary` are reliably English and
@@ -1317,9 +1318,11 @@ export async function runIngest(
     finishedAt: new Date().toISOString(),
     ok: runOk,
     trigger,
-    model: groqFallbackUsed
-      ? `${geminiModel()}+groq-fallback(${groqModel()})`
-      : geminiModel(),
+    model: [
+      geminiModel(),
+      groqFallbackUsed ? `groq-fallback(${groqModel()})` : null,
+      nvidiaFallbackUsed ? `nvidia-fallback(${nvidiaModel()})` : null,
+    ].filter(Boolean).join("+"),
     scanned,
     added: addedIds.length,
     skipped,

@@ -143,10 +143,13 @@ filesystem — so it runs unchanged inside Deno Deploy:
    and returns `goNumber/type/date/subject(+Ml)`, the manifesto goal it backs,
    **and** a `category` (`appointment` vs `general`) with a structured
    `appointments[]` list when the order appoints/transfers/posts named office
-   holders — all in one call. **Fallback:** If Gemini fails or hits a
-   quota/limit, the pipeline falls back to **GROQ** (`lib/groq.ts` using
-   `qwen/qwen3-32b` or similar via standard chat API) if `GROQ_API_KEY` is
-   provided, after extracting text from the PDF bytes in memory.
+   holders — all in one call. **Fallback chain (Gemini → GROQ → NVIDIA):** If
+   Gemini fails or hits a quota/limit, the pipeline falls back to **GROQ**
+   (`lib/groq.ts`, `qwen/qwen3-32b`) when `GROQ_API_KEY` is set, then to
+   **NVIDIA NIM** (`lib/nvidia.ts`, `meta/llama-3.3-70b-instruct`) when
+   `NVIDIA_KEY` is set. Both fallbacks are text-only — they extract readable
+   text from the PDF bytes in memory (`extractPdfText`), so they degrade on
+   scanned/image-only GOs that Gemini's native PDF vision would still read.
 3. **Persist** via `putIngestedGovernmentOrder` → writes `["go", id]` + indexes
    **and** a durable mirror `["go_ingested", id]`. Appointment GOs additionally
    spawn `Appointment` records (`putIngestedAppointment`, dept-mapped + tenure
@@ -164,11 +167,16 @@ fixture. So cron-ingested orders survive reseeds. `data/government-orders.ts` is
 just a small static baseline (only orders with a verified, resolvable PDF) — do
 **not** add speculative records with guessed URLs; the cron fills the rest.
 
-`GEMINI_API_KEY` (and optional `GROQ_API_KEY` for fallback) must be set in Deno
-Deploy env (and `.env` for local CLI runs). Note: `gemini-2.0-flash` has a zero
-free-tier quota on the project key — use `gemini-flash-latest` (the default;
-override with `GEMINI_MODEL`). Override GROQ fallback model using `GROQ_MODEL`
-(defaults to `qwen/qwen3-32b`).
+`GEMINI_API_KEY` (and optional `GROQ_API_KEY` / `NVIDIA_KEY` for the fallback
+chain) must be set in Deno Deploy env (and `.env` for local CLI runs). Note:
+`gemini-2.0-flash` has a zero free-tier quota on the project key — use
+`gemini-flash-latest` (the default; override with `GEMINI_MODEL`). Override the
+GROQ fallback model with `GROQ_MODEL` (defaults to `qwen/qwen3-32b`) and the
+NVIDIA NIM fallback model with `NVIDIA_MODEL` (defaults to
+`meta/llama-3.3-70b-instruct`; ~40 RPM free tier, confirm the tag against
+build.nvidia.com). The run-status `model` string records which fallback tiers
+were used (e.g.
+`gemini-flash-latest+nvidia-fallback(meta/llama-3.3-70b-instruct)`).
 
 Manual runs / backfills:
 `deno task ingest-gos [--since YYYY-MM-DD] [--limit N]
