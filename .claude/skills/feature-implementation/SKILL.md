@@ -19,16 +19,21 @@ the Status Paper were built. Pair with `arch-discovery` (where things live) and
 3. **Wire the KV layer** in `data/db.ts`: add the `["<thing>", id]` prefix to
    the layout comment + the `seed()` wipe-list + the seed loop, add
    `put*`/`list*`/`get*` accessors, and **bump `SEED_VERSION`**.
-4. **Build the route/component** under `routes/**` / `components/**`.
+4. **Project into the knowledge graph** (only if the entity *relates* to existing
+   entities — a leaf with no relationships skips this). Add `<thing>Node` +
+   `<thing>Edges` builders and a `sync<Thing>Graph` to `lib/graph.ts`, wire the
+   prefix into `buildGraph()`, and call the sync from your `putIngested*` writer.
+   Full recipe + the "silently dropped edge" gotcha: `docs/specs/knowledge-graph.md`.
+5. **Build the route/component** under `routes/**` / `components/**`.
    Server-render by default; add an island only for real client interactivity.
    Use `define.handlers` + `define.page`, `t(lang, …)`/`pick`, and the CSS
    tokens in `static/styles.css`. For visuals, prefer SSR SVG / daisyUI over a
    chart library (see `components/MetricChart.tsx`).
-5. **Bilingual.** Provide verified `*Ml` for new strings. If you can't verify a
+6. **Bilingual.** Provide verified `*Ml` for new strings. If you can't verify a
    Malayalam government term, leave it unset and set `dataStatus: "tbd"` — never
    guess. Run `/bilingual-audit`.
-6. **Nav.** Add the entry to `components/Header.tsx` if it's a top-level page.
-7. **Verify.** `deno task check` (fmt + lint + type-check) **and**
+7. **Nav.** Add the entry to `components/Header.tsx` if it's a top-level page.
+8. **Verify.** `deno task check` (fmt + lint + type-check) **and**
    `deno task check:sources`. For data changes, run the relevant reviewer agent
    (`kpi-data-reviewer` / `governance-data-reviewer`). Smoke-test with
    `deno task dev` and, for visuals, a screenshot.
@@ -38,6 +43,8 @@ the Status Paper were built. Pair with `arch-discovery` (where things live) and
 - The `deno fmt` PostToolUse hook rewrites files on save — **re-read before a
   second edit** or the next edit's `old_string` won't match.
 - Forgetting the `SEED_VERSION` bump = the site silently serves stale KV data.
+- A graph edge whose **target node isn't projected yet is silently dropped** (no
+  dangling edges by design) — seed/rehydrate nodes *before* `buildGraph()` runs.
 - `Lang` is exported from `data/lang.ts`, not `data/types.ts`.
 - JSX lists need a `key` prop (Fresh lint rule `jsx-key`).
 

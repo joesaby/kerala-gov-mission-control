@@ -15,19 +15,26 @@
  */
 
 import type {
+  Appointment,
+  AppointmentAction,
+  AppointmentBranch,
   DeptTagConfidence,
   GoOrderType,
+  GoReference,
+  GoRelation,
   GovernmentOrder,
   ManifestoGoal,
   TranslationStatus,
 } from "../data/types.ts";
 import { DEPARTMENTS } from "../data/departments.ts";
+import { PERSONS } from "../data/persons.ts";
 import {
   appendIngestRun,
   type IngestStatus,
   listGovernmentOrderKeys,
   listGovernmentOrders,
   listManifestoGoals,
+  putIngestedAppointment,
   putIngestedGovernmentOrder,
   setIngestLog,
   setIngestStatus,
@@ -44,6 +51,12 @@ import {
   groqKey,
   groqModel,
 } from "./groq.ts";
+import {
+  nvidiaExtractFromPdf,
+  nvidiaGenerate,
+  nvidiaKey,
+  nvidiaModel,
+} from "./nvidia.ts";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -180,6 +193,26 @@ async function scrapeListings(
 // Gemini extraction + manifesto mapping (single call)
 // ---------------------------------------------------------------------------
 
+interface ExtractedAppointment {
+  appointeeName: string | null;
+  appointeeNameMl: string | null;
+  office: string | null;
+  officeMl: string | null;
+  branch: AppointmentBranch | null;
+  action: AppointmentAction | null;
+  court: string | null;
+  courtMl: string | null;
+  effectiveDate: string | null;
+}
+
+/** One GO citation as returned by the extractor, before id resolution. */
+interface ExtractedRef {
+  goNumber: string;
+  relation: GoRelation;
+  note: string | null;
+  noteMl: string | null;
+}
+
 interface Extracted {
   goNumber: string;
   type: GoOrderType;
@@ -190,6 +223,12 @@ interface Extracted {
   summaryMl: string | null;
   manifestoGoalId: string | null;
   manifestoConfidence: "direct" | "supporting" | "weak" | null;
+  /** Semantic class — "appointment" GOs carry `appointments`. */
+  category: "appointment" | "general";
+  /** One row per appointee for appointment GOs; null/[] otherwise. */
+  appointments: ExtractedAppointment[] | null;
+  /** Other GOs this document cites in its body; [] when none. */
+  references: ExtractedRef[];
 }
 
 function cleanPortalHtml(s: string): string {
@@ -231,6 +270,42 @@ Return ONLY a JSON object with these exact keys:
                          implements or supports, or null if none genuinely apply
   manifestoConfidence  - "direct" (the order enacts the pledge), "supporting"
                          (a related/enabling step), "weak" (tangential), or null
+  category             - "appointment" if the order's PRIMARY purpose is to appoint,
+                         post, transfer, promote, give additional charge to, depute,
+                         extend, reinstate, or relieve one or more named office
+                         holders (Malayalam cues: നിയമനം, സ്ഥലംമാറ്റം, ചുമതല,
+                         സ്ഥാനക്കയറ്റം, ഡെപ്യൂട്ടേഷൻ, വിരമിക്കൽ); otherwise "general".
+  appointments         - when category is "appointment", an array with one object
+                         per named person, each with EXACTLY these keys:
+                           appointeeName    - person's name in English (transliterate if needed)
+                           appointeeNameMl  - person's name in Malayalam (Unicode), or null
+                           office           - the post/designation in English (e.g. "Principal Secretary, Finance")
+                           officeMl         - the post in Malayalam, or null
+                           branch           - one of: "executive" (minister), "bureaucratic"
+                                              (IAS/IPS/IFS, secretary, HoD, civil servant),
+                                              "judiciary" (judge, High Court, district court),
+                                              "board" (corporation/board/commission/university chair, VC)
+                           action           - one of: "appointment" | "transfer" | "promotion" |
+                                              "additional-charge" | "extension" | "deputation" |
+                                              "reinstatement" | "relieved"
+                           court            - for judiciary only: the court name in English
+                                              (e.g. "High Court of Kerala"), else null
+                           courtMl          - the court name in Malayalam, or null
+                           effectiveDate    - ISO "YYYY-MM-DD" the appointment takes effect, or null
+                         When category is "general", return null or [].
+  references           - an array of OTHER government orders this document explicitly
+                         cites in its body (orders it amends, cancels/supersedes,
+                         references for context, or implements). Malayalam cues:
+                         ഭേദഗതി (amends), റദ്ദാക്കി/പിൻവലിച്ചു (supersedes),
+                         പരാമർശം/സൂചന (references), പ്രകാരം/അടിസ്ഥാനത്തിൽ (implements).
+                         Each item has EXACTLY these keys:
+                           goNumber - the cited order's number, exactly as printed
+                                      (e.g. "G.O.(P) No.45/2020/Fin"). Never invent one.
+                           relation - one of: "amends" | "supersedes" | "references" | "implements"
+                           note     - a short English gloss of the citation context
+                           noteMl   - the same gloss in Malayalam, or null
+                         Return [] when the document cites no other order. Do NOT list
+                         the document's OWN number here.
 
 Type mapping: G.O.(P)->"P", G.O.(Ms)->"Ms", G.O.(Rt)->"Rt", S.R.O.->"SRO",
 Circular->"Circular", Bill->"Bill", Cabinet Decision->"Cabinet".
@@ -261,6 +336,99 @@ const VALID_TYPES = new Set<GoOrderType>([
   "Cabinet",
 ]);
 const VALID_CONF = new Set(["direct", "supporting", "weak"]);
+const VALID_BRANCHES = new Set<AppointmentBranch>([
+  "executive",
+  "bureaucratic",
+  "judiciary",
+  "board",
+]);
+const VALID_ACTIONS = new Set<AppointmentAction>([
+  "appointment",
+  "transfer",
+  "promotion",
+  "additional-charge",
+  "extension",
+  "deputation",
+  "reinstatement",
+  "relieved",
+]);
+const VALID_RELATIONS = new Set<GoRelation>([
+  "amends",
+  "supersedes",
+  "references",
+  "implements",
+]);
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Validate + coerce the model's `appointments` array into ExtractedAppointment[]. */
+function parseExtractedAppointments(raw: unknown): ExtractedAppointment[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ExtractedAppointment[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const name = typeof r.appointeeName === "string"
+      ? r.appointeeName.trim()
+      : "";
+    const office = typeof r.office === "string" ? r.office.trim() : "";
+    // A usable row needs at least a name and an office.
+    if (
+      !name && !(typeof r.appointeeNameMl === "string" && r.appointeeNameMl)
+    ) {
+      continue;
+    }
+    const branch = VALID_BRANCHES.has(r.branch as AppointmentBranch)
+      ? r.branch as AppointmentBranch
+      : "bureaucratic";
+    const action = VALID_ACTIONS.has(r.action as AppointmentAction)
+      ? r.action as AppointmentAction
+      : "appointment";
+    const eff = typeof r.effectiveDate === "string" &&
+        ISO_DATE_RE.test(r.effectiveDate)
+      ? r.effectiveDate
+      : null;
+    out.push({
+      appointeeName: name || null,
+      appointeeNameMl: typeof r.appointeeNameMl === "string"
+        ? r.appointeeNameMl.trim() || null
+        : null,
+      office: office || null,
+      officeMl: typeof r.officeMl === "string"
+        ? r.officeMl.trim() || null
+        : null,
+      branch,
+      action,
+      court: typeof r.court === "string" ? r.court.trim() || null : null,
+      courtMl: typeof r.courtMl === "string" ? r.courtMl.trim() || null : null,
+      effectiveDate: eff,
+    });
+  }
+  return out;
+}
+
+/** Validate + coerce the model's `references` array into ExtractedRef[]. */
+function parseExtractedRefs(raw: unknown): ExtractedRef[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ExtractedRef[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const goNumber = typeof r.goNumber === "string" ? r.goNumber.trim() : "";
+    // A citation is useless without the cited order's number.
+    if (!goNumber) continue;
+    const relation = VALID_RELATIONS.has(r.relation as GoRelation)
+      ? r.relation as GoRelation
+      : "references";
+    out.push({
+      goNumber,
+      relation,
+      note: typeof r.note === "string" ? r.note.trim() || null : null,
+      noteMl: typeof r.noteMl === "string" ? r.noteMl.trim() || null : null,
+    });
+  }
+  return out;
+}
 
 function inferType(goNumber: string, hint = ""): GoOrderType {
   if (hint.toLowerCase().includes("cabinet")) return "Cabinet";
@@ -275,6 +443,9 @@ function inferType(goNumber: string, hint = ""): GoOrderType {
   return "Rt";
 }
 
+/** Which model actually produced an extraction (Gemini, or a fallback tier). */
+type ExtractProvider = "gemini" | "groq" | "nvidia";
+
 async function geminiExtract(
   pdfBytes: Uint8Array,
   fallback: Listing,
@@ -282,20 +453,40 @@ async function geminiExtract(
   goals: ManifestoGoal[],
   goalIds: Set<string>,
   log?: (m: string) => void,
-): Promise<{ extracted: Extracted; usedGroq: boolean }> {
+): Promise<{ extracted: Extracted; provider: ExtractProvider }> {
   const prompt = buildPrompt(hint, fallback, goals);
   let raw: string;
-  let usedGroq = false;
+  let provider: ExtractProvider = "gemini";
   try {
     raw = await geminiExtractFromPdf(pdfBytes, prompt);
   } catch (geminiErr) {
-    if (!groqKey()) throw geminiErr;
     const msg = geminiErr instanceof Error
       ? geminiErr.message
       : String(geminiErr);
-    log?.(`    [Gemini failed, falling back to GROQ] ${msg}`);
-    raw = await groqExtractFromPdf(pdfBytes, prompt);
-    usedGroq = true;
+    // Fallback chain: Gemini → GROQ → NVIDIA. Both fallbacks are text-only
+    // (they read PDF text, not the image), so they degrade on scanned GOs.
+    if (groqKey()) {
+      try {
+        log?.(`    [Gemini failed, falling back to GROQ] ${msg}`);
+        raw = await groqExtractFromPdf(pdfBytes, prompt);
+        provider = "groq";
+      } catch (groqErr) {
+        if (!nvidiaKey()) throw groqErr;
+        log?.(
+          `    [GROQ failed, falling back to NVIDIA] ${
+            groqErr instanceof Error ? groqErr.message : groqErr
+          }`,
+        );
+        raw = await nvidiaExtractFromPdf(pdfBytes, prompt);
+        provider = "nvidia";
+      }
+    } else if (nvidiaKey()) {
+      log?.(`    [Gemini failed, falling back to NVIDIA] ${msg}`);
+      raw = await nvidiaExtractFromPdf(pdfBytes, prompt);
+      provider = "nvidia";
+    } else {
+      throw geminiErr;
+    }
   }
   const p = parseJsonObject<Record<string, unknown>>(raw);
 
@@ -316,6 +507,14 @@ async function geminiExtract(
     ? p.manifestoConfidence as "direct" | "supporting" | "weak"
     : (mappedId ? "supporting" : null);
 
+  const appointments = parseExtractedAppointments(p.appointments);
+  // Trust the appointee rows over the bare flag: a GO with named appointees is an
+  // appointment even if the model labelled `category` "general", and vice versa.
+  const category: "appointment" | "general" =
+    p.category === "appointment" || appointments.length > 0
+      ? "appointment"
+      : "general";
+
   return {
     extracted: {
       goNumber: (p.goNumber as string) || fallback.goNumber,
@@ -327,8 +526,11 @@ async function geminiExtract(
       summaryMl: (p.summaryMl as string) || null,
       manifestoGoalId: mappedId,
       manifestoConfidence: conf,
+      category,
+      appointments: category === "appointment" ? appointments : null,
+      references: parseExtractedRefs(p.references),
     },
-    usedGroq,
+    provider,
   };
 }
 
@@ -389,7 +591,7 @@ function isGoNumberEcho(
   return /^g?o?[a-z]{0,3}\d+\d{4}[a-z&]+$/.test(s);
 }
 
-/** Translate a short text to English or Malayalam (Gemini → GROQ fallback). */
+/** Translate a short text (Gemini → GROQ → NVIDIA fallback chain). */
 async function translateText(
   text: string,
   target: "English" | "Malayalam",
@@ -421,6 +623,19 @@ async function translateText(
     } catch (e) {
       log?.(
         `    [translate→${target} via GROQ failed] ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+  }
+  if (nvidiaKey()) {
+    try {
+      const raw = await nvidiaGenerate(sys, user);
+      const t = parseJsonObject<{ translation?: unknown }>(raw).translation;
+      if (typeof t === "string" && t.trim()) return t.trim();
+    } catch (e) {
+      log?.(
+        `    [translate→${target} via NVIDIA failed] ${
           e instanceof Error ? e.message : e
         }`,
       );
@@ -608,6 +823,158 @@ function generateId(
   return `go.${year}-misc-${num}`;
 }
 
+/**
+ * Best-effort resolution of a cited GO number to a `GovernmentOrder.id`,
+ * mirroring `generateId`'s scheme (`go.<year>-<deptCode>-<num>`). Returns
+ * undefined when the number is too garbled to parse a year + serial — those
+ * citations stay display-only and draw no graph edge. The returned id is a
+ * candidate: the detail page only links it after confirming the record exists,
+ * and the graph only writes an edge when the target node is present.
+ */
+function resolveReferenceId(goNumber: string): string | undefined {
+  const yearMatch = goNumber.match(/\/\s*((?:19|20)\d{2})\b/) ??
+    goNumber.match(/\b((?:19|20)\d{2})\b/);
+  const numMatch = goNumber.match(/No\.?\s*(\d+)/i) ??
+    goNumber.match(/(\d+)\s*\/\s*(?:19|20)\d{2}\b/);
+  if (!yearMatch || !numMatch) return undefined;
+  const year = yearMatch[1];
+  const num = numMatch[1];
+  const segments = goNumber.split("/");
+  const suffix = segments[segments.length - 1]?.trim().toLowerCase();
+  if (suffix && DEPT_CODE_MAP[suffix]) return `go.${year}-${suffix}-${num}`;
+  if (inferType(goNumber) === "Bill") return `go.${year}-bill-${num}`;
+  return `go.${year}-misc-${num}`;
+}
+
+/**
+ * Resolve the extractor's raw citations into `GoReference[]`: attach a candidate
+ * id where the cited number parses, drop self-citations, and dedupe (by resolved
+ * id, else by squashed number). Returns undefined when nothing usable remains so
+ * the field stays absent rather than an empty array.
+ */
+function buildReferences(
+  refs: ExtractedRef[],
+  selfId: string,
+): GoReference[] | undefined {
+  const seen = new Set<string>();
+  const out: GoReference[] = [];
+  for (const r of refs) {
+    const goId = resolveReferenceId(r.goNumber);
+    if (goId === selfId) continue; // never cite ourselves
+    const key = goId ?? squash(r.goNumber);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      goNumber: r.goNumber,
+      goId,
+      relation: r.relation,
+      note: r.note ?? undefined,
+      noteMl: r.noteMl ?? undefined,
+    });
+  }
+  return out.length ? out : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Appointment mapping (extracted appointees -> Appointment records)
+// ---------------------------------------------------------------------------
+
+/** Squash a name to lowercase alphanumerics for matching (drops initials' dots). */
+function squashName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9ഀ-ൿ]/g, "");
+}
+
+/**
+ * Confident match of an extracted appointee to a seeded `Person`. Compares the
+ * squashed English name against `Person.name` and the Malayalam name against
+ * `Person.nameMl`. Returns the Person id ONLY on an exact squashed match — never
+ * a fuzzy/substring guess — so ingest never invents a `personId`.
+ */
+export function matchPerson(
+  name: string | null,
+  nameMl: string | null,
+): string | undefined {
+  const en = name ? squashName(name) : "";
+  const ml = nameMl ? squashName(nameMl) : "";
+  if (!en && !ml) return undefined;
+  for (const p of PERSONS) {
+    if (en && squashName(p.name) === en) return p.id;
+    if (ml && p.nameMl && squashName(p.nameMl) === ml) return p.id;
+  }
+  return undefined;
+}
+
+/**
+ * Build `Appointment` records for one ingested GO. IDs are derived from the GO id
+ * (`go.2026-fin-162` -> `appt.2026-fin-162-<n>`) so re-extraction overwrites the
+ * same records. Judiciary rows default their dept to `dept.law`; everything else
+ * reuses the GO's department tag. The appointment's `termEnd` is left undefined
+ * (it opens the office); supersession of the prior holder happens in
+ * `putIngestedAppointment`.
+ */
+export function buildAppointmentsForOrder(
+  go: GovernmentOrder,
+  rows: ExtractedAppointment[],
+): Appointment[] {
+  const apptBase = go.id.replace(/^go\./, "appt.");
+  const out: Appointment[] = [];
+  rows.forEach((r, i) => {
+    const name = r.appointeeName ?? r.appointeeNameMl ?? "";
+    if (!name) return;
+    const office = r.office ?? r.officeMl ?? "";
+    const branch = r.branch ?? "bureaucratic";
+    const deptId = branch === "judiciary"
+      ? (go.deptId ?? "dept.law")
+      : go.deptId;
+    out.push({
+      id: `${apptBase}-${i}`,
+      goId: go.id,
+      appointeeName: name,
+      appointeeNameMl: r.appointeeNameMl ?? undefined,
+      personId: matchPerson(r.appointeeName, r.appointeeNameMl),
+      office: office || name,
+      officeMl: r.officeMl ?? undefined,
+      branch,
+      action: r.action ?? "appointment",
+      deptId,
+      court: r.court ?? undefined,
+      courtMl: r.courtMl ?? undefined,
+      termStart: r.effectiveDate ?? go.effectiveDate ?? go.date,
+      confidence: go.deptConfidence,
+      source: go.meta.source,
+      sourceUrl: go.meta.sourceUrl,
+      translationStatus: "machine-draft" satisfies TranslationStatus,
+      dataStatus: "unverified",
+    });
+  });
+  return out;
+}
+
+/** Persist appointments for a GO (best-effort: a failure must not fail GO ingest). */
+async function persistAppointments(
+  go: GovernmentOrder,
+  ex: Extracted,
+  log: (m: string) => void,
+): Promise<number> {
+  if (ex.category !== "appointment" || !ex.appointments?.length) return 0;
+  const appts = buildAppointmentsForOrder(go, ex.appointments);
+  let n = 0;
+  for (const a of appts) {
+    try {
+      await putIngestedAppointment(a);
+      n++;
+      log(`      ↳ appointment ${a.id}: ${a.appointeeName} — ${a.office}`);
+    } catch (e) {
+      log(
+        `      ↳ appointment ${a.id} failed: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Targeted repair of already-ingested records
 //
@@ -621,6 +988,9 @@ function generateId(
 function ingestedOrderNeedsRepair(o: GovernmentOrder): boolean {
   // Not yet re-processed by the language-aware pipeline.
   if (o.translationStatus !== "machine-draft") return true;
+  // Not yet classified for appointments — a repair pass backfills `category`
+  // and spawns any Appointment records (the retrospective categorization).
+  if (o.category === undefined) return true;
   // English subject is empty, Malayalam, or a bare GO-number echo.
   if (!o.subject || isMostlyMalayalam(o.subject)) return true;
   if (squash(o.subject) === squash(o.goNumber)) return true;
@@ -729,11 +1099,16 @@ export async function repairIngestedOrders(
         deptConfidence,
         manifestoGoalIds: ex.manifestoGoalId ? [ex.manifestoGoalId] : undefined,
         manifestoConfidence: ex.manifestoConfidence ?? undefined,
+        references: buildReferences(ex.references, o.id),
+        category: ex.category,
         meta: { ...o.meta, retrievedAt: new Date().toISOString() },
         translationStatus: "machine-draft" satisfies TranslationStatus,
       };
 
-      if (!opts.dryRun) await putIngestedGovernmentOrder(updated);
+      if (!opts.dryRun) {
+        await putIngestedGovernmentOrder(updated);
+        await persistAppointments(updated, ex, log);
+      }
       repaired++;
       log(`    ✓ repaired ${o.id}`);
     } catch (e) {
@@ -804,6 +1179,7 @@ export async function runIngest(
 
   let runOk = true;
   let groqFallbackUsed = false;
+  let nvidiaFallbackUsed = false;
   try {
     // Scrape every source up front, then process round-robin. With a single
     // global `limit`, processing sources front-to-back lets the first, highest-
@@ -840,7 +1216,7 @@ export async function runIngest(
         }
         const pdfBytes = new Uint8Array(await r.arrayBuffer());
 
-        const { extracted: ex, usedGroq } = await geminiExtract(
+        const { extracted: ex, provider } = await geminiExtract(
           pdfBytes,
           listing,
           hint,
@@ -848,7 +1224,8 @@ export async function runIngest(
           goalIds,
           log,
         );
-        if (usedGroq) groqFallbackUsed = true;
+        if (provider === "groq") groqFallbackUsed = true;
+        if (provider === "nvidia") nvidiaFallbackUsed = true;
 
         // Re-slot mis-placed languages, drop GO-number echoes, and translate
         // the missing side so `subject`/`summary` are reliably English and
@@ -882,6 +1259,8 @@ export async function runIngest(
             ? [ex.manifestoGoalId]
             : undefined,
           manifestoConfidence: ex.manifestoConfidence ?? undefined,
+          references: buildReferences(ex.references, id),
+          category: ex.category,
           meta: {
             source: "Document Portal, Government of Kerala",
             sourceUrl: listing.pdfUrl,
@@ -893,7 +1272,10 @@ export async function runIngest(
           dataStatus: "verified",
         };
 
-        if (!opts.dryRun) await putIngestedGovernmentOrder(record);
+        if (!opts.dryRun) {
+          await putIngestedGovernmentOrder(record);
+          await persistAppointments(record, ex, log);
+        }
         seenGoNumbers.add(ex.goNumber);
         seenUrls.add(listing.pdfUrl);
         addedIds.push(id);
@@ -936,9 +1318,11 @@ export async function runIngest(
     finishedAt: new Date().toISOString(),
     ok: runOk,
     trigger,
-    model: groqFallbackUsed
-      ? `${geminiModel()}+groq-fallback(${groqModel()})`
-      : geminiModel(),
+    model: [
+      geminiModel(),
+      groqFallbackUsed ? `groq-fallback(${groqModel()})` : null,
+      nvidiaFallbackUsed ? `nvidia-fallback(${nvidiaModel()})` : null,
+    ].filter(Boolean).join("+"),
     scanned,
     added: addedIds.length,
     skipped,

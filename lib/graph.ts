@@ -19,6 +19,7 @@
 
 import { kv } from "../data/db.ts";
 import type {
+  Appointment,
   Department,
   GovernmentOrder,
   GraphEdge,
@@ -261,6 +262,27 @@ export function orderNode(go: GovernmentOrder): GraphNode {
   };
 }
 
+export function appointmentNode(a: Appointment): GraphNode {
+  return {
+    id: a.id,
+    type: "appointment",
+    label: a.appointeeName,
+    labelMl: a.appointeeNameMl,
+    properties: {
+      office: a.office,
+      officeMl: a.officeMl,
+      branch: a.branch,
+      action: a.action,
+      deptId: a.deptId,
+      court: a.court,
+      courtMl: a.courtMl,
+      goId: a.goId,
+      termStart: a.termStart,
+      termEnd: a.termEnd,
+    },
+  };
+}
+
 // ----- Edge builders (entity record -> GraphEdge[]) -----------------------
 //
 // Pure projections — exported so the derivation can be unit-tested without KV.
@@ -295,8 +317,11 @@ export function ministerEdges(m: Minister): GraphEdge[] {
 }
 
 /**
- * Government order -[ISSUED_BY]-> department and -[IMPACTS]-> each manifesto
- * goal it backs. These are the edges the LLM ingest pipeline produces per order.
+ * Government order -[ISSUED_BY]-> department, -[IMPACTS]-> each manifesto goal
+ * it backs, and -[REFERENCES {relation}]-> each prior order it cites. These are
+ * the edges the LLM ingest pipeline produces per order. A REFERENCES edge is
+ * emitted only for a citation that resolved to a known order id (`ref.goId`); a
+ * self-citation is dropped.
  */
 export function orderEdges(go: GovernmentOrder): GraphEdge[] {
   const edges: GraphEdge[] = [];
@@ -316,6 +341,44 @@ export function orderEdges(go: GovernmentOrder): GraphEdge[] {
       properties: { date: go.date, confidence: go.manifestoConfidence },
     });
   }
+  for (const ref of go.references ?? []) {
+    if (!ref.goId || ref.goId === go.id) continue;
+    edges.push({
+      sourceId: go.id,
+      targetId: ref.goId,
+      type: "REFERENCES",
+      properties: { date: go.date, relation: ref.relation },
+    });
+  }
+  return edges;
+}
+
+/**
+ * Appointment -[APPOINTED_TO {tenure, branch}]-> department, -[APPOINTEE]->
+ * person (only when a confident match set `personId`), and -[EVIDENCED_BY]-> the
+ * government order that made it. The appointment node is the hub: an appointee
+ * often has no Person node, so the tenure lives on the appointment rather than on
+ * a Person → Department edge (cf. `ministerEdges`).
+ */
+export function appointmentEdges(a: Appointment): GraphEdge[] {
+  const edges: GraphEdge[] = [];
+  if (a.deptId) {
+    edges.push({
+      sourceId: a.id,
+      targetId: a.deptId,
+      type: "APPOINTED_TO",
+      properties: {
+        termStart: a.termStart,
+        termEnd: a.termEnd,
+        branch: a.branch,
+        confidence: a.confidence,
+      },
+    });
+  }
+  if (a.personId) {
+    edges.push({ sourceId: a.id, targetId: a.personId, type: "APPOINTEE" });
+  }
+  edges.push({ sourceId: a.id, targetId: a.goId, type: "EVIDENCED_BY" });
   return edges;
 }
 
@@ -336,8 +399,10 @@ async function listByPrefix<T>(prefix: Deno.KvKey): Promise<T[]> {
  * Idempotent and re-extraction-safe: the order's existing outgoing edges are
  * cleared first, so when the repair / re-ingest path changes a GO's department
  * or manifesto-goal mapping the stale `ISSUED_BY` / `IMPACTS` edges are removed
- * rather than left dangling. A GO is only ever an edge *source*, so clearing its
- * outgoing edges is sufficient.
+ * rather than left dangling. A GO owns only its *outgoing* edges (`ISSUED_BY` /
+ * `IMPACTS` / `REFERENCES`); inbound `REFERENCES` from other orders that cite
+ * this one belong to those orders' projections, so clearing this GO's outgoing
+ * edges is sufficient.
  *
  * Best-effort on link creation: an edge is written only when its target node
  * already exists (a GO ingested before its department/goal is projected won't
@@ -350,6 +415,24 @@ export async function syncOrderGraph(go: GovernmentOrder): Promise<void> {
     await deleteEdge(e.sourceId, e.type, e.targetId);
   }
   for (const e of orderEdges(go)) {
+    if (await getNode(e.targetId)) await putEdge(e, { requireNodes: false });
+  }
+}
+
+/**
+ * Project a single appointment into the graph. Same idempotent contract as
+ * `syncOrderGraph`: the appointment's outgoing edges are cleared first, so a
+ * re-extraction that changes the department / person / tenure leaves no stale
+ * `APPOINTED_TO` / `APPOINTEE` / `EVIDENCED_BY` edges. An appointment is only ever
+ * an edge source, so clearing its outgoing edges is sufficient. Each edge is
+ * written only when its target node already exists (best-effort linking).
+ */
+export async function syncAppointmentGraph(a: Appointment): Promise<void> {
+  await putNode(appointmentNode(a));
+  for (const e of await getNeighbors(a.id, "out")) {
+    await deleteEdge(e.sourceId, e.type, e.targetId);
+  }
+  for (const e of appointmentEdges(a)) {
     if (await getNode(e.targetId)) await putEdge(e, { requireNodes: false });
   }
 }
@@ -372,14 +455,16 @@ export async function buildGraph(): Promise<void> {
     for await (const entry of k.list({ prefix })) await k.delete(entry.key);
   }
 
-  const [kpis, depts, persons, ministers, goals, orders] = await Promise.all([
-    listByPrefix<Kpi>(["kpi"]),
-    listByPrefix<Department>(["dept"]),
-    listByPrefix<Person>(["person"]),
-    listByPrefix<Minister>(["minister"]),
-    listByPrefix<ManifestoGoal>(["manifesto_goal"]),
-    listByPrefix<GovernmentOrder>(["go"]),
-  ]);
+  const [kpis, depts, persons, ministers, goals, orders, appointments] =
+    await Promise.all([
+      listByPrefix<Kpi>(["kpi"]),
+      listByPrefix<Department>(["dept"]),
+      listByPrefix<Person>(["person"]),
+      listByPrefix<Minister>(["minister"]),
+      listByPrefix<ManifestoGoal>(["manifesto_goal"]),
+      listByPrefix<GovernmentOrder>(["go"]),
+      listByPrefix<Appointment>(["appointment"]),
+    ]);
 
   // Nodes.
   for (const kpi of kpis) await putNode(kpiNode(kpi));
@@ -387,12 +472,14 @@ export async function buildGraph(): Promise<void> {
   for (const p of persons) await putNode(personNode(p));
   for (const g of goals) await putNode(goalNode(g));
   for (const go of orders) await putNode(orderNode(go));
+  for (const a of appointments) await putNode(appointmentNode(a));
 
   // Edges — every endpoint node is written above, so skip the existence check.
   const edges = [
     ...kpis.flatMap(kpiEdges),
     ...ministers.flatMap(ministerEdges),
     ...orders.flatMap(orderEdges),
+    ...appointments.flatMap(appointmentEdges),
   ];
   for (const e of edges) await putEdge(e, { requireNodes: false });
 }
