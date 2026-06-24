@@ -936,60 +936,113 @@ export async function listBudgetsByFy(fy: string): Promise<Budget[]> {
 
 // ----- Seeding -----------------------------------------------------------
 
+const SEED_LOCK_KEY = ["meta", "seed_lock"] satisfies Deno.KvKey;
+/** Auto-expire so an isolate killed mid-seed can't wedge every other request. */
+const SEED_LOCK_TTL_MS = 5 * 60 * 1000;
+
 export function ensureSeeded(): Promise<void> {
   if (_seedPromise) return _seedPromise;
-  _seedPromise = (async () => {
-    const k = await kv();
-    const versionEntry = await k.get<number>(["meta", "seed_version"]);
-    if (versionEntry.value === SEED_VERSION) return;
-    await seed();
-    await k.set(["meta", "seed_version"], SEED_VERSION);
-  })();
+  // Don't cache a rejected seed for the life of the isolate — a transient
+  // failure would otherwise make every later request in this isolate re-throw.
+  // Reset on failure so the next caller retries.
+  _seedPromise = runSeedOnce().catch((err) => {
+    _seedPromise = null;
+    throw err;
+  });
   return _seedPromise;
+}
+
+async function runSeedOnce(): Promise<void> {
+  const k = await kv();
+  const seeded = async () =>
+    (await k.get<number>(["meta", "seed_version"])).value === SEED_VERSION;
+  if (await seeded()) return;
+
+  // Cross-isolate guard. On Deno Deploy many isolates cold-start at once; without
+  // this they would all wipe and rewrite KV in parallel (contention + wasted
+  // work that can blow the per-request budget). Only the lock holder reseeds; the
+  // rest poll for the version to flip, then proceed.
+  while (!(await seeded())) {
+    const lock = await k.atomic()
+      .check({ key: SEED_LOCK_KEY, versionstamp: null })
+      .set(SEED_LOCK_KEY, new Date().toISOString(), {
+        expireIn: SEED_LOCK_TTL_MS,
+      })
+      .commit();
+    if (lock.ok) {
+      try {
+        await seed();
+        await k.set(["meta", "seed_version"], SEED_VERSION);
+      } finally {
+        await k.delete(SEED_LOCK_KEY);
+      }
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+/** Max mutations per atomic commit on the bulk seed path. Deno KV allows up to
+ * 1000; we stay well under to keep each commit's total size within limits. */
+const ATOMIC_BATCH = 50;
+
+/**
+ * Delete every key under each prefix, batched into atomic commits. One awaited
+ * `delete` per key blows the per-request budget once the cron-ingested corpus
+ * grows; batching cuts the round-trips ~`ATOMIC_BATCH`×.
+ */
+async function deletePrefixes(prefixes: Deno.KvKey[]): Promise<void> {
+  const k = await kv();
+  const keys: Deno.KvKey[] = [];
+  for (const prefix of prefixes) {
+    for await (const entry of k.list({ prefix })) keys.push(entry.key);
+  }
+  for (let i = 0; i < keys.length; i += ATOMIC_BATCH) {
+    let atomic = k.atomic();
+    for (const key of keys.slice(i, i + ATOMIC_BATCH)) {
+      atomic = atomic.delete(key);
+    }
+    const res = await atomic.commit();
+    if (!res.ok) throw new Error("Batched seed delete failed");
+  }
 }
 
 export async function seed(): Promise<void> {
   const k = await kv();
-  for (
-    const prefix of [
-      ["kpi"],
-      ["kpi_by_dept"],
-      ["kpi_by_domain"],
-      ["dept"],
-      ["dept_by_minister"],
-      ["dept_by_secretary"],
-      ["minister"],
-      ["minister_by_govt"],
-      ["minister_by_person"],
-      ["secretary"],
-      ["government"],
-      ["person"],
-      ["party"],
-      ["coalition"],
-      ["coalition_by_party"],
-      ["speaker"],
-      ["speaker_by_term"],
-      ["speech"],
-      ["speech_by_person"],
-      ["speech_by_type"],
-      ["go"],
-      ["go_by_dept"],
-      ["go_by_manifesto_goal"],
-      ["manifesto_goal"],
-      ["manifesto_goal_by_govt"],
-      ["status_paper"],
-      ["budget"],
-      ["budget_by_fy"],
-      ["appointment"],
-      ["appointment_by_dept"],
-      ["appointment_by_branch"],
-      ["appointment_by_go"],
-    ] satisfies Deno.KvKey[]
-  ) {
-    for await (const entry of k.list({ prefix })) {
-      await k.delete(entry.key);
-    }
-  }
+  await deletePrefixes([
+    ["kpi"],
+    ["kpi_by_dept"],
+    ["kpi_by_domain"],
+    ["dept"],
+    ["dept_by_minister"],
+    ["dept_by_secretary"],
+    ["minister"],
+    ["minister_by_govt"],
+    ["minister_by_person"],
+    ["secretary"],
+    ["government"],
+    ["person"],
+    ["party"],
+    ["coalition"],
+    ["coalition_by_party"],
+    ["speaker"],
+    ["speaker_by_term"],
+    ["speech"],
+    ["speech_by_person"],
+    ["speech_by_type"],
+    ["go"],
+    ["go_by_dept"],
+    ["go_by_manifesto_goal"],
+    ["manifesto_goal"],
+    ["manifesto_goal_by_govt"],
+    ["status_paper"],
+    ["budget"],
+    ["budget_by_fy"],
+    ["appointment"],
+    ["appointment_by_dept"],
+    ["appointment_by_branch"],
+    ["appointment_by_go"],
+  ]);
   for (const p of PERSONS) await putPerson(p);
   for (const p of PARTIES) await putParty(p);
   for (const c of COALITION_MEMBERSHIPS) await putCoalitionMembership(c);
@@ -1008,21 +1061,42 @@ export async function seed(): Promise<void> {
   // Re-hydrate cron-ingested orders. The `["go_ingested"]` mirror is never
   // wiped above, so orders the daily cron added since the last reseed are
   // restored into `["go"]` + indexes. Fixture records win on id collision
-  // (re-applied first), but in practice ids do not overlap.
-  for await (
-    const entry of k.list<GovernmentOrder>({ prefix: ["go_ingested"] })
-  ) {
-    await putGovernmentOrder(entry.value);
+  // (re-applied first), but in practice ids do not overlap. Batched into atomic
+  // commits — this corpus grows daily and one write per order blows the budget.
+  {
+    let atomic = k.atomic();
+    let n = 0;
+    for await (
+      const entry of k.list<GovernmentOrder>({ prefix: ["go_ingested"] })
+    ) {
+      atomic = stageGovernmentOrder(atomic, entry.value);
+      if (++n % ATOMIC_BATCH === 0) {
+        await atomic.commit();
+        atomic = k.atomic();
+      }
+    }
+    if (n % ATOMIC_BATCH !== 0) await atomic.commit();
   }
 
   // Re-hydrate cron-ingested appointments the same way — the
   // `["appointment_ingested"]` mirror is never wiped, so appointments extracted
   // since the last reseed are restored into `["appointment"]` + indexes. Must run
   // before buildGraph() so their nodes exist for the graph projection.
-  for await (
-    const entry of k.list<Appointment>({ prefix: ["appointment_ingested"] })
-  ) {
-    await putAppointment(entry.value);
+  {
+    let atomic = k.atomic();
+    let n = 0;
+    for await (
+      const entry of k.list<Appointment>({ prefix: ["appointment_ingested"] })
+    ) {
+      atomic = stageAppointment(atomic, entry.value);
+      // Up to 4 mutations per appointment — keep the batch small enough that a
+      // full commit stays under the 1000-mutation cap.
+      if (++n % Math.floor(ATOMIC_BATCH / 4) === 0) {
+        await atomic.commit();
+        atomic = k.atomic();
+      }
+    }
+    if (n % Math.floor(ATOMIC_BATCH / 4) !== 0) await atomic.commit();
   }
 
   // Rebuild the derived knowledge graph from everything seeded above (including
