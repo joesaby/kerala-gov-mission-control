@@ -318,18 +318,26 @@ async function listByPrefix<T>(prefix: Deno.KvKey): Promise<T[]> {
 }
 
 /**
- * Write the graph node + relationship edges for a single government order.
+ * Write the graph node + relationship edges for a single government order, then
+ * keep them current.
  *
- * Best-effort: only creates an edge when its target node already exists in the
- * graph (so a GO ingested before its department/goal is projected doesn't dangle
- * or throw). Idempotent — re-running overwrites in place. Called by the ingest
- * pipeline for each persisted order, and by `buildGraph` during seed.
+ * Idempotent and re-extraction-safe: the order's existing outgoing edges are
+ * cleared first, so when the repair / re-ingest path changes a GO's department
+ * or manifesto-goal mapping the stale `ISSUED_BY` / `IMPACTS` edges are removed
+ * rather than left dangling. A GO is only ever an edge *source*, so clearing its
+ * outgoing edges is sufficient.
+ *
+ * Best-effort on link creation: an edge is written only when its target node
+ * already exists (a GO ingested before its department/goal is projected won't
+ * dangle or throw). Called by the ingest pipeline for each persisted order, and
+ * by `buildGraph` during seed.
  */
 export async function syncOrderGraph(go: GovernmentOrder): Promise<void> {
   await putNode(orderNode(go));
+  for (const e of await getNeighbors(go.id, "out")) {
+    await deleteEdge(e.sourceId, e.type, e.targetId);
+  }
   for (const e of orderEdges(go)) {
-    // Only link when the target node already exists, so a GO ingested before
-    // its department/goal is projected doesn't dangle or throw.
     if (await getNode(e.targetId)) await putEdge(e, { requireNodes: false });
   }
 }
