@@ -42,6 +42,7 @@ import {
 import {
   geminiExtractFromPdf,
   geminiGenerate,
+  geminiKey,
   geminiModel,
   parseJsonObject,
 } from "./gemini.ts";
@@ -446,48 +447,33 @@ function inferType(goNumber: string, hint = ""): GoOrderType {
 /** Which model actually produced an extraction (Gemini, or a fallback tier). */
 type ExtractProvider = "gemini" | "groq" | "nvidia";
 
-async function geminiExtract(
-  pdfBytes: Uint8Array,
+/**
+ * Thrown when Gemini was overloaded (5xx/429 after its own retries) AND every
+ * available text-only fallback also failed to produce a usable extraction. The
+ * document is almost always one only Gemini's PDF vision could read (a scanned
+ * image), so the caller defers it rather than recording a hard error: the record
+ * is never persisted, so the next scrape re-attempts it once Gemini recovers.
+ */
+export class GeminiOverloadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GeminiOverloadError";
+  }
+}
+
+/** Gemini 5xx/429 (overloaded/throttled) after its in-client retries. */
+function isGeminiOverload(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  return /^Gemini HTTP (429|5\d\d)/.test(m);
+}
+
+/** Parse a raw extraction JSON string into the typed `Extracted` shape. */
+function parseExtraction(
+  raw: string,
   fallback: Listing,
   hint: string,
-  goals: ManifestoGoal[],
   goalIds: Set<string>,
-  log?: (m: string) => void,
-): Promise<{ extracted: Extracted; provider: ExtractProvider }> {
-  const prompt = buildPrompt(hint, fallback, goals);
-  let raw: string;
-  let provider: ExtractProvider = "gemini";
-  try {
-    raw = await geminiExtractFromPdf(pdfBytes, prompt);
-  } catch (geminiErr) {
-    const msg = geminiErr instanceof Error
-      ? geminiErr.message
-      : String(geminiErr);
-    // Fallback chain: Gemini → GROQ → NVIDIA. Both fallbacks are text-only
-    // (they read PDF text, not the image), so they degrade on scanned GOs.
-    if (groqKey()) {
-      try {
-        log?.(`    [Gemini failed, falling back to GROQ] ${msg}`);
-        raw = await groqExtractFromPdf(pdfBytes, prompt);
-        provider = "groq";
-      } catch (groqErr) {
-        if (!nvidiaKey()) throw groqErr;
-        log?.(
-          `    [GROQ failed, falling back to NVIDIA] ${
-            groqErr instanceof Error ? groqErr.message : groqErr
-          }`,
-        );
-        raw = await nvidiaExtractFromPdf(pdfBytes, prompt);
-        provider = "nvidia";
-      }
-    } else if (nvidiaKey()) {
-      log?.(`    [Gemini failed, falling back to NVIDIA] ${msg}`);
-      raw = await nvidiaExtractFromPdf(pdfBytes, prompt);
-      provider = "nvidia";
-    } else {
-      throw geminiErr;
-    }
-  }
+): Extracted {
   const p = parseJsonObject<Record<string, unknown>>(raw);
 
   const type = hint.toLowerCase().includes("cabinet")
@@ -516,22 +502,108 @@ async function geminiExtract(
       : "general";
 
   return {
-    extracted: {
-      goNumber: (p.goNumber as string) || fallback.goNumber,
-      type,
-      date: (p.date as string) || toIso(fallback.dateStr),
-      subject: (p.subject as string) || null,
-      subjectMl: (p.subjectMl as string) || null,
-      summary: (p.summary as string) || null,
-      summaryMl: (p.summaryMl as string) || null,
-      manifestoGoalId: mappedId,
-      manifestoConfidence: conf,
-      category,
-      appointments: category === "appointment" ? appointments : null,
-      references: parseExtractedRefs(p.references),
-    },
-    provider,
+    goNumber: (p.goNumber as string) || fallback.goNumber,
+    type,
+    date: (p.date as string) || toIso(fallback.dateStr),
+    subject: (p.subject as string) || null,
+    subjectMl: (p.subjectMl as string) || null,
+    summary: (p.summary as string) || null,
+    summaryMl: (p.summaryMl as string) || null,
+    manifestoGoalId: mappedId,
+    manifestoConfidence: conf,
+    category,
+    appointments: category === "appointment" ? appointments : null,
+    references: parseExtractedRefs(p.references),
   };
+}
+
+/**
+ * True if the extraction yielded a subject we can actually display/translate:
+ * at least one language present and not a bare GO-number echo. An empty result
+ * means the tier read nothing useful, so the chain should advance to the next.
+ */
+function hasUsableSubject(ex: Extracted): boolean {
+  const squash = (v: string) => v.replace(/\s+/g, "");
+  const goNum = squash(ex.goNumber ?? "");
+  const ok = (v: string | null) => {
+    const t = v?.trim();
+    return !!t && squash(t) !== goNum;
+  };
+  return ok(ex.subject) || ok(ex.subjectMl);
+}
+
+/**
+ * Extract a GO from its PDF, walking the provider chain until one returns a
+ * usable subject: Gemini (native PDF vision) → NVIDIA NIM → GROQ.
+ *
+ * NVIDIA is tried before GROQ because GROQ's free tier caps requests at ~6k
+ * tokens/min (full GOs 413 outright) while NVIDIA's budget is far larger; GROQ
+ * stays last as an independent-quota safety net for short documents. A tier that
+ * returns no usable subject advances the chain instead of being accepted.
+ *
+ * Both fallbacks are text-only (they read extracted PDF text, not the image), so
+ * they cannot read scanned GOs. When Gemini — the only tier that could have read
+ * such a doc — was overloaded and every fallback also failed, we throw
+ * GeminiOverloadError so the caller defers rather than recording a hard error.
+ */
+async function geminiExtract(
+  pdfBytes: Uint8Array,
+  fallback: Listing,
+  hint: string,
+  goals: ManifestoGoal[],
+  goalIds: Set<string>,
+  log?: (m: string) => void,
+): Promise<{ extracted: Extracted; provider: ExtractProvider }> {
+  const prompt = buildPrompt(hint, fallback, goals);
+
+  const tiers = [
+    {
+      name: "gemini" as const,
+      available: geminiKey() !== null,
+      run: () => geminiExtractFromPdf(pdfBytes, prompt),
+    },
+    {
+      name: "nvidia" as const,
+      available: nvidiaKey() !== null,
+      run: () => nvidiaExtractFromPdf(pdfBytes, prompt),
+    },
+    {
+      name: "groq" as const,
+      available: groqKey() !== null,
+      run: () => groqExtractFromPdf(pdfBytes, prompt),
+    },
+  ].filter((t) => t.available);
+
+  let geminiOverloaded = false;
+  let lastErr: unknown = new Error("no extraction provider available");
+
+  for (const tier of tiers) {
+    let raw: string;
+    try {
+      raw = await tier.run();
+    } catch (err) {
+      lastErr = err;
+      const m = err instanceof Error ? err.message : String(err);
+      if (tier.name === "gemini" && isGeminiOverload(err)) {
+        geminiOverloaded = true;
+      }
+      log?.(`    [${tier.name} extract failed] ${m}`);
+      continue;
+    }
+    const extracted = parseExtraction(raw, fallback, hint, goalIds);
+    if (hasUsableSubject(extracted)) {
+      return { extracted, provider: tier.name };
+    }
+    lastErr = new Error("no usable subject extracted");
+    log?.(`    [${tier.name}] no usable subject — trying next tier`);
+  }
+
+  if (geminiOverloaded) {
+    throw new GeminiOverloadError(
+      "Gemini overloaded and all text fallbacks failed — deferring to next run",
+    );
+  }
+  throw lastErr;
 }
 
 // ---------------------------------------------------------------------------
@@ -985,12 +1057,28 @@ async function persistAppointments(
 // ---------------------------------------------------------------------------
 
 /** True when a stored record's bilingual fields look wrong and need re-extract. */
+/**
+ * Strong appointment signals in a subject/summary (EN + ML). Used to re-examine
+ * records misclassified `general` — e.g. a text-only fallback that captured the
+ * subject ("Order appointing X as …") but emitted no structured appointee row,
+ * so the GO never spawned its Appointment. Re-extraction (Gemini vision) recovers
+ * both the category and the row.
+ */
+function looksLikeAppointment(o: GovernmentOrder): boolean {
+  const text = `${o.subject ?? ""} ${o.summary ?? ""}`;
+  return /\bappoint|\bposting\b|\bposted as\b|\bdeputation\b|\bre-?designat/i
+    .test(text) || /നിയമന|ഡെപ്യൂട്ടേഷൻ/.test(text);
+}
+
 function ingestedOrderNeedsRepair(o: GovernmentOrder): boolean {
   // Not yet re-processed by the language-aware pipeline.
   if (o.translationStatus !== "machine-draft") return true;
   // Not yet classified for appointments — a repair pass backfills `category`
   // and spawns any Appointment records (the retrospective categorization).
   if (o.category === undefined) return true;
+  // Categorized "general" but the subject reads like an appointment — re-examine
+  // so a missed appointee row is extracted and its Appointment backfilled.
+  if (o.category === "general" && looksLikeAppointment(o)) return true;
   // English subject is empty, Malayalam, or a bare GO-number echo.
   if (!o.subject || isMostlyMalayalam(o.subject)) return true;
   if (squash(o.subject) === squash(o.goNumber)) return true;
@@ -1013,6 +1101,8 @@ export interface RepairResult {
   candidates: number;
   repaired: number;
   errors: string[];
+  /** Records deferred (Gemini overloaded + all fallbacks failed), re-tried later. */
+  deferred: string[];
 }
 
 /** Hint string for the extractor, derived from a record's properties. */
@@ -1051,6 +1141,7 @@ export async function repairIngestedOrders(
   );
 
   const errors: string[] = [];
+  const deferred: string[] = [];
   let repaired = 0;
 
   for (const o of candidates) {
@@ -1112,14 +1203,21 @@ export async function repairIngestedOrders(
       repaired++;
       log(`    ✓ repaired ${o.id}`);
     } catch (e) {
+      if (e instanceof GeminiOverloadError) {
+        deferred.push(o.id);
+        log(`    ⏳ deferred ${o.id} — Gemini overloaded, will retry`);
+        continue;
+      }
       const msg = `${o.id}: ${e instanceof Error ? e.message : e}`;
       if (errors.length < MAX_ERRORS) errors.push(msg);
       log(`    ✗ ${msg}`);
     }
   }
 
-  log(`\n[repair] done — ${repaired} repaired, ${errors.length} error(s)`);
-  return { candidates: candidates.length, repaired, errors };
+  log(
+    `\n[repair] done — ${repaired} repaired, ${errors.length} error(s), ${deferred.length} deferred`,
+  );
+  return { candidates: candidates.length, repaired, errors, deferred };
 }
 
 // ---------------------------------------------------------------------------
@@ -1166,6 +1264,7 @@ export async function runIngest(
 
   const startedAt = new Date().toISOString();
   const errors: string[] = [];
+  const deferred: string[] = [];
   const addedIds: string[] = [];
   let scanned = 0;
   let skipped = 0;
@@ -1287,6 +1386,13 @@ export async function runIngest(
           }`,
         );
       } catch (e) {
+        if (e instanceof GeminiOverloadError) {
+          deferred.push(listing.goNumber);
+          log(
+            `    ⏳ deferred ${listing.goNumber} — Gemini overloaded, retry next run`,
+          );
+          return;
+        }
         const msg = `${listing.goNumber}: ${
           e instanceof Error ? e.message : e
         }`;
@@ -1327,10 +1433,11 @@ export async function runIngest(
     added: addedIds.length,
     skipped,
     errors,
+    deferred,
     addedIds,
   };
   log(
-    `\n✓ Done — ${status.added} added, ${status.skipped} skipped, ${status.errors.length} errors.`,
+    `\n✓ Done — ${status.added} added, ${status.skipped} skipped, ${status.errors.length} errors, ${deferred.length} deferred.`,
   );
   if (!opts.dryRun) {
     await setIngestStatus(status);

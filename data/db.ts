@@ -793,6 +793,11 @@ export interface IngestStatus {
   skipped: number;
   /** Per-document error messages (capped). */
   errors: string[];
+  /**
+   * GO numbers deferred this run (Gemini overloaded + all fallbacks failed) —
+   * not persisted, re-attempted on the next run. Distinct from hard errors.
+   */
+  deferred?: string[];
   /** Ids added this run, for display. */
   addedIds: string[];
 }
