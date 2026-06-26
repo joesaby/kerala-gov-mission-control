@@ -11,6 +11,7 @@
 
 import { geminiKey } from "./gemini.ts";
 import { repairIngestedOrders, runIngest } from "./ingest.ts";
+import { releaseIngestLock, tryAcquireIngestLock } from "../data/db.ts";
 import { refreshUsdInrRate } from "./fx.ts";
 
 /** Daily at 02:30 IST (21:00 UTC the previous day). */
@@ -48,32 +49,44 @@ export function registerIngestCron(): void {
 
   registered = true;
   Deno.cron("daily-go-ingest", CRON_SCHEDULE, async () => {
+    // Serialize against any in-flight run (a previous cron that overran, or a
+    // manual admin trigger) using the same KV lock the admin endpoint uses.
+    // Without this the cron ran unlocked and could pile a second run on top of a
+    // still-running one. Skip (don't queue) if a run is already active.
+    if (!await tryAcquireIngestLock()) {
+      console.warn("[cron] daily-go-ingest skipped — a run is already active");
+      return;
+    }
     console.log("[cron] daily-go-ingest starting");
     try {
-      const status = await runIngest({
-        trigger: "cron",
-        limit: 30, // quota guard per run
-        log: (m) => console.log(`[cron] ${m}`),
-      });
-      console.log(
-        `[cron] daily-go-ingest done — added ${status.added}, skipped ${status.skipped}, errors ${status.errors.length}`,
-      );
-    } catch (e) {
-      console.error("[cron] daily-go-ingest failed:", e);
-    }
-    // Self-healing sweep: re-extract a bounded batch of already-stored records
-    // that still look degraded (kept separate so a failure never affects the
-    // fresh-order ingest above).
-    try {
-      const repair = await repairIngestedOrders({
-        limit: REPAIR_SWEEP_LIMIT,
-        log: (m) => console.log(`[cron] ${m}`),
-      });
-      console.log(
-        `[cron] daily-go-repair done — repaired ${repair.repaired}, errors ${repair.errors.length}, deferred ${repair.deferred.length}`,
-      );
-    } catch (e) {
-      console.error("[cron] daily-go-repair failed:", e);
+      try {
+        const status = await runIngest({
+          trigger: "cron",
+          limit: 30, // quota guard per run
+          log: (m) => console.log(`[cron] ${m}`),
+        });
+        console.log(
+          `[cron] daily-go-ingest done — added ${status.added}, skipped ${status.skipped}, errors ${status.errors.length}`,
+        );
+      } catch (e) {
+        console.error("[cron] daily-go-ingest failed:", e);
+      }
+      // Self-healing sweep: re-extract a bounded batch of already-stored records
+      // that still look degraded (kept separate so a failure never affects the
+      // fresh-order ingest above).
+      try {
+        const repair = await repairIngestedOrders({
+          limit: REPAIR_SWEEP_LIMIT,
+          log: (m) => console.log(`[cron] ${m}`),
+        });
+        console.log(
+          `[cron] daily-go-repair done — repaired ${repair.repaired}, errors ${repair.errors.length}, deferred ${repair.deferred.length}`,
+        );
+      } catch (e) {
+        console.error("[cron] daily-go-repair failed:", e);
+      }
+    } finally {
+      await releaseIngestLock();
     }
   });
   console.log("[cron] daily-go-ingest registered");

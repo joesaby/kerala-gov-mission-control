@@ -814,8 +814,13 @@ export async function setIngestStatus(status: IngestStatus): Promise<void> {
 }
 
 const INGEST_LOCK_KEY = ["meta", "ingest_lock"] satisfies Deno.KvKey;
-/** Auto-expire the lock so a crashed/killed run can't wedge the trigger. */
-const INGEST_LOCK_TTL_MS = 10 * 60 * 1000;
+/**
+ * Auto-expire the lock so a crashed/killed run can't wedge the trigger. Set
+ * above a normal bounded run's wall-clock (ingest 30 + repair sweep, each doc
+ * now capped by per-request fetch timeouts) so the lock can't expire mid-run and
+ * let a second run overlap — the bug behind earlier run pile-ups.
+ */
+const INGEST_LOCK_TTL_MS = 30 * 60 * 1000;
 
 /**
  * Try to claim the ingest lock. Returns false if a run is already in progress.

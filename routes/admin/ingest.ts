@@ -46,9 +46,13 @@ export const handler = define.handlers({
     let reprocess = false;
     let repair = false;
     let force = false;
+    let unlock = false;
     let sources: string[] | undefined;
     try {
       const body = await ctx.req.json();
+      // Escape hatch: force-release a stale lock (e.g. a run whose isolate was
+      // killed before its `finally` ran). Clears the lock and returns — no run.
+      unlock = body?.unlock === true;
       if (typeof body?.limit === "number") {
         limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(body.limit)));
       }
@@ -78,6 +82,11 @@ export const handler = define.handlers({
       force = body?.force === true;
     } catch {
       // no/invalid body — use defaults
+    }
+
+    if (unlock) {
+      await releaseIngestLock();
+      return Response.json({ ok: true, unlocked: true });
     }
 
     if (!await tryAcquireIngestLock()) {
