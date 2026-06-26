@@ -10,7 +10,6 @@ const NAV = [
     en: "Orders & Decisions",
     ml: "ഉത്തരവുകൾ & തീരുമാനങ്ങൾ",
   },
-  { href: "/gov/appointments", en: "Appointments", ml: "നിയമനങ്ങൾ" },
   { href: "/gov/manifesto", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
   { href: "/economy", en: "Economy", ml: "സമ്പദ്‌വ്യവസ്ഥ" },
   { href: "/research", en: "Research", ml: "ഗവേഷണം" },
