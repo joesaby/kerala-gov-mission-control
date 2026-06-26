@@ -192,6 +192,82 @@ export async function getKpiLineage(kpiId: string): Promise<KpiLineage> {
   };
 }
 
+/**
+ * One Government Order entry returned by `getKpiDepartmentOrders`.
+ *
+ * Named and typed deliberately to reflect ADMINISTRATIVE ASSOCIATION, not
+ * causal attribution: these are orders issued by the department that owns this
+ * KPI — they appear alongside the KPI's time series so the reader can see
+ * temporal co-occurrence, not proven causation.
+ */
+export interface KpiDepartmentOrder {
+  id: string;
+  goNumber: string;
+  /** English subject line. */
+  subject: string;
+  /** Malayalam subject line (present on ingested records). */
+  subjectMl?: string;
+  /** ISO date the GO was issued. */
+  date: string;
+  /** Direct link to the source PDF. */
+  sourceUrl: string;
+}
+
+/**
+ * Return Government Orders issued by the KPI's owning department (and any
+ * contributing departments), de-duplicated and sorted newest-first.
+ *
+ * This is a 2-hop join:
+ *   kpi -[OWNED_BY | CONTRIBUTES_TO]-> department <-[ISSUED_BY]- government_order
+ *
+ * The result shows ADMINISTRATIVE ASSOCIATION — orders from the department
+ * accountable for this indicator. Do NOT label these as orders that caused the
+ * KPI to move; the temporal co-occurrence is suggestive, not evidential.
+ *
+ * Returns an empty array when:
+ * - the KPI node doesn't exist in the graph, or
+ * - the KPI has no OWNED_BY / CONTRIBUTES_TO edges, or
+ * - no GOs tagged to those departments exist yet.
+ */
+export async function getKpiDepartmentOrders(
+  kpiId: string,
+): Promise<KpiDepartmentOrder[]> {
+  const k = await kv();
+
+  // Collect all department IDs this KPI relates to (owner + contributors).
+  const deptEdges = await Promise.all([
+    getNeighborsByType(kpiId, "OWNED_BY", "out"),
+    getNeighborsByType(kpiId, "CONTRIBUTES_TO", "out"),
+  ]);
+  const deptIds = [...new Set(deptEdges.flat().map((e) => e.targetId))];
+  if (deptIds.length === 0) return [];
+
+  // For each department, scan inbound ISSUED_BY edges (GO → dept).
+  const seen = new Set<string>();
+  const orders: KpiDepartmentOrder[] = [];
+
+  for (const deptId of deptIds) {
+    const issuedEdges = await getNeighborsByType(deptId, "ISSUED_BY", "in");
+    for (const edge of issuedEdges) {
+      if (seen.has(edge.sourceId)) continue;
+      seen.add(edge.sourceId);
+      const node = (await k.get<GraphNode>(["nodes", edge.sourceId])).value;
+      if (!node || node.type !== "government_order") continue;
+      orders.push({
+        id: node.id,
+        goNumber: String(node.properties?.goNumber ?? ""),
+        subject: node.label,
+        subjectMl: node.labelMl,
+        date: String(node.properties?.date ?? edge.properties?.date ?? ""),
+        sourceUrl: String(node.properties?.sourceUrl ?? ""),
+      });
+    }
+  }
+
+  // Newest first.
+  return orders.sort((a, b) => b.date.localeCompare(a.date));
+}
+
 // ----- Node builders (entity record -> GraphNode) -------------------------
 //
 // Pure projections — exported so the derivation can be unit-tested without KV.

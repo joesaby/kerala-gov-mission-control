@@ -2,7 +2,11 @@ import { HttpError, page } from "fresh";
 import { define } from "../../utils.ts";
 import { t } from "../../data/lang.ts";
 import { getDepartment, getKpi, listMinistersByPerson } from "../../data/db.ts";
-import { getKpiLineage } from "../../lib/graph.ts";
+import {
+  getKpiDepartmentOrders,
+  getKpiLineage,
+  type KpiDepartmentOrder,
+} from "../../lib/graph.ts";
 import { Header } from "../../components/Header.tsx";
 import { Footer } from "../../components/Footer.tsx";
 import { StatusBadge } from "../../components/StatusBadge.tsx";
@@ -31,6 +35,8 @@ interface Data {
   ownerDept: NamePair | null;
   minister: NamePair | null;
   impactingOrders: ImpactingOrder[];
+  /** Orders from the accountable department — administrative association, not causation. */
+  departmentOrders: KpiDepartmentOrder[];
 }
 
 export const handler = define.handlers<Data>({
@@ -41,6 +47,7 @@ export const handler = define.handlers<Data>({
     let ownerDept: NamePair | null = null;
     let minister: NamePair | null = null;
     let impactingOrders: ImpactingOrder[] = [];
+    let departmentOrders: KpiDepartmentOrder[] = [];
 
     // Primary path: traverse the knowledge graph for the accountability chain.
     try {
@@ -79,7 +86,20 @@ export const handler = define.handlers<Data>({
       if (d) ownerDept = { name: d.name, nameMl: d.nameMl, slug: d.slug };
     }
 
-    return page({ kpi, ownerDept, minister, impactingOrders });
+    // Department orders: best-effort, silent on graph miss.
+    try {
+      departmentOrders = await getKpiDepartmentOrders(kpi.id);
+    } catch {
+      // Graph unavailable — section will render empty state.
+    }
+
+    return page({
+      kpi,
+      ownerDept,
+      minister,
+      impactingOrders,
+      departmentOrders,
+    });
   },
 });
 
@@ -92,7 +112,7 @@ function fmt(n: number): string {
 
 export default define.page<typeof handler>(function KpiPage({ data, state }) {
   const lang = state.lang;
-  const { kpi, ownerDept, minister, impactingOrders } = data;
+  const { kpi, ownerDept, minister, impactingOrders, departmentOrders } = data;
 
   const title = lang === "ml" ? kpi.titleMl : kpi.title;
   const definition = lang === "ml" && kpi.meta.definitionMl
@@ -289,6 +309,69 @@ export default define.page<typeof handler>(function KpiPage({ data, state }) {
                   lang,
                   "No Government Orders are directly linked to this indicator yet. Linked decisions appear here as they are ingested and tagged.",
                   "ഈ സൂചകവുമായി നേരിട്ട് ബന്ധിപ്പിച്ച സർക്കാർ ഉത്തരവുകളൊന്നും ഇതുവരെയില്ല. ടാഗ് ചെയ്യപ്പെടുന്ന മുറയ്ക്ക് അവ ഇവിടെ കാണാം.",
+                )}
+              </p>
+            )}
+        </section>
+
+        {/* Department orders — administrative co-occurrence, NOT proven causation. */}
+        <section class="mt-8">
+          <h2 class="font-display text-lg font-semibold mb-1">
+            {t(
+              lang,
+              "Orders from the accountable department",
+              "ഉത്തരവാദ വകുപ്പിൽ നിന്നുള്ള ഉത്തരവുകൾ",
+            )}
+          </h2>
+          <p class="text-xs text-base-content/55 mb-3 italic">
+            {t(
+              lang,
+              "Co-movement, not proven causation — orders issued by the department accountable for this indicator.",
+              "സഹ-ചലനം, തെളിയിക്കപ്പെട്ട കാര്യകാരണബന്ധമല്ല — ഈ സൂചകത്തിന് ഉത്തരവാദിത്തമുള്ള വകുപ്പ് പുറപ്പെടുവിച്ച ഉത്തരവുകൾ.",
+            )}
+          </p>
+          {departmentOrders.length > 0
+            ? (
+              <ul class="flex flex-col gap-2">
+                {departmentOrders.map((o) => (
+                  <li key={o.id}>
+                    <a
+                      href={`/gov/orders/${o.id}`}
+                      class="surface-link block p-3"
+                    >
+                      <div class="flex items-center gap-3 flex-wrap">
+                        <span class="text-xs tabular-nums text-base-content/50 shrink-0">
+                          {o.date}
+                        </span>
+                        {o.goNumber && (
+                          <span class="text-xs font-mono text-base-content/40 shrink-0">
+                            {o.goNumber}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        class={`mt-0.5 ${
+                          lang === "ml" && o.subjectMl ? "ml" : ""
+                        }`}
+                      >
+                        {lang === "ml" && o.subjectMl ? o.subjectMl : o.subject}
+                      </div>
+                      {o.sourceUrl && (
+                        <span class="mt-1 text-xs text-base-content/40 block">
+                          {t(lang, "View PDF", "PDF കാണുക")} ↗
+                        </span>
+                      )}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )
+            : (
+              <p class="text-sm text-base-content/60">
+                {t(
+                  lang,
+                  "No orders from the accountable department have been ingested yet. They will appear here as the daily pipeline runs.",
+                  "ഉത്തരവാദ വകുപ്പിൽ നിന്നുള്ള ഉത്തരവുകൾ ഇതുവരെ ഇൻജസ്റ്റ് ചെയ്തിട്ടില്ല. ദൈനംദിന പൈപ്പ്‌ലൈൻ പ്രവർത്തിക്കുന്ന മുറയ്ക്ക് അവ ഇവിടെ കാണാം.",
                 )}
               </p>
             )}
