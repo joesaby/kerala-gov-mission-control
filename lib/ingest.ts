@@ -818,7 +818,7 @@ const DEPT_CODE_MAP: Record<string, string> = {
   "hfw": "dept.health-family-welfare",
   "gad": "dept.cmo",
   "gen": "dept.cmo",
-  "clad": "dept.cmo",
+  "clad": "dept.cultural-affairs",
   "lsg": "dept.local-self-government",
   "edu": "dept.general-education",
   "gedn": "dept.general-education",
@@ -834,7 +834,7 @@ const DEPT_CODE_MAP: Record<string, string> = {
   "coop": "dept.cooperation",
   "fish": "dept.fisheries-harbour",
   "pwr": "dept.power",
-  "elec": "dept.power",
+  "power": "dept.power",
   "wr": "dept.water-resources",
   "irr": "dept.water-resources",
   "sc/st": "dept.scheduled-castes-tribes-bcd",
@@ -854,9 +854,44 @@ const DEPT_CODE_MAP: Record<string, string> = {
   "port": "dept.ports",
   "yth": "dept.youth-welfare",
   "law": "dept.law",
+  // Real-world suffix variants seen in production GO numbers (the canonical
+  // codes above missed these, dropping the orders into the fuzzy fallback).
+  "lsgd": "dept.local-self-government",
+  "wcdd": "dept.women-child-development",
+  "rd": "dept.revenue",
+  "dmd": "dept.revenue", // Disaster Management — under Revenue & Disaster Mgmt
+  "wrd": "dept.water-resources",
+  "id": "dept.industries-commerce",
+  "industries": "dept.industries-commerce",
+  "lbr": "dept.labour-skills",
+  "f&p": "dept.fisheries-harbour",
+  "f&pd": "dept.fisheries-harbour",
+  "f&cs": "dept.food-civil-supplies",
+  "f&csd": "dept.food-civil-supplies",
+  "scstd": "dept.scheduled-castes-tribes-bcd",
+  "scstdd": "dept.scheduled-castes-tribes-bcd",
+  "tour": "dept.tourism",
+  "tsm": "dept.tourism",
+  "envt": "dept.environment-climate-change",
+  "env": "dept.environment-climate-change",
+  "co-op": "dept.cooperation",
+  "p&ea": "dept.planning-economic-affairs",
 };
 
-function tagDepartment(
+/**
+ * Departments whose name (EN or ML) is a common word that appears in ordinary
+ * GO prose — excluded from the subject-substring fallback to avoid false tags
+ * (e.g. "in exercise of the powers conferred…" → Power, "നിയമം" (act) → Law).
+ */
+const AMBIGUOUS_DEPT_IDS = new Set<string>([
+  "dept.law",
+  "dept.power",
+  "dept.home",
+  "dept.ports",
+  "dept.excise",
+]);
+
+export function tagDepartment(
   goNumber: string,
   subject: string,
 ): { deptId?: string; deptConfidence: DeptTagConfidence } {
@@ -867,6 +902,9 @@ function tagDepartment(
   }
   const subjectLower = subject.toLowerCase();
   for (const dept of DEPARTMENTS) {
+    // Skip departments whose name is a common word — substring-matching them
+    // against GO prose produces false tags (see AMBIGUOUS_DEPT_IDS).
+    if (AMBIGUOUS_DEPT_IDS.has(dept.id)) continue;
     if (
       subjectLower.includes(dept.name.toLowerCase()) ||
       (dept.nameMl && subjectLower.includes(dept.nameMl.toLowerCase()))

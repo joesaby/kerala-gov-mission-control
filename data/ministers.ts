@@ -26,10 +26,14 @@ import type { Minister } from "./types.ts";
 
 // ─── Shared source strings ───────────────────────────────────────────────────
 
+// Primary source: GoK General Administration (Protocol) Dept portfolio
+// notification No. Pro.5/57(2)/2026/GAD, 20 May 2026 (revised 31 May 2026).
+// Archived at web.archive.org/web/20260520151116/ and cited by Wikipedia
+// https://en.wikipedia.org/wiki/Satheesan_ministry
 const SRCS =
-  "The New Indian Express — 'Who are the new Kerala ministers? Meet the full UDF cabinet under CM Satheesan', 18 May 2026";
+  "GoK General Administration (Protocol) Dept — Portfolio Notification No. Pro.5/57(2)/2026/GAD, 20 May 2026 (revised 31 May 2026)";
 const SRCS_URL =
-  "https://www.newindianexpress.com/states/kerala/2026/May/18/kerala-new-ministers-list-vd-satheesan-udf-cabinet-profiles";
+  "https://document.kerala.gov.in/documents/notifications/notification2005202618:21:17.pdf";
 const SRC2 = "Wikipedia — Second Vijayan ministry";
 const SRC2_URL = "https://en.wikipedia.org/wiki/Second_Vijayan_ministry";
 const SRC1 = "Wikipedia — First Pinarayi Vijayan ministry";
@@ -56,7 +60,16 @@ const SATHEESAN: Minister[] = [
     rank: "CM",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.cmo", "dept.finance", "dept.law", "dept.ports"],
+    // CM portfolios per GAD notification: Finance, Law, Ports, Planning,
+    // General Administration, Science & Technology, Disaster Management,
+    // NORKA, Metro Rail, Information & Public Relations (key portfolios listed).
+    departmentIds: [
+      "dept.cmo",
+      "dept.finance",
+      "dept.law",
+      "dept.ports",
+      "dept.planning-economic-affairs",
+    ],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/VD_Satheesan.jpg/120px-VD_Satheesan.jpg",
     photoCredit: "Wikimedia Commons / GODL-India",
@@ -76,7 +89,9 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.power", "dept.devaswom"],
+    // Health & Family Welfare, Medical Education, Indigenous Medicine, Ayush,
+    // Drugs Control, Food Safety, Devaswom — per GAD notification.
+    departmentIds: ["dept.health-family-welfare", "dept.devaswom"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Muraleedharan.jpg/120px-Muraleedharan.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -109,13 +124,15 @@ const SATHEESAN: Minister[] = [
     slug: "t-siddique",
     personId: "person.t-siddique",
     name: "T Siddique",
-    nameMl: "ടി. സിദ്ധിഖ്",
+    nameMl: "ടി. സിദ്ദിഖ്",
     constituency: "Kalpetta",
     party: "INC",
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.forest-wildlife"],
+    // Agriculture, Soil Survey & Soil Conservation, Kerala Agricultural
+    // University, Warehousing Corporation — per GAD notification.
+    departmentIds: ["dept.agriculture-farmers-welfare"],
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",
@@ -131,7 +148,8 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.health-family-welfare"],
+    // Land Revenue, Survey and Land Records, Land Reforms — per GAD notification.
+    departmentIds: ["dept.revenue"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/A.P._Anil_Kumar.JPG/120px-A.P._Anil_Kumar.JPG",
     photoCredit: "Wikimedia Commons / CC BY-SA 3.0",
@@ -150,7 +168,8 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.excise"],
+    // Excise + Co-operation — per GAD notification.
+    departmentIds: ["dept.excise", "dept.cooperation"],
     source: SRCS,
     sourceUrl: SRCS_URL,
     dataStatus: "verified",
@@ -166,7 +185,8 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.agriculture-farmers-welfare"],
+    // Forests & Wildlife Protection, Skill Development, KASE — per GAD notification.
+    departmentIds: ["dept.forest-wildlife", "dept.labour-skills"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Shibu-Baby-John.jpg/120px-Shibu-Baby-John.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 3.0",
@@ -185,7 +205,13 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.women-child-development"],
+    // Labour, Dairy Development, Women & Child Development, Animal Husbandry
+    // — per GAD notification (post-reshuffle 31 May 2026).
+    departmentIds: [
+      "dept.labour-skills",
+      "dept.women-child-development",
+      "dept.animal-husbandry",
+    ],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/BinduKrishnaMLA.png/120px-BinduKrishnaMLA.png",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -205,7 +231,9 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.general-education"],
+    // General Education, Literacy Movement, Waqf/Haj Pilgrimage, Minority
+    // Welfare — per GAD notification.
+    departmentIds: ["dept.general-education", "dept.minority-welfare"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/N_Shamsudheen.jpg/120px-N_Shamsudheen.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -260,6 +288,8 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
+    // Sports, Youth Affairs, Zoos, Museum, Registration, Archaeology, Archives
+    // — per GAD notification.
     departmentIds: ["dept.youth-welfare"],
     source: SRCS,
     sourceUrl: SRCS_URL,
@@ -270,13 +300,14 @@ const SATHEESAN: Minister[] = [
     slug: "cp-john",
     personId: "person.cp-john",
     name: "C P John",
-    nameMl: "സി.പി. ജോൻ",
+    nameMl: "സി.പി. ജോൺ",
     constituency: "Thiruvananthapuram",
     party: "CMP",
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.labour-skills"],
+    // Road Transport, Motor Vehicles, Water Transport — per GAD notification.
+    departmentIds: ["dept.transport"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/C.P.John.jpg/120px-C.P.John.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -296,7 +327,9 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.cooperation", "dept.cultural-affairs"],
+    // Tourism, Cultural Affairs, KSFDC, Kerala Chalachithra Academy
+    // — per GAD notification.
+    departmentIds: ["dept.tourism", "dept.cultural-affairs"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/APJPCV.jpg/120px-APJPCV.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -327,10 +360,11 @@ const SATHEESAN: Minister[] = [
     name: "Anoop Jacob",
     nameMl: "അനൂപ് ജേക്കബ്",
     constituency: "Piravom",
-    party: "KC",
+    party: "KC(J)",
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
+    // Food, Civil Supplies, Consumer Affairs, Legal Metrology — per GAD notification.
     departmentIds: ["dept.food-civil-supplies"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Anoop_jacob.JPG/120px-Anoop_jacob.JPG",
@@ -350,7 +384,9 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.transport"],
+    // Collegiate Education, Technical Education, Universities, Entrance
+    // Examination, NCC, ASAP Kerala — per GAD notification.
+    departmentIds: ["dept.higher-education"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Roji_M_John_at_Kodussery_IMG_20260326_160534972_%28cropped%29.jpg/120px-Roji_M_John_at_Kodussery_IMG_20260326_160534972_%28cropped%29.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -385,7 +421,8 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.minority-welfare"],
+    // Fisheries, Harbour Engineering, Social Justice — per GAD notification.
+    departmentIds: ["dept.fisheries-harbour", "dept.social-justice"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/VE_Abdul_Gafoor.jpg/120px-VE_Abdul_Gafoor.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",
@@ -423,7 +460,8 @@ const SATHEESAN: Minister[] = [
     rank: "Cabinet",
     governmentId: "govt.satheesan-1",
     termStart: "2026-05-18",
-    departmentIds: ["dept.revenue"],
+    // Electricity, Environment, Parliamentary Affairs, ANERT — per GAD notification.
+    departmentIds: ["dept.power", "dept.environment-climate-change"],
     photoUrl:
       "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/SUNNYJOSEPHMLA.jpg/120px-SUNNYJOSEPHMLA.jpg",
     photoCredit: "Wikimedia Commons / CC BY-SA 4.0",

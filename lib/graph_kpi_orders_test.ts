@@ -1,10 +1,11 @@
 /**
  * Unit tests for `getKpiDepartmentOrders` — the 2-hop KPI → dept → GO join.
  *
- * Uses an in-memory Deno KV instance populated manually so no running server
- * or seeded database is required.  The module-level `kv` singleton in db.ts
- * is replaced for the duration of this test file by writing nodes and edges
- * directly into an isolated store via the graph write primitives.
+ * Writes nodes and edges directly via the graph write primitives. Fixtures use
+ * synthetic ids (`dept.test-*`, `test.kpi-*`) that cannot collide with real
+ * seeded fixtures — otherwise, on a machine whose local Deno KV already holds
+ * real data, the dept→GO join would pick up real orders and break the
+ * order-sensitive assertions.
  */
 import {
   getKpiDepartmentOrders,
@@ -27,7 +28,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 const DEPT_FINANCE: Department = {
-  id: "dept.finance",
+  id: "dept.test-finance",
   slug: "finance",
   name: "Finance",
   nameMl: "ധനകാര്യം",
@@ -36,7 +37,7 @@ const DEPT_FINANCE: Department = {
 };
 
 const DEPT_HEALTH: Department = {
-  id: "dept.health",
+  id: "dept.test-health",
   slug: "health",
   name: "Health & Family Welfare",
   nameMl: "ആരോഗ്യം",
@@ -45,11 +46,11 @@ const DEPT_HEALTH: Department = {
 };
 
 const KPI_OWNED_BY_FINANCE: Kpi = {
-  id: "fiscal.debt-to-gsdp",
+  id: "test.kpi-fin",
   title: "Debt to GSDP",
   titleMl: "കടം / ജി.എസ്.ഡി.പി",
   domain: "fiscal",
-  ownerDeptId: "dept.finance",
+  ownerDeptId: "dept.test-finance",
   value: 36.4,
   unit: "%",
   direction: "lower-better",
@@ -72,8 +73,8 @@ const KPI_OWNED_BY_FINANCE: Kpi = {
 /** A KPI owned by Finance AND contributed to by Health — tests the contributor path. */
 const KPI_WITH_CONTRIBUTOR: Kpi = {
   ...KPI_OWNED_BY_FINANCE,
-  id: "fiscal.debt-multi",
-  contributingDeptIds: ["dept.health"],
+  id: "test.kpi-multi",
+  contributingDeptIds: ["dept.test-health"],
 };
 
 const GO_FROM_FINANCE_1: GovernmentOrder = {
@@ -82,7 +83,7 @@ const GO_FROM_FINANCE_1: GovernmentOrder = {
   type: "P",
   subject: "Release of KIIFB capital grant",
   subjectMl: "കിഫ്ബി മൂലധന ഗ്രാന്റ് അനുവദിക്കൽ",
-  deptId: "dept.finance",
+  deptId: "dept.test-finance",
   deptConfidence: "high",
   date: "2026-04-10",
   manifestoGoalIds: [],
@@ -100,7 +101,7 @@ const GO_FROM_FINANCE_2: GovernmentOrder = {
   type: "Ms",
   subject: "State budget allocation for infrastructure",
   subjectMl: "അടിസ്ഥാന സൗകര്യ വികസനത്തിനുള്ള ബജറ്റ് വകയിരുത്തൽ",
-  deptId: "dept.finance",
+  deptId: "dept.test-finance",
   deptConfidence: "high",
   date: "2025-08-20",
   manifestoGoalIds: [],
@@ -118,7 +119,7 @@ const GO_FROM_HEALTH: GovernmentOrder = {
   type: "Ms",
   subject: "PMJAY insurance scheme renewal",
   subjectMl: "പിഎം-ജെഎവൈ ഇൻഷ്വറൻസ് നവീകരണം",
-  deptId: "dept.health",
+  deptId: "dept.test-health",
   deptConfidence: "high",
   date: "2026-01-15",
   manifestoGoalIds: [],
