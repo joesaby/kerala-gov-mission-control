@@ -58,6 +58,19 @@ function durationS(a: string, b: string): number {
   );
 }
 
+/** Per-tier extraction breakdown, e.g. "gemini 4 · openrouter 2". */
+function byModel(pc: IngestStatus["providerCounts"]): string {
+  if (!pc) return "—";
+  const parts = ([
+    ["gemini", pc.gemini ?? 0],
+    ["openrouter", pc.openrouter ?? 0],
+    ["nvidia", pc.nvidia ?? 0],
+  ] as const)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${k} ${n}`);
+  return parts.length ? parts.join(" · ") : "—";
+}
+
 export default define.page<typeof handler>(function AdminPage({ data }) {
   const { status, runs, log, recent, running } = data;
 
@@ -110,8 +123,13 @@ export default define.page<typeof handler>(function AdminPage({ data }) {
                 <Row k="Outcome" v={status.ok ? "ok" : "errored"} />
                 <Row
                   k="Counts"
-                  v={`+${status.added} · skip ${status.skipped} · scan ${status.scanned} · err ${status.errors.length}`}
+                  v={`+${status.added} · skip ${status.skipped} · scan ${status.scanned} · err ${status.errors.length}${
+                    status.deferred?.length
+                      ? ` · defer ${status.deferred.length}`
+                      : ""
+                  }`}
                 />
+                <Row k="Extracted by" v={byModel(status.providerCounts)} />
               </div>
               {status.addedIds.length > 0 && (
                 <p class="mt-2 text-xs text-base-content/60 break-words">
@@ -169,6 +187,7 @@ export default define.page<typeof handler>(function AdminPage({ data }) {
                     <th class="text-right">Added</th>
                     <th class="text-right">Skipped</th>
                     <th class="text-right">Errors</th>
+                    <th>By model</th>
                     <th>OK</th>
                   </tr>
                 </thead>
@@ -187,6 +206,9 @@ export default define.page<typeof handler>(function AdminPage({ data }) {
                         }`}
                       >
                         {r.errors.length}
+                      </td>
+                      <td class="text-xs text-base-content/60 whitespace-nowrap">
+                        {byModel(r.providerCounts)}
                       </td>
                       <td>{r.ok ? "✓" : "✗"}</td>
                     </tr>

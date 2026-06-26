@@ -783,8 +783,10 @@ export interface IngestStatus {
   ok: boolean;
   /** What kicked off the run. */
   trigger: "cron" | "manual";
-  /** Gemini model used. */
+  /** Full model string, incl. which fallback tiers were used. */
   model: string;
+  /** How many orders each provider tier successfully extracted this run. */
+  providerCounts?: { gemini?: number; openrouter?: number; nvidia?: number };
   /** Listings scanned across all sources. */
   scanned: number;
   /** New orders written this run. */

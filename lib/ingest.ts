@@ -47,11 +47,11 @@ import {
   parseJsonObject,
 } from "./gemini.ts";
 import {
-  groqExtractFromPdf,
-  groqGenerate,
-  groqKey,
-  groqModel,
-} from "./groq.ts";
+  openrouterExtractFromPdf,
+  openrouterGenerate,
+  openrouterKey,
+  openrouterModel,
+} from "./openrouter.ts";
 import {
   nvidiaExtractFromPdf,
   nvidiaGenerate,
@@ -445,7 +445,7 @@ function inferType(goNumber: string, hint = ""): GoOrderType {
 }
 
 /** Which model actually produced an extraction (Gemini, or a fallback tier). */
-type ExtractProvider = "gemini" | "groq" | "nvidia";
+type ExtractProvider = "gemini" | "openrouter" | "nvidia";
 
 /**
  * Thrown when Gemini was overloaded (5xx/429 after its own retries) AND every
@@ -534,17 +534,18 @@ function hasUsableSubject(ex: Extracted): boolean {
 
 /**
  * Extract a GO from its PDF, walking the provider chain until one returns a
- * usable subject: Gemini (native PDF vision) → NVIDIA NIM → GROQ.
+ * usable subject: Gemini (native PDF vision) → OpenRouter → NVIDIA NIM.
  *
- * NVIDIA is tried before GROQ because GROQ's free tier caps requests at ~6k
- * tokens/min (full GOs 413 outright) while NVIDIA's budget is far larger; GROQ
- * stays last as an independent-quota safety net for short documents. A tier that
- * returns no usable subject advances the chain instead of being accepted.
+ * OpenRouter is the first fallback because it routes to a native-PDF-vision
+ * model (gemini-2.5-flash-lite) — it reads scanned GOs the text-only tier
+ * cannot, and has no 20-req/day free-tier wall. NVIDIA NIM stays last as a
+ * text-only, independent-quota safety net. A tier that returns no usable subject
+ * advances the chain instead of being accepted.
  *
- * Both fallbacks are text-only (they read extracted PDF text, not the image), so
- * they cannot read scanned GOs. When Gemini — the only tier that could have read
- * such a doc — was overloaded and every fallback also failed, we throw
- * GeminiOverloadError so the caller defers rather than recording a hard error.
+ * The NVIDIA tier is text-only (reads extracted PDF text, not the image), so it
+ * cannot read scanned GOs. When Gemini was overloaded and every fallback also
+ * failed, we throw GeminiOverloadError so the caller defers rather than recording
+ * a hard error.
  */
 async function geminiExtract(
   pdfBytes: Uint8Array,
@@ -563,14 +564,14 @@ async function geminiExtract(
       run: () => geminiExtractFromPdf(pdfBytes, prompt),
     },
     {
+      name: "openrouter" as const,
+      available: openrouterKey() !== null,
+      run: () => openrouterExtractFromPdf(pdfBytes, prompt),
+    },
+    {
       name: "nvidia" as const,
       available: nvidiaKey() !== null,
       run: () => nvidiaExtractFromPdf(pdfBytes, prompt),
-    },
-    {
-      name: "groq" as const,
-      available: groqKey() !== null,
-      run: () => groqExtractFromPdf(pdfBytes, prompt),
     },
   ].filter((t) => t.available);
 
@@ -663,7 +664,7 @@ function isGoNumberEcho(
   return /^g?o?[a-z]{0,3}\d+\d{4}[a-z&]+$/.test(s);
 }
 
-/** Translate a short text (Gemini → GROQ → NVIDIA fallback chain). */
+/** Translate a short text (Gemini → OpenRouter → NVIDIA fallback chain). */
 async function translateText(
   text: string,
   target: "English" | "Malayalam",
@@ -687,14 +688,14 @@ async function translateText(
       }`,
     );
   }
-  if (groqKey()) {
+  if (openrouterKey()) {
     try {
-      const raw = await groqGenerate(sys, user);
+      const raw = await openrouterGenerate(sys, user);
       const t = parseJsonObject<{ translation?: unknown }>(raw).translation;
       if (typeof t === "string" && t.trim()) return t.trim();
     } catch (e) {
       log?.(
-        `    [translate→${target} via GROQ failed] ${
+        `    [translate→${target} via OpenRouter failed] ${
           e instanceof Error ? e.message : e
         }`,
       );
@@ -1277,8 +1278,11 @@ export async function runIngest(
   const goalIds = new Set(goals.map((g) => g.id));
 
   let runOk = true;
-  let groqFallbackUsed = false;
-  let nvidiaFallbackUsed = false;
+  const providerCounts: Record<ExtractProvider, number> = {
+    gemini: 0,
+    openrouter: 0,
+    nvidia: 0,
+  };
   try {
     // Scrape every source up front, then process round-robin. With a single
     // global `limit`, processing sources front-to-back lets the first, highest-
@@ -1323,8 +1327,7 @@ export async function runIngest(
           goalIds,
           log,
         );
-        if (provider === "groq") groqFallbackUsed = true;
-        if (provider === "nvidia") nvidiaFallbackUsed = true;
+        providerCounts[provider]++;
 
         // Re-slot mis-placed languages, drop GO-number echoes, and translate
         // the missing side so `subject`/`summary` are reliably English and
@@ -1426,9 +1429,12 @@ export async function runIngest(
     trigger,
     model: [
       geminiModel(),
-      groqFallbackUsed ? `groq-fallback(${groqModel()})` : null,
-      nvidiaFallbackUsed ? `nvidia-fallback(${nvidiaModel()})` : null,
+      providerCounts.openrouter > 0
+        ? `openrouter-fallback(${openrouterModel()})`
+        : null,
+      providerCounts.nvidia > 0 ? `nvidia-fallback(${nvidiaModel()})` : null,
     ].filter(Boolean).join("+"),
+    providerCounts,
     scanned,
     added: addedIds.length,
     skipped,

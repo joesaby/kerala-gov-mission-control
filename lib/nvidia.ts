@@ -3,17 +3,17 @@
  *
  * Like GROQ, NVIDIA's hosted models are OpenAI-compatible chat (text in, text
  * out) and cannot read PDFs natively the way Gemini does. So this module first
- * extracts readable text from the PDF bytes (reusing `extractPdfText` from
- * groq.ts — effective for digitally-generated Kerala GOs, empty for scanned
- * images) and sends that text + the instruction prompt as a chat completion
- * against the OpenAI-compatible endpoint.
+ * extracts readable text from the PDF bytes (`extractPdfText` from pdf-text.ts —
+ * effective for digitally-generated Kerala GOs, empty for scanned images) and
+ * sends that text + the instruction prompt as a chat completion against the
+ * OpenAI-compatible endpoint.
  *
  * Auth: NVIDIA_KEY in env (matches the Deno Deploy secret name).
  * Model: meta/llama-3.3-70b-instruct by default (override with NVIDIA_MODEL) —
  * confirm the exact current tag against https://build.nvidia.com/models.
  */
 
-import { extractPdfText } from "./groq.ts";
+import { extractPdfText } from "./pdf-text.ts";
 
 const NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 const DEFAULT_MODEL = "meta/llama-3.3-70b-instruct";

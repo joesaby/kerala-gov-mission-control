@@ -143,13 +143,18 @@ filesystem — so it runs unchanged inside Deno Deploy:
    and returns `goNumber/type/date/subject(+Ml)`, the manifesto goal it backs,
    **and** a `category` (`appointment` vs `general`) with a structured
    `appointments[]` list when the order appoints/transfers/posts named office
-   holders — all in one call. **Fallback chain (Gemini → GROQ → NVIDIA):** If
-   Gemini fails or hits a quota/limit, the pipeline falls back to **GROQ**
-   (`lib/groq.ts`, `qwen/qwen3-32b`) when `GROQ_API_KEY` is set, then to
-   **NVIDIA NIM** (`lib/nvidia.ts`, `meta/llama-3.3-70b-instruct`) when
-   `NVIDIA_KEY` is set. Both fallbacks are text-only — they extract readable
-   text from the PDF bytes in memory (`extractPdfText`), so they degrade on
-   scanned/image-only GOs that Gemini's native PDF vision would still read.
+   holders — all in one call. **Fallback chain (Gemini → OpenRouter → NVIDIA):**
+   If Gemini fails or hits a quota/limit, the pipeline falls back to
+   **OpenRouter** (`lib/openrouter.ts`, `google/gemini-2.5-flash-lite`) when
+   `OPENROUTER_API_KEY` is set, then to **NVIDIA NIM** (`lib/nvidia.ts`,
+   `meta/llama-3.3-70b-instruct`) when `NVIDIA_KEY` is set. OpenRouter reads the
+   PDF **natively** (a vision model, sent as a base64 `file` part) and has no
+   20-req/day free-tier wall, so it handles scanned/image-only GOs too. The
+   NVIDIA tier is text-only — it extracts readable text from the PDF bytes in
+   memory (`extractPdfText` in `lib/pdf-text.ts`), so it degrades on scanned GOs
+   that only native PDF vision can read. (GROQ — `lib/groq.ts` — is no longer in
+   the extraction chain; it is retained as a fast text-only client for other
+   pipeline stages such as graph inference.)
 3. **Persist** via `putIngestedGovernmentOrder` → writes `["go", id]` + indexes
    **and** a durable mirror `["go_ingested", id]`. Appointment GOs additionally
    spawn `Appointment` records (`putIngestedAppointment`, dept-mapped + tenure
@@ -167,16 +172,18 @@ fixture. So cron-ingested orders survive reseeds. `data/government-orders.ts` is
 just a small static baseline (only orders with a verified, resolvable PDF) — do
 **not** add speculative records with guessed URLs; the cron fills the rest.
 
-`GEMINI_API_KEY` (and optional `GROQ_API_KEY` / `NVIDIA_KEY` for the fallback
-chain) must be set in Deno Deploy env (and `.env` for local CLI runs). Note:
-`gemini-2.0-flash` has a zero free-tier quota on the project key — use
+`GEMINI_API_KEY` (and optional `OPENROUTER_API_KEY` / `NVIDIA_KEY` for the
+fallback chain) must be set in Deno Deploy env (and `.env` for local CLI runs).
+Note: `gemini-2.0-flash` has a zero free-tier quota on the project key — use
 `gemini-flash-latest` (the default; override with `GEMINI_MODEL`). Override the
-GROQ fallback model with `GROQ_MODEL` (defaults to `qwen/qwen3-32b`) and the
+OpenRouter fallback model with `OPENROUTER_MODEL` (defaults to
+`google/gemini-2.5-flash-lite`; native PDF, ~$0.10/$0.40 per 1M tok) and the
 NVIDIA NIM fallback model with `NVIDIA_MODEL` (defaults to
 `meta/llama-3.3-70b-instruct`; ~40 RPM free tier, confirm the tag against
-build.nvidia.com). The run-status `model` string records which fallback tiers
-were used (e.g.
-`gemini-flash-latest+nvidia-fallback(meta/llama-3.3-70b-instruct)`).
+build.nvidia.com — avoid reasoning models like `sarvamai/sarvam-m`, which emit
+hidden think tokens and return empty/timeout for bulk extraction). The
+run-status `model` string records which fallback tiers were used (e.g.
+`gemini-flash-latest+openrouter-fallback(google/gemini-2.5-flash-lite)`).
 
 Manual runs / backfills:
 `deno task ingest-gos [--since YYYY-MM-DD] [--limit N]
