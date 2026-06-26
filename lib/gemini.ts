@@ -39,6 +39,8 @@ interface GenerateOptions {
   temperature?: number;
   /** Max 429 retries before giving up. Default 4. */
   maxRetries?: number;
+  /** Per-request wall-clock cap (ms) so a hung endpoint can't wedge a run. */
+  timeoutMs?: number;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -62,7 +64,8 @@ export async function geminiGenerate(
   const key = geminiKey();
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
-  const { json = true, temperature = 0, maxRetries = 4 } = opts;
+  const { json = true, temperature = 0, maxRetries = 4, timeoutMs = 120_000 } =
+    opts;
   const url = `${ENDPOINT}/${geminiModel()}:generateContent`;
   const payload = {
     contents: [{ parts }],
@@ -76,11 +79,28 @@ export async function geminiGenerate(
   // Cap total backoff so a daily cron run can't hang for minutes.
   const MAX_BACKOFF_S = 60;
   while (true) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      const timedOut = e instanceof DOMException && e.name === "TimeoutError";
+      if (attempt >= maxRetries) {
+        throw new Error(
+          timedOut
+            ? `Gemini timeout after ${timeoutMs}ms`
+            : `Gemini fetch error: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+      const backoff = Math.min(2 ** attempt, MAX_BACKOFF_S);
+      attempt++;
+      await sleep(backoff * 1000);
+      continue;
+    }
 
     if (res.ok) {
       const data = await res.json();

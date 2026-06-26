@@ -31,6 +31,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 interface NvidiaOptions {
   maxRetries?: number;
   temperature?: number;
+  /**
+   * Per-request wall-clock cap (ms). NVIDIA NIM can hang ~20 min before 504ing;
+   * without this an unresponsive endpoint wedges the whole ingest run. Default
+   * 60s — the text-only llama call should return well inside that.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -48,7 +54,7 @@ export async function nvidiaGenerate(
   const key = nvidiaKey();
   if (!key) throw new Error("NVIDIA_KEY is not set");
 
-  const { maxRetries = 3, temperature = 0 } = opts;
+  const { maxRetries = 3, temperature = 0, timeoutMs = 60_000 } = opts;
   const payload = {
     model: nvidiaModel(),
     messages: [
@@ -63,14 +69,33 @@ export async function nvidiaGenerate(
   let attempt = 0;
   const MAX_BACKOFF_S = 30;
   while (true) {
-    const res = await fetch(NVIDIA_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${key}`,
-      },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch(NVIDIA_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      // Timeout (AbortSignal) or network error — bounded-retryable so a hung
+      // endpoint can't stall the run indefinitely.
+      const timedOut = e instanceof DOMException && e.name === "TimeoutError";
+      if (attempt >= maxRetries) {
+        throw new Error(
+          timedOut
+            ? `NVIDIA timeout after ${timeoutMs}ms`
+            : `NVIDIA fetch error: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+      const backoff = Math.min(2 ** attempt, MAX_BACKOFF_S);
+      attempt++;
+      await sleep(backoff * 1000);
+      continue;
+    }
 
     if (res.ok) {
       const data = await res.json();

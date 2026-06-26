@@ -42,6 +42,8 @@ function toBase64(bytes: Uint8Array): string {
 interface OpenRouterOptions {
   maxRetries?: number;
   temperature?: number;
+  /** Per-request wall-clock cap (ms) so a hung endpoint can't wedge a run. */
+  timeoutMs?: number;
 }
 
 /** A single content part of an OpenAI-compatible user message. */
@@ -63,7 +65,7 @@ export async function openrouterGenerate(
   const key = openrouterKey();
   if (!key) throw new Error("OPENROUTER_API_KEY is not set");
 
-  const { maxRetries = 3, temperature = 0 } = opts;
+  const { maxRetries = 3, temperature = 0, timeoutMs = 120_000 } = opts;
   const payload = {
     model: openrouterModel(),
     messages: [
@@ -77,17 +79,34 @@ export async function openrouterGenerate(
   let attempt = 0;
   const MAX_BACKOFF_S = 30;
   while (true) {
-    const res = await fetch(OPENROUTER_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${key}`,
-        // Optional attribution headers used by OpenRouter for ranking.
-        "HTTP-Referer": "https://kerala-mission-control.deno.dev",
-        "X-Title": "Kerala Mission Control",
-      },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch(OPENROUTER_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`,
+          // Optional attribution headers used by OpenRouter for ranking.
+          "HTTP-Referer": "https://kerala-mission-control.deno.dev",
+          "X-Title": "Kerala Mission Control",
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      const timedOut = e instanceof DOMException && e.name === "TimeoutError";
+      if (attempt >= maxRetries) {
+        throw new Error(
+          timedOut
+            ? `OpenRouter timeout after ${timeoutMs}ms`
+            : `OpenRouter fetch error: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+      const backoff = Math.min(2 ** attempt, MAX_BACKOFF_S);
+      attempt++;
+      await sleep(backoff * 1000);
+      continue;
+    }
 
     if (res.ok) {
       const data = await res.json();
