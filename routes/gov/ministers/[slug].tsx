@@ -13,7 +13,7 @@ import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
 import { MinisterAvatar } from "../../../components/MinisterAvatar.tsx";
-import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
+import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
 import type { EgoGroup } from "../../../lib/ego-layout.ts";
 import type {
@@ -258,7 +258,7 @@ export default define.page<typeof handler>(function MinisterPage(
               : "Orders & Circulars under Portfolio"}
           </h2>
           <div class="max-w-4xl">
-            <GovernmentOrderList orders={orders} depts={allDepts} lang={lang} />
+            <OrdersBrowser orders={orders} depts={allDepts} lang={lang} />
           </div>
         </section>
 

@@ -13,6 +13,14 @@ interface Props {
   orders: GovernmentOrder[];
   depts: DeptLite[];
   lang: "en" | "ml";
+  /** Hide the type dropdown — for mono-type lanes (e.g. Cabinet decisions). */
+  hideTypeFilter?: boolean;
+  /** Hide the department dropdown — for single-department pages. */
+  hideDeptFilter?: boolean;
+  /** Hide the per-row department link — redundant on a single-department page. */
+  hideDeptColumn?: boolean;
+  /** Noun used in the result count (defaults to "orders"). */
+  unit?: { en: string; ml: string };
 }
 
 const TYPE_LABEL: Record<string, { en: string; ml: string; class: string }> = {
@@ -29,7 +37,17 @@ function t(lang: "en" | "ml", en: string, ml: string): string {
   return lang === "ml" ? ml : en;
 }
 
-export default function OrdersBrowser({ orders, depts, lang }: Props) {
+export default function OrdersBrowser(
+  {
+    orders,
+    depts,
+    lang,
+    hideTypeFilter = false,
+    hideDeptFilter = false,
+    hideDeptColumn = false,
+    unit = { en: "orders", ml: "ഉത്തരവുകൾ" },
+  }: Props,
+) {
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
   const [type, setType] = useState("all");
@@ -133,39 +151,45 @@ export default function OrdersBrowser({ orders, depts, lang }: Props) {
           />
         </label>
 
-        <select
-          value={dept}
-          onChange={(e) => setDept((e.target as HTMLSelectElement).value)}
-          class="select select-sm select-bordered max-w-[12rem]"
-        >
-          <option value="all">
-            {t(lang, "All departments", "എല്ലാ വകുപ്പുകൾ")}
-          </option>
-          {deptOptions.map((d) => (
-            <option key={d.id} value={d.id}>
-              {lang === "ml" && d.nameMl ? d.nameMl : d.name}
+        {!hideDeptFilter && (
+          <select
+            value={dept}
+            onChange={(e) => setDept((e.target as HTMLSelectElement).value)}
+            class="select select-sm select-bordered max-w-[12rem]"
+          >
+            <option value="all">
+              {t(lang, "All departments", "എല്ലാ വകുപ്പുകൾ")}
             </option>
-          ))}
-          <option value="untagged">{t(lang, "Untagged", "ടാഗ് ഇല്ലാത്തവ")}</option>
-        </select>
+            {deptOptions.map((d) => (
+              <option key={d.id} value={d.id}>
+                {lang === "ml" && d.nameMl ? d.nameMl : d.name}
+              </option>
+            ))}
+            <option value="untagged">
+              {t(lang, "Untagged", "ടാഗ് ഇല്ലാത്തവ")}
+            </option>
+          </select>
+        )}
 
-        <select
-          value={type}
-          onChange={(e) => setType((e.target as HTMLSelectElement).value)}
-          class="select select-sm select-bordered"
-        >
-          <option value="all">{t(lang, "All types", "എല്ലാ തരം")}</option>
-          {typeOptions.map((k) => (
-            <option key={k} value={k}>
-              {lang === "ml" ? TYPE_LABEL[k].ml : TYPE_LABEL[k].en}
-            </option>
-          ))}
-        </select>
+        {!hideTypeFilter && (
+          <select
+            value={type}
+            onChange={(e) => setType((e.target as HTMLSelectElement).value)}
+            class="select select-sm select-bordered"
+          >
+            <option value="all">{t(lang, "All types", "എല്ലാ തരം")}</option>
+            {typeOptions.map((k) => (
+              <option key={k} value={k}>
+                {lang === "ml" ? TYPE_LABEL[k].ml : TYPE_LABEL[k].en}
+              </option>
+            ))}
+          </select>
+        )}
 
         <span class="text-xs text-base-content/50 tabular-nums whitespace-nowrap">
           {filtered.length}
           {filtered.length !== orders.length ? ` / ${orders.length}` : ""}{" "}
-          {t(lang, "orders", "ഉത്തരവുകൾ")}
+          {lang === "ml" ? unit.ml : unit.en}
         </span>
       </div>
 
@@ -210,10 +234,10 @@ export default function OrdersBrowser({ orders, depts, lang }: Props) {
                         <OrderRow
                           key={o.id}
                           o={o}
-                          deptName={deptName(o)}
-                          deptSlug={o.deptId
-                            ? deptMap.get(o.deptId)?.slug
-                            : undefined}
+                          deptName={hideDeptColumn ? null : deptName(o)}
+                          deptSlug={hideDeptColumn || !o.deptId
+                            ? undefined
+                            : deptMap.get(o.deptId)?.slug}
                           lang={lang}
                         />
                       ))}
@@ -256,6 +280,18 @@ function OrderRow(
       <span class="shrink-0 hidden md:inline text-[11px] text-base-content/50 tabular-nums w-40 truncate">
         {o.goNumber}
       </span>
+      {o.deptConfidence === "low" && (
+        <span
+          class="shrink-0 text-warning text-xs leading-none"
+          title={t(
+            lang,
+            "Low-confidence department tag — verify against the source order.",
+            "വകുപ്പ് ടാഗ് വിശ്വാസ്യത കുറവ് — ഉറവിട ഉത്തരവുമായി ഒത്തുനോക്കുക.",
+          )}
+        >
+          ⚠
+        </span>
+      )}
       <a
         href={`/gov/orders/${o.id}`}
         class={`flex-1 min-w-0 truncate font-medium hover:text-primary transition ${

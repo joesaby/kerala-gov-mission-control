@@ -8,7 +8,6 @@ import {
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
-import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
 import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
 import type { EgoGroup } from "../../../lib/ego-layout.ts";
 import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
@@ -33,11 +32,16 @@ export const handler = define.handlers<Data>({
       listAppointments(), // newest-first by termStart
       listDepartments(),
     ]);
-    const cabinet = all.filter((o) => o.type === "Cabinet");
-    // Appointment GOs are surfaced via the richer Appointment records in the
-    // Appointments tab, so the general orders lane excludes them too.
+    // A GO that re-surfaces as a (richer) Appointment record is shown only in
+    // the Appointments tab — never duplicated into the order/decision lanes.
+    // Keyed on real Appointment records (not the bare `category` flag) so a GO
+    // can never vanish from every tab.
+    const apptGoIds = new Set(appointments.map((a) => a.goId));
+    const cabinet = all.filter((o) =>
+      o.type === "Cabinet" && !apptGoIds.has(o.id)
+    );
     const orders = all.filter((o) =>
-      o.type !== "Cabinet" && o.category !== "appointment"
+      o.type !== "Cabinet" && !apptGoIds.has(o.id)
     );
     return page({ cabinet, orders, appointments, depts });
   },
@@ -242,10 +246,12 @@ export default define.page<typeof handler>(function OrdersPage(
             </p>
             {cabinet.length > 0
               ? (
-                <GovernmentOrderList
+                <OrdersBrowser
                   orders={cabinet}
-                  depts={depts}
+                  depts={deptOptions}
                   lang={lang}
+                  hideTypeFilter
+                  unit={{ en: "decisions", ml: "തീരുമാനങ്ങൾ" }}
                 />
               )
               : (
