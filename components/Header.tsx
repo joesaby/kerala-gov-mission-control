@@ -12,6 +12,7 @@ const NAV = [
   },
   { href: "/gov/appointments", en: "Appointments", ml: "നിയമനങ്ങൾ" },
   { href: "/gov/manifesto", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
+  { href: "/gov/insights", en: "Insights", ml: "നിരീക്ഷണങ്ങൾ" },
   { href: "/economy", en: "Economy", ml: "സമ്പദ്‌വ്യവസ്ഥ" },
   { href: "/research", en: "Research", ml: "ഗവേഷണം" },
 ];
