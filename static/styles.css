@@ -143,6 +143,32 @@
     @apply text-[11px] font-semibold uppercase tracking-wider text-base-content/55;
   }
 
+  /* ── CSS-only hash tabs (Orders / Decisions / Appointments) ──
+     Panels switch on the URL :target, so every tab is deep-linkable and the
+     back button works — no client JS / island. :has() drives both the default
+     panel (shown when no hash matches) and the active-tab highlight. */
+  .gov-tabs .tab-panel {
+    display: none;
+    scroll-margin-top: 4.5rem; /* clear the sticky header on anchor jump */
+  }
+  .gov-tabs .tab-panel:target {
+    display: block;
+  }
+  .gov-tabs:not(:has(.tab-panel:target)) .tab-panel[data-default] {
+    display: block;
+  }
+
+  /* Active-tab look — mirrors the header nav's active pill. The active tab is
+     the one whose panel is :target (or the default tab when nothing is). */
+  .gov-tabs:has(#orders:target) .tab-link[data-tab="orders"],
+  .gov-tabs:has(#decisions:target) .tab-link[data-tab="decisions"],
+  .gov-tabs:has(#appointments:target) .tab-link[data-tab="appointments"],
+  .gov-tabs:not(:has(.tab-panel:target)) .tab-link[data-default] {
+    background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
   .kpi-tile {
     @apply bg-base-100 border border-base-300 rounded-box transition;
     box-shadow: 0 1px 2px rgb(39 36 29 / 0.04);

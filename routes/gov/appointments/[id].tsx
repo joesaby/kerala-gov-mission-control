@@ -102,7 +102,10 @@ export default define.page<typeof handler>(function AppointmentDetail(
       <Header lang={lang} path={state.path} />
       <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
         <p class="eyebrow">
-          <a href="/gov/appointments" class="hover:text-primary transition">
+          <a
+            href="/gov/orders#appointments"
+            class="hover:text-primary transition"
+          >
             {t(lang, "Appointments", "നിയമനങ്ങൾ")}
           </a>
         </p>
