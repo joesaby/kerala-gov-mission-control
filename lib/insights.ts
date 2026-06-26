@@ -100,7 +100,20 @@ export interface DeptVelocityResult {
   summaries: DeptVelocitySummary[];
   /** Departments that are anomalously active (in descending order of z-score). */
   flagged: DeptVelocitySummary[];
+  /**
+   * True when no department yet has enough baseline history for anomaly
+   * detection — so an empty `flagged` means "still building a baseline", not
+   * "nothing unusual".
+   */
+  insufficientHistory: boolean;
 }
+
+/**
+ * Months of baseline history required before a department can be flagged
+ * anomalous. With only a month or two of data (cold start) the trailing mean is
+ * ~0, so every active department would false-flag.
+ */
+const MIN_BASELINE_MONTHS = 3;
 
 /** Extract "YYYY-MM" from an ISO date string. */
 function toYearMonth(isoDate: string): string {
@@ -173,9 +186,16 @@ export function computeDeptGoVelocity(
     );
     const { mean, stdDev } = meanAndStdDev(baselineCounts);
 
-    const anomalous = stdDev > 0
-      ? mostRecentCount > mean + 2 * stdDev
-      : mostRecentCount > mean * 2 && mostRecentCount > 1;
+    // Cold-start guard: only flag once there's a real baseline
+    // (≥ MIN_BASELINE_MONTHS). Without it a department in its first month —
+    // trailing mean ~0 — flags spuriously. With enough history, a flat baseline
+    // (stdDev 0) still flags on a clear multiplicative jump.
+    const hasBaseline = baselineMonths.length >= MIN_BASELINE_MONTHS;
+    const anomalous = hasBaseline && (
+      stdDev > 0
+        ? mostRecentCount > mean + 2 * stdDev
+        : mostRecentCount > mean * 2 && mostRecentCount > 1
+    );
 
     const monthlyBuckets: DeptMonthBucket[] = allMonths.map((m) => ({
       month: m,
@@ -204,8 +224,13 @@ export function computeDeptGoVelocity(
   });
 
   const flagged = summaries.filter((s) => s.anomalous);
+  // Baseline excludes the most recent month, so a dept needs
+  // MIN_BASELINE_MONTHS + 1 total months before it can be flagged.
+  const insufficientHistory = summaries.every(
+    (s) => s.monthlyBuckets.length - 1 < MIN_BASELINE_MONTHS,
+  );
 
-  return { summaries, flagged };
+  return { summaries, flagged, insufficientHistory };
 }
 
 // ---------------------------------------------------------------------------

@@ -88,7 +88,7 @@ import {
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 29;
+const SEED_VERSION = 30;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;

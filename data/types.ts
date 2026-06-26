@@ -255,6 +255,7 @@ export type PartyAffiliation =
   | "IUML"
   | "KC(M)"
   | "KC"
+  | "KC(J)"
   | "RSP"
   | "JD(S)"
   | "NCP"

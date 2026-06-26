@@ -243,6 +243,26 @@ Deno.test("computeDeptGoVelocity: single month is not anomalous", () => {
   assert(!finSummary.anomalous, "single month should not be flagged");
 });
 
+Deno.test("computeDeptGoVelocity: cold start (<3 baseline months) never flags", () => {
+  // Two months only — one baseline month + a spiking recent month. Without the
+  // cold-start guard the spike would false-flag against a near-zero baseline.
+  const orders = [
+    makeOrder("o0", { deptId: "dept.finance", date: "2026-05-10" }),
+    ...Array.from(
+      { length: 12 },
+      (_, i) =>
+        makeOrder(`o-${i}`, { deptId: "dept.finance", date: "2026-06-10" }),
+    ),
+  ];
+  const result = computeDeptGoVelocity(orders, [DEPT_FIN]);
+  const finSummary = result.summaries[0];
+  assert(!finSummary.anomalous, "cold start must not flag a spike");
+  assert(
+    result.insufficientHistory,
+    "insufficientHistory true with <3 baseline months",
+  );
+});
+
 // ── computeOfficeChurn ───────────────────────────────────────────────────────
 
 Deno.test("computeOfficeChurn: counts closed tenures", () => {

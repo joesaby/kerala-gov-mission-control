@@ -12,7 +12,7 @@ import {
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
-import { GovernmentOrderList } from "../../../components/GovernmentOrderList.tsx";
+import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
 import type { EgoGroup } from "../../../lib/ego-layout.ts";
 import type {
@@ -221,11 +221,12 @@ export default define.page<typeof handler>(function DeptPage(
               : "Recent Government Orders & Bills"}
           </h2>
           <div class="max-w-4xl">
-            <GovernmentOrderList
+            <OrdersBrowser
               orders={orders}
               depts={allDepts}
               lang={lang}
-              hideDepartment
+              hideDeptFilter
+              hideDeptColumn
             />
           </div>
         </section>

@@ -32,6 +32,7 @@ interface Data {
   velocity: {
     flagged: DeptVelocitySummary[];
     topByVolume: DeptVelocitySummary[];
+    insufficientHistory: boolean;
   };
   churn: OfficeChurnResult;
   goals: ManifestoGoal[];
@@ -64,6 +65,7 @@ export const handler = define.handlers<Data>({
         .slice()
         .sort((a, b) => b.mostRecentCount - a.mostRecentCount)
         .slice(0, 10),
+      insufficientHistory: velocityFull.insufficientHistory,
     };
 
     const churn = computeOfficeChurn(appointments, 180);
@@ -343,9 +345,13 @@ export default define.page<typeof handler>(function InsightsPage(
 
           {velocity.flagged.length === 0 && (
             <p class="text-sm text-base-content/40 italic mb-4">
-              {lang === "ml"
-                ? "ഈ കാലയളവിൽ അതിസജീവ വകുപ്പുകൾ ഒന്നുമില്ല."
-                : "No anomalously active departments this period."}
+              {velocity.insufficientHistory
+                ? (lang === "ml"
+                  ? "ക്രമക്കേട് കണ്ടെത്തലിന് മതിയായ ചരിത്രം ഇതുവരെ ഇല്ല — കുറച്ച് മാസത്തെ ഡാറ്റ ശേഖരിക്കുന്നു."
+                  : "Not enough history yet for anomaly detection — building a baseline over the first few months.")
+                : (lang === "ml"
+                  ? "ഈ കാലയളവിൽ അതിസജീവ വകുപ്പുകൾ ഒന്നുമില്ല."
+                  : "No anomalously active departments this period.")}
             </p>
           )}
 
