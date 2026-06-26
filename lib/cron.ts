@@ -10,11 +10,21 @@
  */
 
 import { geminiKey } from "./gemini.ts";
-import { runIngest } from "./ingest.ts";
+import { repairIngestedOrders, runIngest } from "./ingest.ts";
 import { refreshUsdInrRate } from "./fx.ts";
 
 /** Daily at 02:30 IST (21:00 UTC the previous day). */
 const CRON_SCHEDULE = "0 21 * * *";
+
+/**
+ * Records to re-extract per daily run after the fresh-order ingest. This lets
+ * already-stored records that came out degraded — e.g. an appointment GO whose
+ * appointee row was lost to a text-only fallback on a Gemini-quota-exhausted
+ * batch day — self-heal over a few days instead of staying stuck. Gemini's free
+ * tier (20/day) is spent by the ingest above, so the sweep runs on the
+ * OpenRouter/NVIDIA fallbacks; keep it small to bound token cost.
+ */
+const REPAIR_SWEEP_LIMIT = 12;
 
 let registered = false;
 
@@ -50,6 +60,20 @@ export function registerIngestCron(): void {
       );
     } catch (e) {
       console.error("[cron] daily-go-ingest failed:", e);
+    }
+    // Self-healing sweep: re-extract a bounded batch of already-stored records
+    // that still look degraded (kept separate so a failure never affects the
+    // fresh-order ingest above).
+    try {
+      const repair = await repairIngestedOrders({
+        limit: REPAIR_SWEEP_LIMIT,
+        log: (m) => console.log(`[cron] ${m}`),
+      });
+      console.log(
+        `[cron] daily-go-repair done — repaired ${repair.repaired}, errors ${repair.errors.length}, deferred ${repair.deferred.length}`,
+      );
+    } catch (e) {
+      console.error("[cron] daily-go-repair failed:", e);
     }
   });
   console.log("[cron] daily-go-ingest registered");

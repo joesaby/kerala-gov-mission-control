@@ -31,6 +31,7 @@ import { PERSONS } from "../data/persons.ts";
 import {
   appendIngestRun,
   type IngestStatus,
+  listAppointments,
   listGovernmentOrderKeys,
   listGovernmentOrders,
   listManifestoGoals,
@@ -1109,12 +1110,21 @@ function looksLikeAppointment(o: GovernmentOrder): boolean {
     .test(text) || /നിയമന|ഡെപ്യൂട്ടേഷൻ/.test(text);
 }
 
-function ingestedOrderNeedsRepair(o: GovernmentOrder): boolean {
+function ingestedOrderNeedsRepair(
+  o: GovernmentOrder,
+  apptGoIds: Set<string>,
+): boolean {
   // Not yet re-processed by the language-aware pipeline.
   if (o.translationStatus !== "machine-draft") return true;
   // Not yet classified for appointments — a repair pass backfills `category`
   // and spawns any Appointment records (the retrospective categorization).
   if (o.category === undefined) return true;
+  // Categorized "appointment" but no Appointment record ever materialized —
+  // a degraded fallback (e.g. text-only NVIDIA on a Gemini-quota-exhausted batch
+  // day) classified it but extracted no named appointee row. Re-extract so the
+  // appointees the PDF actually names are recovered and surfaced. Without this
+  // such a GO is stuck: it shows in the Orders tab and never in Appointments.
+  if (o.category === "appointment" && !apptGoIds.has(o.id)) return true;
   // Categorized "general" but the subject reads like an appointment — re-examine
   // so a missed appointee row is extracted and its Appointment backfilled.
   if (o.category === "general" && looksLikeAppointment(o)) return true;
@@ -1169,9 +1179,12 @@ export async function repairIngestedOrders(
   const goalIds = new Set(goals.map((g) => g.id));
 
   const all = await listGovernmentOrders();
+  // GO ids that already spawned at least one Appointment record — so an
+  // appointment-category GO still missing its rows can be flagged for repair.
+  const apptGoIds = new Set((await listAppointments()).map((a) => a.goId));
   const candidates = all.filter((o) =>
     o.meta.sourceUrl.toLowerCase().endsWith(".pdf") &&
-    (opts.force || ingestedOrderNeedsRepair(o))
+    (opts.force || ingestedOrderNeedsRepair(o, apptGoIds))
   );
   log(
     `[repair] ${candidates.length} record(s) ${
