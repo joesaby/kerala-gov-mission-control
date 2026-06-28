@@ -30,7 +30,6 @@ const MS_90_DAYS = 90 * 24 * 60 * 60 * 1000;
 export default function AppointmentsBands(
   { appointments, offices, depts, personSlugById, lang }: Props,
 ) {
-  const [showAll, setShowAll] = useState(false);
   const officeById = useMemo(
     () => new Map(offices.map((o) => [o.id, o])),
     [offices],
@@ -65,6 +64,11 @@ export default function AppointmentsBands(
     return map;
   }, [headline.current]);
 
+  const hasKeyOffices = keyByOffice.size > 0;
+  // When no headline office has matched yet, the full list is the only real
+  // content — show it open by default so the page isn't an empty apology.
+  const [showAll, setShowAll] = useState(!hasKeyOffices);
+
   const recentEvents = useMemo(
     () =>
       [...headline.recent]
@@ -95,28 +99,19 @@ export default function AppointmentsBands(
 
   return (
     <div class="flex flex-col gap-10">
-      <section>
-        <h2 class="font-display text-xl font-semibold mb-1">
-          {t(lang, "Key offices now", "പ്രധാന പദവികൾ — ഇപ്പോൾ")}
-        </h2>
-        <p class="text-sm text-base-content/60 mb-4">
-          {t(
-            lang,
-            "Current holders of headline-tier posts (Principal Secretaries and similar), grouped by office.",
-            "പ്രധാന പദവികളുടെ (പ്രincipal സെക്രട്ടറി മുതലായ) നിലവിലെ ഉദ്യോഗസ്ഥർ — പദവി അനുസരിച്ച്.",
-          )}
-        </p>
-        {keyByOffice.size === 0
-          ? (
-            <p class="text-sm text-base-content/50 italic">
+      {hasKeyOffices
+        ? (
+          <section>
+            <h2 class="font-display text-xl font-semibold mb-1">
+              {t(lang, "Key offices now", "പ്രധാന പദവികൾ — ഇപ്പോൾ")}
+            </h2>
+            <p class="text-sm text-base-content/60 mb-4">
               {t(
                 lang,
-                "No headline offices matched yet — ingest is still mapping free-text titles to normalized posts.",
-                "പ്രധാന പദവികൾ ഇതുവരെ ബന്ധിപ്പിച്ചിട്ടില്ല — ഉറവിട വരികൾ Office മോഡലിലേക്ക് മാപ്പ് ചെയ്യപ്പെടുന്നു.",
+                "Current holders of headline-tier posts (Principal Secretaries and similar), grouped by office.",
+                "പ്രധാന പദവികളുടെ (പ്രിൻസിപ്പൽ സെക്രട്ടറി മുതലായ) നിലവിലെ ഉദ്യോഗസ്ഥർ — പദവി അനുസരിച്ച്.",
               )}
             </p>
-          )
-          : (
             <ul class="flex flex-col gap-4">
               {[...keyByOffice.entries()].map(([officeId, holders]) => {
                 const office = officeById.get(officeId);
@@ -194,8 +189,9 @@ export default function AppointmentsBands(
                 );
               })}
             </ul>
-          )}
-      </section>
+          </section>
+        )
+        : null}
 
       {recentEvents.length > 0 && (
         <section>
@@ -223,7 +219,7 @@ export default function AppointmentsBands(
               {t(
                 lang,
                 "Full searchable list — includes routine and unverified rows.",
-                "പൂർണ്ണ searchable പട്ടിക — ROUTINE / പരിശോധന ബാക്കിയുള്ള വരികൾ ഉൾപ്പെടെ.",
+                "പൂർണ്ണമായ തിരയാവുന്ന പട്ടിക — സാധാരണ, പരിശോധന ബാക്കിയുള്ള വരികൾ ഉൾപ്പെടെ.",
               )}
             </p>
           </div>
