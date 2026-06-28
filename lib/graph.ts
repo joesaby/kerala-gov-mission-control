@@ -20,13 +20,16 @@
 import { kv } from "../data/db.ts";
 import type {
   Appointment,
+  Constituency,
   Department,
   GovernmentOrder,
   GraphEdge,
   GraphNode,
   Kpi,
   ManifestoGoal,
+  MemberOfLegislative,
   Minister,
+  Office,
   Person,
 } from "../data/types.ts";
 
@@ -333,6 +336,110 @@ export async function getKpiDepartmentOrders(
   return orders.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/** A current or historical office holder derived from HOLDS edges. */
+export interface OfficeHolder {
+  personId: string;
+  personSlug?: string;
+  personName: string;
+  personNameMl?: string;
+  termStart: string;
+  termEnd?: string;
+  appointmentId?: string;
+  current: boolean;
+}
+
+/** Department leadership row for "Who runs this". */
+export interface DeptHolderRow {
+  kind: "minister" | "bureaucrat";
+  personId: string;
+  personSlug?: string;
+  personName: string;
+  personNameMl?: string;
+  officeTitle?: string;
+  officeTitleMl?: string;
+  officeSlug?: string;
+  termStart?: string;
+  appointmentId?: string;
+  sourceUrl?: string;
+  current: boolean;
+}
+
+/**
+ * Active headline-tier bureaucratic holders for a department (HOLDS → office
+ * BELONGS_TO dept). Does not include the accountable minister — query PORTFOLIO
+ * separately.
+ */
+export async function getDeptHeadlineHolders(
+  deptId: string,
+): Promise<DeptHolderRow[]> {
+  const k = await kv();
+  const belongs = await getNeighborsByType(deptId, "BELONGS_TO", "in");
+  const rows: DeptHolderRow[] = [];
+
+  for (const edge of belongs) {
+    const officeNode = (await k.get<GraphNode>(["nodes", edge.sourceId])).value;
+    if (!officeNode || officeNode.type !== "office") continue;
+    if (officeNode.properties?.tier !== "headline") continue;
+
+    const holds = await getNeighborsByType(edge.sourceId, "HOLDS", "in");
+    for (const h of holds) {
+      if (h.properties?.termEnd) continue;
+      const person = (await k.get<GraphNode>(["nodes", h.sourceId])).value;
+      if (!person || person.type !== "person") continue;
+      const apptId = h.properties?.appointmentId as string | undefined;
+      let sourceUrl: string | undefined;
+      if (apptId) {
+        const appt = (await k.get<Appointment>(["appointment", apptId])).value;
+        sourceUrl = appt?.sourceUrl;
+      }
+      rows.push({
+        kind: "bureaucrat",
+        personId: person.id,
+        personSlug: String(person.properties?.slug ?? ""),
+        personName: person.label,
+        personNameMl: person.labelMl,
+        officeTitle: officeNode.label,
+        officeTitleMl: officeNode.labelMl,
+        officeSlug: String(officeNode.properties?.slug ?? ""),
+        termStart: String(h.properties?.termStart ?? ""),
+        appointmentId: apptId,
+        sourceUrl,
+        current: true,
+      });
+    }
+  }
+
+  return rows.sort((a, b) =>
+    (a.termStart ?? "").localeCompare(b.termStart ?? "")
+  );
+}
+
+/** All holders of an office (succession), oldest first. */
+export async function getOfficeSuccession(
+  officeId: string,
+): Promise<OfficeHolder[]> {
+  const k = await kv();
+  const holds = await getNeighborsByType(officeId, "HOLDS", "in");
+  const out: OfficeHolder[] = [];
+
+  for (const h of holds) {
+    const person = (await k.get<GraphNode>(["nodes", h.sourceId])).value;
+    if (!person || person.type !== "person") continue;
+    out.push({
+      personId: person.id,
+      personSlug: String(person.properties?.slug ?? ""),
+      personName: person.label,
+      personNameMl: person.labelMl,
+      termStart: String(h.properties?.termStart ?? ""),
+      termEnd: h.properties?.termEnd as string | undefined,
+      appointmentId: h.properties?.appointmentId as string | undefined,
+      current: !h.properties?.termEnd,
+    });
+  }
+
+  return out.sort((a, b) => a.termStart.localeCompare(b.termStart));
+}
+
 // ----- Node builders (entity record -> GraphNode) -------------------------
 //
 // Pure projections — exported so the derivation can be unit-tested without KV.
@@ -413,6 +520,7 @@ export function appointmentNode(a: Appointment): GraphNode {
     properties: {
       office: a.office,
       officeMl: a.officeMl,
+      officeId: a.officeId,
       branch: a.branch,
       action: a.action,
       deptId: a.deptId,
@@ -422,6 +530,31 @@ export function appointmentNode(a: Appointment): GraphNode {
       termStart: a.termStart,
       termEnd: a.termEnd,
     },
+  };
+}
+
+export function officeNode(o: Office): GraphNode {
+  return {
+    id: o.id,
+    type: "office",
+    label: o.title,
+    labelMl: o.titleMl,
+    properties: {
+      slug: o.slug,
+      branch: o.branch,
+      deptId: o.deptId,
+      tier: o.tier,
+    },
+  };
+}
+
+export function constituencyNode(c: Constituency): GraphNode {
+  return {
+    id: c.id,
+    type: "constituency",
+    label: c.name,
+    labelMl: c.nameMl,
+    properties: { slug: c.slug, district: c.district },
   };
 }
 
@@ -524,6 +657,41 @@ export function appointmentEdges(a: Appointment): GraphEdge[] {
   return edges;
 }
 
+/** Person -[HOLDS {tenure}]-> office when appointment is normalized + matched. */
+export function holdsEdge(a: Appointment): GraphEdge | null {
+  if (!a.personId || !a.officeId) return null;
+  return {
+    sourceId: a.personId,
+    targetId: a.officeId,
+    type: "HOLDS",
+    properties: {
+      termStart: a.termStart,
+      termEnd: a.termEnd,
+      appointmentId: a.id,
+    },
+  };
+}
+
+/** Office -[BELONGS_TO]-> department when the post sits in a dept. */
+export function officeEdges(o: Office): GraphEdge[] {
+  if (!o.deptId) return [];
+  return [{ sourceId: o.id, targetId: o.deptId, type: "BELONGS_TO" }];
+}
+
+/** Person -[REPRESENTS {tenure}]-> constituency (MLA). */
+export function mlaEdges(m: MemberOfLegislative): GraphEdge {
+  return {
+    sourceId: m.personId,
+    targetId: m.constituencyId,
+    type: "REPRESENTS",
+    properties: {
+      termStart: m.termStart,
+      termEnd: m.termEnd,
+      term: m.assemblyTerm,
+    },
+  };
+}
+
 // ----- Derivation ---------------------------------------------------------
 
 async function listByPrefix<T>(prefix: Deno.KvKey): Promise<T[]> {
@@ -577,6 +745,23 @@ export async function syncAppointmentGraph(a: Appointment): Promise<void> {
   for (const e of appointmentEdges(a)) {
     if (await getNode(e.targetId)) await putEdge(e, { requireNodes: false });
   }
+  await syncHoldsEdge(a);
+}
+
+/** Keep person→office HOLDS display edge in sync with a normalized appointment. */
+async function syncHoldsEdge(a: Appointment): Promise<void> {
+  if (a.personId) {
+    for (const e of await getNeighborsByType(a.personId, "HOLDS", "out")) {
+      if (e.properties?.appointmentId === a.id) {
+        await deleteEdge(e.sourceId, e.type, e.targetId);
+      }
+    }
+  }
+  const edge = holdsEdge(a);
+  if (!edge) return;
+  if (await getNode(edge.targetId)) {
+    await putEdge(edge, { requireNodes: false });
+  }
 }
 
 /**
@@ -621,16 +806,29 @@ export async function buildGraph(): Promise<void> {
   }
   await batchCommit(k, stale.map((key) => (a) => a.delete(key)), GRAPH_BATCH);
 
-  const [kpis, depts, persons, ministers, goals, orders, appointments] =
-    await Promise.all([
-      listByPrefix<Kpi>(["kpi"]),
-      listByPrefix<Department>(["dept"]),
-      listByPrefix<Person>(["person"]),
-      listByPrefix<Minister>(["minister"]),
-      listByPrefix<ManifestoGoal>(["manifesto_goal"]),
-      listByPrefix<GovernmentOrder>(["go"]),
-      listByPrefix<Appointment>(["appointment"]),
-    ]);
+  const [
+    kpis,
+    depts,
+    persons,
+    ministers,
+    goals,
+    orders,
+    appointments,
+    offices,
+    constituencies,
+    mlas,
+  ] = await Promise.all([
+    listByPrefix<Kpi>(["kpi"]),
+    listByPrefix<Department>(["dept"]),
+    listByPrefix<Person>(["person"]),
+    listByPrefix<Minister>(["minister"]),
+    listByPrefix<ManifestoGoal>(["manifesto_goal"]),
+    listByPrefix<GovernmentOrder>(["go"]),
+    listByPrefix<Appointment>(["appointment"]),
+    listByPrefix<Office>(["office"]),
+    listByPrefix<Constituency>(["constituency"]),
+    listByPrefix<MemberOfLegislative>(["mla"]),
+  ]);
 
   // Nodes.
   const nodes = [
@@ -640,6 +838,8 @@ export async function buildGraph(): Promise<void> {
     ...goals.map(goalNode),
     ...orders.map(orderNode),
     ...appointments.map(appointmentNode),
+    ...offices.map(officeNode),
+    ...constituencies.map(constituencyNode),
   ];
   await batchCommit(
     k,
@@ -655,6 +855,9 @@ export async function buildGraph(): Promise<void> {
     ...ministers.flatMap(ministerEdges),
     ...orders.flatMap(orderEdges),
     ...appointments.flatMap(appointmentEdges),
+    ...offices.flatMap(officeEdges),
+    ...appointments.map(holdsEdge).filter((e): e is GraphEdge => e !== null),
+    ...mlas.map(mlaEdges),
   ];
   await batchCommit(
     k,

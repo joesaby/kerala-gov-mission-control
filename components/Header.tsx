@@ -5,11 +5,6 @@ import { PookalamMark } from "./PookalamMark.tsx";
 const NAV = [
   { href: "/", en: "Kerala Today", ml: "ഇന്നത്തെ കേരളം" },
   { href: "/gov", en: "Government", ml: "സർക്കാർ" },
-  {
-    href: "/gov/orders",
-    en: "Orders & Decisions",
-    ml: "ഉത്തരവുകൾ & തീരുമാനങ്ങൾ",
-  },
   { href: "/gov/manifesto", en: "Promises", ml: "വാഗ്ദാനങ്ങൾ" },
   { href: "/gov/insights", en: "Insights", ml: "നിരീക്ഷണങ്ങൾ" },
   { href: "/economy", en: "Economy", ml: "സമ്പദ്‌വ്യവസ്ഥ" },

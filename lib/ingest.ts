@@ -28,6 +28,7 @@ import type {
 } from "../data/types.ts";
 import { DEPARTMENTS } from "../data/departments.ts";
 import { PERSONS } from "../data/persons.ts";
+import { matchOffice } from "./office-match.ts";
 import {
   appendIngestRun,
   type IngestStatus,
@@ -1038,13 +1039,15 @@ export function buildAppointmentsForOrder(
     const deptId = branch === "judiciary"
       ? (go.deptId ?? "dept.law")
       : go.deptId;
+    const officeText = office || name;
     out.push({
       id: `${apptBase}-${i}`,
       goId: go.id,
       appointeeName: name,
       appointeeNameMl: r.appointeeNameMl ?? undefined,
       personId: matchPerson(r.appointeeName, r.appointeeNameMl),
-      office: office || name,
+      officeId: matchOffice(officeText, r.officeMl, { branch, deptId }),
+      office: officeText,
       officeMl: r.officeMl ?? undefined,
       branch,
       action: r.action ?? "appointment",

@@ -4,12 +4,15 @@ import type {
   Budget,
   CivicDomain,
   CoalitionMembership,
+  Constituency,
   Department,
   Government,
   GovernmentOrder,
   Kpi,
   ManifestoGoal,
+  MemberOfLegislative,
   Minister,
+  Office,
   Party,
   Person,
   PublicSpeech,
@@ -28,6 +31,9 @@ import { SPEAKERS } from "./speakers.ts";
 import { PUBLIC_SPEECHES } from "./public-speeches.ts";
 import { GOVERNMENT_ORDERS } from "./government-orders.ts";
 import { APPOINTMENTS } from "./appointments.ts";
+import { CONSTITUENCIES } from "./constituencies.ts";
+import { MLAS } from "./mlas.ts";
+import { OFFICES } from "./offices.ts";
 import { MANIFESTO_GOALS } from "./manifesto-goals.ts";
 import { STATUS_PAPERS } from "./status-papers.ts";
 import { BUDGETS } from "./budgets.ts";
@@ -69,6 +75,10 @@ import {
  *   ["appointment_by_dept",   deptId, id]         -> null
  *   ["appointment_by_branch", branch, id]         -> null
  *   ["appointment_by_go",     goId,   id]         -> null
+ *   ["office", id]                               -> Office
+ *   ["constituency", id]                         -> Constituency
+ *   ["mla", id]                                  -> MemberOfLegislative
+ *   ["mla_by_person", personId, mlaId]           -> null
  *
  * Retired entity-to-entity indexes — now served by graph edges (below), still
  * in the seed wipe list to purge legacy entries: kpi_by_dept (OWNED_BY +
@@ -88,7 +98,7 @@ import {
  *   ["meta", "seed_version"] -> number
  */
 
-const SEED_VERSION = 31;
+const SEED_VERSION = 32;
 
 let _kv: Deno.Kv | null = null;
 let _seedPromise: Promise<void> | null = null;
@@ -549,6 +559,23 @@ export async function putPerson(p: Person): Promise<void> {
   await (await kv()).set(["person", p.id], p);
 }
 
+export async function putOffice(o: Office): Promise<void> {
+  await (await kv()).set(["office", o.id], o);
+}
+
+export async function putConstituency(c: Constituency): Promise<void> {
+  await (await kv()).set(["constituency", c.id], c);
+}
+
+export async function putMla(m: MemberOfLegislative): Promise<void> {
+  const k = await kv();
+  const res = await k.atomic()
+    .set(["mla", m.id], m)
+    .set(["mla_by_person", m.personId, m.id], null)
+    .commit();
+  if (!res.ok) throw new Error(`Failed to put mla ${m.id}`);
+}
+
 export async function putParty(p: Party): Promise<void> {
   await (await kv()).set(["party", p.id], p);
 }
@@ -708,6 +735,56 @@ export async function listAppointmentsByPerson(
   personId: string,
 ): Promise<Appointment[]> {
   return (await listAppointments()).filter((a) => a.personId === personId);
+}
+
+// ----- Office / Constituency / MLA ---------------------------------------
+
+export async function listOffices(): Promise<Office[]> {
+  await ensureSeeded();
+  return await listAll<Office>(["office"]);
+}
+
+export async function getOffice(id: string): Promise<Office | null> {
+  await ensureSeeded();
+  return (await (await kv()).get<Office>(["office", id])).value;
+}
+
+export async function getOfficeBySlug(slug: string): Promise<Office | null> {
+  const all = await listOffices();
+  return all.find((o) => o.slug === slug) ?? null;
+}
+
+export async function listConstituencies(): Promise<Constituency[]> {
+  await ensureSeeded();
+  return (await listAll<Constituency>(["constituency"]))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getConstituency(
+  id: string,
+): Promise<Constituency | null> {
+  await ensureSeeded();
+  return (await (await kv()).get<Constituency>(["constituency", id])).value;
+}
+
+export async function getConstituencyBySlug(
+  slug: string,
+): Promise<Constituency | null> {
+  const all = await listConstituencies();
+  return all.find((c) => c.slug === slug) ?? null;
+}
+
+export async function listMlas(): Promise<MemberOfLegislative[]> {
+  await ensureSeeded();
+  return await listAll<MemberOfLegislative>(["mla"]);
+}
+
+export async function listMlasByPerson(
+  personId: string,
+): Promise<MemberOfLegislative[]> {
+  return (await listMlas())
+    .filter((m) => m.personId === personId)
+    .sort((a, b) => b.termStart.localeCompare(a.termStart));
 }
 
 /** Ids ingested at runtime (the durable mirror), newest first. */
@@ -1075,9 +1152,17 @@ export async function seed(): Promise<void> {
     ["appointment"],
     ["appointment_by_dept"],
     ["appointment_by_branch"],
+    ["appointment_by_branch"],
     ["appointment_by_go"],
+    ["office"],
+    ["constituency"],
+    ["mla"],
+    ["mla_by_person"],
   ]);
   for (const p of PERSONS) await putPerson(p);
+  for (const o of OFFICES) await putOffice(o);
+  for (const c of CONSTITUENCIES) await putConstituency(c);
+  for (const m of MLAS) await putMla(m);
   for (const p of PARTIES) await putParty(p);
   for (const c of COALITION_MEMBERSHIPS) await putCoalitionMembership(c);
   for (const g of GOVERNMENTS) await putGovernment(g);

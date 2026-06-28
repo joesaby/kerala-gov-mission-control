@@ -2,21 +2,25 @@ import { HttpError, page } from "fresh";
 import { define } from "../../../utils.ts";
 import { t } from "../../../data/lang.ts";
 import {
+  getConstituency,
   getPersonBySlug,
   listAppointmentsByPerson,
   listDepartments,
   listMinistersByPerson,
+  listMlasByPerson,
   listSpeakersByPerson,
   listSpeechesByPerson,
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
+import { GovSubnav } from "../../../components/GovSubnav.tsx";
 import { MinisterAvatar } from "../../../components/MinisterAvatar.tsx";
 import { SpeechList } from "../../../components/SpeechList.tsx";
 import { AutoLinkDisclaimer } from "../../../components/AutoLinkDisclaimer.tsx";
 import type {
   Appointment,
   Department,
+  MemberOfLegislative,
   Minister,
   Person,
   PublicSpeech,
@@ -28,6 +32,8 @@ interface Data {
   ministers: Minister[];
   appointments: Appointment[];
   speakers: Speaker[];
+  mlas: MemberOfLegislative[];
+  constituencyNames: Record<string, string>;
   speeches: PublicSpeech[];
   depts: Department[];
 }
@@ -36,15 +42,31 @@ export const handler = define.handlers<Data>({
   async GET(ctx) {
     const person = await getPersonBySlug(ctx.params.slug);
     if (!person) throw new HttpError(404, "Person not found");
-    const [ministers, appointments, speakers, speeches, depts] = await Promise
-      .all([
-        listMinistersByPerson(person.id),
-        listAppointmentsByPerson(person.id),
-        listSpeakersByPerson(person.id),
-        listSpeechesByPerson(person.id),
-        listDepartments(),
-      ]);
-    return page({ person, ministers, appointments, speakers, speeches, depts });
+    const [ministers, appointments, speakers, mlas, speeches, depts] =
+      await Promise
+        .all([
+          listMinistersByPerson(person.id),
+          listAppointmentsByPerson(person.id),
+          listSpeakersByPerson(person.id),
+          listMlasByPerson(person.id),
+          listSpeechesByPerson(person.id),
+          listDepartments(),
+        ]);
+    const constituencyNames: Record<string, string> = {};
+    for (const m of mlas) {
+      const c = await getConstituency(m.constituencyId);
+      if (c) constituencyNames[c.id] = c.name;
+    }
+    return page({
+      person,
+      ministers,
+      appointments,
+      speakers,
+      mlas,
+      constituencyNames,
+      speeches,
+      depts,
+    });
   },
 });
 
@@ -59,12 +81,13 @@ const KIND_CHIP: Record<string, { en: string; ml: string; class: string }> = {
   minister: { en: "Cabinet", ml: "മന്ത്രിസഭ", class: "badge-primary" },
   appointment: { en: "Posting", ml: "നിയമനം", class: "badge-secondary" },
   speaker: { en: "Assembly", ml: "നിയമസഭ", class: "badge-accent" },
+  mla: { en: "MLA", ml: "എം.എൽ.എ.", class: "badge-info" },
 };
 
 /** A role tenure normalized for the unified career timeline. */
 interface RoleItem {
   key: string;
-  kind: "minister" | "appointment" | "speaker";
+  kind: "minister" | "appointment" | "speaker" | "mla";
   title: string;
   sub?: string;
   href?: string;
@@ -87,7 +110,16 @@ export default define.page<typeof handler>(function PersonPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { person, ministers, appointments, speakers, speeches, depts } = data;
+  const {
+    person,
+    ministers,
+    appointments,
+    speakers,
+    mlas,
+    constituencyNames,
+    speeches,
+    depts,
+  } = data;
   const deptById = new Map(depts.map((d) => [d.id, d]));
   const deptName = (id?: string) => {
     const d = id ? deptById.get(id) : undefined;
@@ -147,6 +179,24 @@ export default define.page<typeof handler>(function PersonPage(
       ),
       termStart: s.termStart,
       termEnd: s.termEnd,
+    })),
+    ...mlas.map((m): RoleItem => ({
+      key: m.id,
+      kind: "mla",
+      title: t(lang, "Member of Legislative Assembly", "നിയമസഭാംഗം"),
+      sub: constituencyNames[m.constituencyId]
+        ? t(
+          lang,
+          `${constituencyNames[m.constituencyId]} · ${m.assemblyTerm}th KLA`,
+          `${constituencyNames[m.constituencyId]} · ${m.assemblyTerm}-ാം നിയമസഭ`,
+        )
+        : t(
+          lang,
+          `${m.assemblyTerm}th Kerala Legislative Assembly`,
+          `${m.assemblyTerm}-ാം കേരള നിയമസഭ`,
+        ),
+      termStart: m.termStart,
+      termEnd: m.termEnd,
     })),
   ].sort((x, y) => y.termStart.localeCompare(x.termStart));
 
@@ -218,10 +268,12 @@ export default define.page<typeof handler>(function PersonPage(
       <Header lang={lang} path={state.path} />
       <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
         <p class="text-xs">
-          <a href="/gov" class="link link-hover text-base-content/60">
-            ← {t(lang, "Government", "സർക്കാർ")}
+          <a href="/gov/people" class="link link-hover text-base-content/60">
+            ← {t(lang, "People", "വ്യക്തികൾ")}
           </a>
         </p>
+
+        <GovSubnav lang={lang} path={state.path} />
 
         <header class="mt-3 flex items-start gap-5 flex-wrap">
           <MinisterAvatar

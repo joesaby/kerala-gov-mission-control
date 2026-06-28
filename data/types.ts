@@ -577,6 +577,27 @@ export type AppointmentBranch =
   | "judiciary"
   | "board";
 
+/**
+ * A normalized government post — one record per real chair, not per spelling
+ * variant in ingest. Significance (`tier`) is set by human review only.
+ */
+export interface Office {
+  id: string; // office.ps-finance
+  slug: string;
+  title: string;
+  titleMl?: string;
+  branch: AppointmentBranch;
+  /** FK → Department.id (bureaucratic / executive posts). */
+  deptId?: string;
+  court?: string;
+  /** headline = dept/person pages & key offices band; routine = all-ingested only. */
+  tier: "headline" | "routine";
+  /** Curated free-text strings ingest maps onto this office (exact match only). */
+  aliases?: string[];
+  translationStatus?: TranslationStatus;
+  dataStatus: "verified" | "unverified" | "tbd";
+}
+
 /** What the order does to the office holder. */
 export type AppointmentAction =
   | "appointment"
@@ -614,6 +635,8 @@ export interface Appointment {
   appointeeNameMl?: string;
   /** FK → Person.id — set only on a confident match to a known person. */
   personId?: string;
+  /** FK → Office.id — set when free-text office normalizes to a known post. */
+  officeId?: string;
   /** Office / designation, English, e.g. "Principal Secretary (Finance)". */
   office: string;
   officeMl?: string;
@@ -966,7 +989,9 @@ export type GraphNodeType =
   | "government_order"
   | "manifesto_goal"
   | "status_paper_vital"
-  | "appointment";
+  | "appointment"
+  | "office"
+  | "constituency";
 
 /**
  * The relationship vocabulary. Every edge type used in code must appear here.
@@ -980,6 +1005,9 @@ export type GraphNodeType =
  * - `APPOINTED_TO`   appointment → department it places the holder in (carries tenure)
  * - `APPOINTEE`      appointment → the person appointed (only on a confident match)
  * - `EVIDENCED_BY`   appointment → the government order that made it (provenance)
+ * - `HOLDS`          person → office (display tenure from normalized appointment)
+ * - `BELONGS_TO`     office → department the post sits in
+ * - `REPRESENTS`     person → constituency (MLA tenure)
  */
 export type GraphEdgeType =
   | "OWNED_BY"
@@ -991,7 +1019,10 @@ export type GraphEdgeType =
   | "BASELINES"
   | "APPOINTED_TO"
   | "APPOINTEE"
-  | "EVIDENCED_BY";
+  | "EVIDENCED_BY"
+  | "HOLDS"
+  | "BELONGS_TO"
+  | "REPRESENTS";
 
 /**
  * A node in the derived graph. `id` is the EXISTING entity id verbatim
@@ -1028,5 +1059,9 @@ export interface GraphEdge {
     branch?: string;
     /** Relation kind for REFERENCES edges (GoRelation). */
     relation?: string;
+    /** Source appointment for HOLDS display edges. */
+    appointmentId?: string;
+    /** Assembly term number for REPRESENTS edges. */
+    term?: number;
   };
 }
