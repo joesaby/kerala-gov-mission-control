@@ -11,6 +11,7 @@ import {
 } from "../../data/db.ts";
 import { Header } from "../../components/Header.tsx";
 import { Footer } from "../../components/Footer.tsx";
+import { GovSubnav } from "../../components/GovSubnav.tsx";
 import { MinisterAvatar } from "../../components/MinisterAvatar.tsx";
 import type {
   Department,
@@ -116,7 +117,7 @@ export default define.page<typeof handler>(function GovernmentHub(
   { data, state },
 ) {
   const lang = state.lang;
-  const { govt, governments, ministers, depts, goals, ordersCount } = data;
+  const { govt, governments, ministers, depts, goals } = data;
   const { coalitionBreakdown } = data;
 
   const deptById = new Map(depts.map((d) => [d.id, d]));
@@ -173,6 +174,8 @@ export default define.page<typeof handler>(function GovernmentHub(
             })}
           </div>
         )}
+
+        <GovSubnav lang={lang} path={state.path} />
 
         {/* ── Hero ── */}
         <section class="hero-band rounded-box border border-base-300 p-6 md:p-8 mb-8">
@@ -319,10 +322,25 @@ export default define.page<typeof handler>(function GovernmentHub(
                 href="/gov/orders"
                 class="btn btn-sm btn-outline justify-start"
               >
-                {lang === "ml" ? "ഉത്തരവുകൾ & തീരുമാനങ്ങൾ" : "Orders & decisions"}
-                <span class="ml-auto tabular-nums opacity-60">
-                  {ordersCount || ""}
-                </span>
+                {lang === "ml" ? "ഉത്തരവുകൾ" : "Orders"}
+              </a>
+              <a
+                href="/gov/decisions"
+                class="btn btn-sm btn-outline justify-start"
+              >
+                {lang === "ml" ? "മന്ത്രിസഭാ തീരുമാനങ്ങൾ" : "Cabinet decisions"}
+              </a>
+              <a
+                href="/gov/appointments"
+                class="btn btn-sm btn-outline justify-start"
+              >
+                {lang === "ml" ? "നിയമനങ്ങൾ" : "Appointments"}
+              </a>
+              <a
+                href="/gov/people"
+                class="btn btn-sm btn-outline justify-start"
+              >
+                {lang === "ml" ? "വ്യക്തികൾ" : "People"}
               </a>
               <a
                 href="/gov/manifesto"
