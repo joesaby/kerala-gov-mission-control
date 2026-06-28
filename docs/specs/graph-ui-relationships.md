@@ -261,6 +261,12 @@ block — it must not be droppable.
 ## 9. Out of scope
 
 - New ingest/extraction work beyond the optional §5 Option B edge.
-- `Constituency` / `MemberOfLegislative` / `Secretary` data (not yet
-  implemented) — the strip should _accommodate_ designation when it lands, not
-  block on it.
+- **Person hub, office normalization, significance tiers, and tenure entity
+  work** — specified in
+  [`person-office-tenure-model.md`](./person-office-tenure-model.md) (Phase 1
+  Person hub ships independently; Phases 2–4 add `Office`, `HOLDS`, banded
+  appointments). This document covers only _how_ graph-derived links render once
+  those entities exist.
+- `Constituency` / `MemberOfLegislative` / `Secretary` **data** (types exist;
+  seeding and graph projection are in the entity spec) — presentation patterns
+  here should _accommodate_ designation when it lands, not block on it.
