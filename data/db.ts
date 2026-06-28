@@ -349,6 +349,15 @@ export async function listSpeakersByTerm(
   return results.map((r) => r.value).filter(Boolean) as Speaker[];
 }
 
+/** All Speaker / Deputy Speaker tenures for a person, newest-first. */
+export async function listSpeakersByPerson(
+  personId: string,
+): Promise<Speaker[]> {
+  return (await listSpeakers())
+    .filter((s) => s.personId === personId)
+    .sort((a, b) => b.termStart.localeCompare(a.termStart));
+}
+
 export async function getCurrentSpeaker(): Promise<Speaker | null> {
   const all = await listSpeakers();
   return (
@@ -686,6 +695,19 @@ export function listAppointmentsByBranch(
 
 export function listAppointmentsByGo(goId: string): Promise<Appointment[]> {
   return listAppointmentsByIndex(["appointment_by_go", goId]);
+}
+
+/**
+ * All appointments confidently matched to a given person, newest-first.
+ *
+ * No `appointment_by_person` secondary index exists (adding one would mean a
+ * `SEED_VERSION` bump + buildGraph wiring); appointment volume is bounded, so we
+ * filter the full list in memory. Used by the Person hub (`/gov/people/[slug]`).
+ */
+export async function listAppointmentsByPerson(
+  personId: string,
+): Promise<Appointment[]> {
+  return (await listAppointments()).filter((a) => a.personId === personId);
 }
 
 /** Ids ingested at runtime (the durable mirror), newest first. */

@@ -5,6 +5,7 @@ import {
   getAppointment,
   getDepartment,
   getGovernmentOrder,
+  getPerson,
   listAppointmentsByGo,
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
@@ -13,12 +14,15 @@ import type {
   Appointment,
   Department,
   GovernmentOrder,
+  Person,
 } from "../../../data/types.ts";
 
 interface Data {
   appt: Appointment;
   dept: Department | null;
   sourceGo: GovernmentOrder | null;
+  /** The matched Person, when `appt.personId` resolves. */
+  person: Person | null;
   /** Other appointees named in the same order. */
   siblings: Appointment[];
 }
@@ -27,15 +31,17 @@ export const handler = define.handlers<Data>({
   async GET(ctx) {
     const appt = await getAppointment(ctx.params.id);
     if (!appt) throw new HttpError(404, "Appointment not found");
-    const [dept, sourceGo, siblings] = await Promise.all([
+    const [dept, sourceGo, person, siblings] = await Promise.all([
       appt.deptId ? getDepartment(appt.deptId) : Promise.resolve(null),
       getGovernmentOrder(appt.goId),
+      appt.personId ? getPerson(appt.personId) : Promise.resolve(null),
       listAppointmentsByGo(appt.goId),
     ]);
     return page({
       appt,
       dept,
       sourceGo,
+      person,
       siblings: siblings.filter((s) => s.id !== appt.id),
     });
   },
@@ -72,7 +78,7 @@ export default define.page<typeof handler>(function AppointmentDetail(
   { data, state },
 ) {
   const lang = state.lang;
-  const { appt, dept, sourceGo, siblings } = data;
+  const { appt, dept, sourceGo, person, siblings } = data;
   const name = lang === "ml" && appt.appointeeNameMl
     ? appt.appointeeNameMl
     : appt.appointeeName;
@@ -117,6 +123,16 @@ export default define.page<typeof handler>(function AppointmentDetail(
           {name}
         </h1>
         <p class="text-base-content/70 mt-1">{office}</p>
+        {person && (
+          <p class="mt-2">
+            <a
+              href={`/gov/people/${person.slug}`}
+              class="link link-hover text-primary text-sm font-medium"
+            >
+              {t(lang, "View person profile →", "വ്യക്തിയുടെ പ്രൊഫൈൽ →")}
+            </a>
+          </p>
+        )}
 
         {/* Caveat banner — machine-extracted, unverified. */}
         <div class="mt-4 rounded-box border border-warning/40 bg-warning/5 px-4 py-2 text-xs text-base-content/70">
@@ -161,11 +177,14 @@ export default define.page<typeof handler>(function AppointmentDetail(
                 </span>
               )}
           </Row>
-          {appt.personId && (
+          {person && (
             <Row label={t(lang, "Person link", "വ്യക്തി ബന്ധം")}>
-              <span class="text-primary">
-                {t(lang, "Matched to a known person", "അറിയപ്പെടുന്ന വ്യക്തി")}
-              </span>
+              <a
+                href={`/gov/people/${person.slug}`}
+                class="link link-hover text-primary"
+              >
+                {lang === "ml" && person.nameMl ? person.nameMl : person.name}
+              </a>
             </Row>
           )}
         </dl>

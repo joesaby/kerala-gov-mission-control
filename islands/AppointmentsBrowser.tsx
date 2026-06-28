@@ -12,6 +12,8 @@ export interface DeptLite {
 interface Props {
   appointments: Appointment[];
   depts: DeptLite[];
+  /** Map of matched `personId` → Person slug, for linking the ★ to the hub. */
+  personSlugById?: Record<string, string>;
   lang: "en" | "ml";
 }
 
@@ -52,7 +54,7 @@ function t(lang: "en" | "ml", en: string, ml: string): string {
 }
 
 export default function AppointmentsBrowser(
-  { appointments, depts, lang }: Props,
+  { appointments, depts, personSlugById, lang }: Props,
 ) {
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("all");
@@ -235,6 +237,9 @@ export default function AppointmentsBrowser(
                           deptSlug={a.deptId
                             ? deptMap.get(a.deptId)?.slug
                             : undefined}
+                          personSlug={a.personId
+                            ? personSlugById?.[a.personId]
+                            : undefined}
                           lang={lang}
                         />
                       ))}
@@ -259,10 +264,11 @@ function fmtDay(iso: string, lang: "en" | "ml"): string {
 }
 
 function AppointmentRow(
-  { a, deptName, deptSlug, lang }: {
+  { a, deptName, deptSlug, personSlug, lang }: {
     a: Appointment;
     deptName: string | null;
     deptSlug?: string;
+    personSlug?: string;
     lang: "en" | "ml";
   },
 ) {
@@ -291,24 +297,37 @@ function AppointmentRow(
         <span class="font-semibold">{name}</span>
         <span class="text-base-content/60">{` — ${office}`}</span>
         {court && <span class="text-base-content/50">{` · ${court}`}</span>}
-        {a.personId && (
-          <span
-            class="ml-1 text-primary"
-            title={t(
-              lang,
-              "Matched to a known person",
-              "അറിയപ്പെടുന്ന വ്യക്തിയുമായി ബന്ധിപ്പിച്ചു",
-            )}
-          >
-            ★
-          </span>
-        )}
         {a.termEnd && (
           <span class="ml-1 text-[11px] text-base-content/40">
             {t(lang, "(ended)", "(അവസാനിച്ചു)")}
           </span>
         )}
       </a>
+      {/* Person link — a sibling anchor (never nested in the row link). */}
+      {a.personId && (
+        personSlug
+          ? (
+            <a
+              href={`/gov/people/${personSlug}`}
+              class="shrink-0 text-primary hover:text-primary-focus"
+              title={t(lang, "View person profile", "വ്യക്തിയുടെ പ്രൊഫൈൽ")}
+            >
+              ★
+            </a>
+          )
+          : (
+            <span
+              class="shrink-0 text-primary/60"
+              title={t(
+                lang,
+                "Matched to a known person",
+                "അറിയപ്പെടുന്ന വ്യക്തിയുമായി ബന്ധിപ്പിച്ചു",
+              )}
+            >
+              ★
+            </span>
+          )
+      )}
       {deptName && deptSlug && (
         <a
           href={`/gov/departments/${deptSlug}`}

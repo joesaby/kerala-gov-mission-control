@@ -5,13 +5,10 @@ import {
   listAppointments,
   listDepartments,
   listGovernmentOrders,
+  listPersons,
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
-import {
-  type SuccessionBlock,
-  SuccessionTimeline,
-} from "../../../components/SuccessionTimeline.tsx";
 import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import AppointmentsBrowser from "../../../islands/AppointmentsBrowser.tsx";
 import type {
@@ -25,15 +22,21 @@ interface Data {
   orders: GovernmentOrder[];
   appointments: Appointment[];
   depts: Department[];
+  /** Matched `personId` → Person slug, so appointment ★s link to the hub. */
+  personSlugById: Record<string, string>;
 }
 
 export const handler = define.handlers<Data>({
   async GET() {
-    const [all, appointments, depts] = await Promise.all([
+    const [all, appointments, depts, persons] = await Promise.all([
       listGovernmentOrders(), // already newest-first
       listAppointments(), // newest-first by termStart
       listDepartments(),
+      listPersons(),
     ]);
+    const personSlugById = Object.fromEntries(
+      persons.map((p) => [p.id, p.slug]),
+    );
     // A GO that re-surfaces as a (richer) Appointment record is shown only in
     // the Appointments tab — never duplicated into the order/decision lanes.
     // Keyed on real Appointment records (not the bare `category` flag) so a GO
@@ -45,79 +48,15 @@ export const handler = define.handlers<Data>({
     const orders = all.filter((o) =>
       o.type !== "Cabinet" && !apptGoIds.has(o.id)
     );
-    return page({ cabinet, orders, appointments, depts });
+    return page({ cabinet, orders, appointments, depts, personSlugById });
   },
 });
-
-/** Normalized office key for succession grouping (matches db.ts officeKey). */
-function officeKey(a: Appointment): string {
-  const office = a.office.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return [a.deptId ?? "", a.court ?? "", office].join("|");
-}
-
-/**
- * Build succession timelines per department — offices with ≥2 dated holders.
- */
-function buildSuccessionBlocks(
-  appointments: Appointment[],
-  depts: Department[],
-  lang: "en" | "ml",
-): SuccessionBlock[] {
-  const deptMap = new Map(depts.map((d) => [d.id, d]));
-  const byDept = new Map<string, Appointment[]>();
-  for (const a of appointments) {
-    const key = a.deptId ?? "untagged";
-    (byDept.get(key) ?? byDept.set(key, []).get(key)!).push(a);
-  }
-
-  const blocks: SuccessionBlock[] = [];
-  for (const [deptId, appts] of byDept) {
-    const byOffice = new Map<string, Appointment[]>();
-    for (const a of appts) {
-      const key = officeKey(a);
-      (byOffice.get(key) ?? byOffice.set(key, []).get(key)!).push(a);
-    }
-
-    const offices = [];
-    for (const holders of byOffice.values()) {
-      if (holders.length < 2) continue;
-      const sorted = [...holders].sort((x, y) =>
-        x.termStart.localeCompare(y.termStart)
-      );
-      const first = sorted[0];
-      offices.push({
-        id: officeKey(first),
-        office: lang === "ml" && first.officeMl ? first.officeMl : first.office,
-        holders: sorted.map((h) => ({
-          id: h.id,
-          label: lang === "ml" && h.appointeeNameMl
-            ? h.appointeeNameMl
-            : h.appointeeName,
-          href: `/gov/appointments/${h.id}`,
-          termStart: h.termStart,
-          current: !h.termEnd,
-        })),
-      });
-    }
-    if (offices.length === 0) continue;
-
-    const d = deptMap.get(deptId);
-    blocks.push({
-      id: deptId,
-      deptLabel: d ? (lang === "ml" && d.nameMl ? d.nameMl : d.name) : deptId,
-      deptHref: d ? `/gov/departments/${d.slug}` : undefined,
-      offices,
-    });
-  }
-  return blocks;
-}
 
 export default define.page<typeof handler>(function OrdersPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { cabinet, orders, appointments, depts } = data;
-  const successionBlocks = buildSuccessionBlocks(appointments, depts, lang);
+  const { cabinet, orders, appointments, depts, personSlugById } = data;
   const total = orders.length + cabinet.length + appointments.length;
 
   const deptOptions = depts.map((d) => ({
@@ -290,25 +229,14 @@ export default define.page<typeof handler>(function OrdersPage(
               )
               : (
                 <>
-                  {/* Tenure succession maps (only where an office changed hands) */}
-                  {successionBlocks.length > 0 && (
-                    <section class="mb-10">
-                      <h2 class="font-display text-xl font-semibold mb-1">
-                        {t(lang, "Who succeeded whom", "ആരുടെ പിൻഗാമി ആര്")}
-                      </h2>
-                      <p class="text-sm text-base-content/60 mb-4">
-                        {t(
-                          lang,
-                          "Offices that changed hands — each holder dated by when they took charge.",
-                          "കൈമാറിയ പദവികൾ — ഓരോ ഉദ്യോഗസ്ഥനും ചുമതലയേറ്റ തീയതി സഹിതം.",
-                        )}
-                      </p>
-                      <SuccessionTimeline
-                        blocks={successionBlocks}
-                        lang={lang}
-                      />
-                    </section>
-                  )}
+                  {/* Office succession charts need normalized Office records (Phase 2). */}
+                  <p class="mb-6 rounded-box border border-base-300 bg-base-200/40 px-4 py-3 text-xs text-base-content/60">
+                    {t(
+                      lang,
+                      "Office succession charts (“who succeeded whom”) are paused until posts are normalized — raw ingest rows often show duplicate “current” holders for the same chair. Key offices and clean succession timelines ship with the Office model (see person-office-tenure-model spec).",
+                      "പദവി പിന്തുടർച്ച (“ആരുടെ പിൻഗാമി ആര്”) ചാർട്ടുകൾ താൽക്കാലികമായി നിർത്തിയിട്ടുണ്ട് — ഉറവിട നിയമന വരികളിൽ ഒരേ പദവിക്ക് പല “നിലവിൽ” ഉദ്യോഗസ്ഥർ കാണാം. പ്രധാന പദവികളും വ്യക്തമായ പിന്തുടർച്ചയും Office മോഡൽ വരുമ്പോൾ ലഭ്യമാകും.",
+                    )}
+                  </p>
 
                   {/* Searchable list, grouped by branch */}
                   <section>
@@ -318,6 +246,7 @@ export default define.page<typeof handler>(function OrdersPage(
                     <AppointmentsBrowser
                       appointments={appointments}
                       depts={deptOptions}
+                      personSlugById={personSlugById}
                       lang={lang}
                     />
                   </section>
