@@ -125,6 +125,7 @@ export const MANIFESTO_GOALS: ManifestoGoal[] = [
     featuredLabel: "Dream Project",
     featuredLabelMl: "ഡ്രീം പ്രോജക്ട്",
     status: "committed",
+    relatedKpiIds: ["transport.road-fatalities"],
     sourceUrl: "https://voterlist.co.in/udf-kerala-election-manifesto-2026/",
     dataStatus: "verified",
   },
@@ -189,6 +190,7 @@ export const MANIFESTO_GOALS: ManifestoGoal[] = [
     summaryMl:
       "കേരളത്തിന്റെ ബജറ്റേതര കടം വ്യക്തമാക്കുന്ന വൈറ്റ് പേപ്പർ; KIIFB ബാധ്യതകൾ CAG ഓഡിറ്റിന് വിധേയമാക്കൽ.",
     status: "fulfilled",
+    relatedKpiIds: ["fiscal.debt-to-gsdp", "fiscal.revenue-deficit"],
     sourceUrl:
       "http://www.niyamasabha.org/codes/16kla/Kerala_Status_Paper_consolidated%20Eng.pdf",
     dataStatus: "verified",

@@ -132,3 +132,10 @@ on the record.
 - **Active holder**: filter incident tenure edges for `termEnd === undefined`.
 - **Lineage payloads**: assemble one struct per page (see `getKpiLineage`)
   rather than traversing in the component.
+- **KPI ↔ manifesto promise bridge**: `ManifestoGoal.relatedKpiIds` is a
+  **curated** list of KPI ids this promise is tracked against — never inferred
+  from shared category/domain. UI promise-backed GOs for a KPI come from
+  `getKpiPromiseBackedOrders(kpiId)`, which joins:
+  `kpi ←relatedKpiIds— goal ←IMPACTS— government_order`. Goals with no
+  `relatedKpiIds` entry for the KPI are excluded even when their
+  `ManifestoCategory` matches the KPI's `CivicDomain`.

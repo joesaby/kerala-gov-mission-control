@@ -434,6 +434,8 @@ export interface ManifestoGoal {
   featuredLabel?: string;
   featuredLabelMl?: string;
   status: ManifestoGoalStatus;
+  /** Headline KPIs this promise is tracked against (curated, not inferred). */
+  relatedKpiIds?: string[];
   sourceUrl?: string;
   dataStatus: "verified" | "unverified" | "tbd";
 }
