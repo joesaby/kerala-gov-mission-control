@@ -8,8 +8,10 @@ import {
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
-import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
-import type { EgoGroup } from "../../../lib/ego-layout.ts";
+import {
+  type SuccessionBlock,
+  SuccessionTimeline,
+} from "../../../components/SuccessionTimeline.tsx";
 import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import AppointmentsBrowser from "../../../islands/AppointmentsBrowser.tsx";
 import type {
@@ -54,15 +56,13 @@ function officeKey(a: Appointment): string {
 }
 
 /**
- * Build one tenure-succession ego map per department that has an office with
- * more than one dated holder — the visual proof that "the holder changes by
- * date". Center = department, group = office, leaves = holders oldest→newest.
+ * Build succession timelines per department — offices with ≥2 dated holders.
  */
-function buildTenureMaps(
+function buildSuccessionBlocks(
   appointments: Appointment[],
   depts: Department[],
   lang: "en" | "ml",
-): { id: string; label: string; href?: string; groups: EgoGroup[] }[] {
+): SuccessionBlock[] {
   const deptMap = new Map(depts.map((d) => [d.id, d]));
   const byDept = new Map<string, Appointment[]>();
   for (const a of appointments) {
@@ -70,51 +70,46 @@ function buildTenureMaps(
     (byDept.get(key) ?? byDept.set(key, []).get(key)!).push(a);
   }
 
-  const maps: {
-    id: string;
-    label: string;
-    href?: string;
-    groups: EgoGroup[];
-  }[] = [];
+  const blocks: SuccessionBlock[] = [];
   for (const [deptId, appts] of byDept) {
     const byOffice = new Map<string, Appointment[]>();
     for (const a of appts) {
       const key = officeKey(a);
       (byOffice.get(key) ?? byOffice.set(key, []).get(key)!).push(a);
     }
-    // Only offices with real succession (≥2 holders) are interesting here.
-    const groups: EgoGroup[] = [];
+
+    const offices = [];
     for (const holders of byOffice.values()) {
       if (holders.length < 2) continue;
       const sorted = [...holders].sort((x, y) =>
         x.termStart.localeCompare(y.termStart)
       );
       const first = sorted[0];
-      groups.push({
+      offices.push({
         id: officeKey(first),
-        label: lang === "ml" && first.officeMl ? first.officeMl : first.office,
-        leaves: sorted.map((h) => ({
+        office: lang === "ml" && first.officeMl ? first.officeMl : first.office,
+        holders: sorted.map((h) => ({
           id: h.id,
-          label: `${
-            lang === "ml" && h.appointeeNameMl
-              ? h.appointeeNameMl
-              : h.appointeeName
-          } · ${h.termStart.slice(0, 7)}`,
+          label: lang === "ml" && h.appointeeNameMl
+            ? h.appointeeNameMl
+            : h.appointeeName,
           href: `/gov/appointments/${h.id}`,
-          tone: h.termEnd ? "off-track" : "on-track",
+          termStart: h.termStart,
+          current: !h.termEnd,
         })),
       });
     }
-    if (groups.length === 0) continue;
+    if (offices.length === 0) continue;
+
     const d = deptMap.get(deptId);
-    maps.push({
+    blocks.push({
       id: deptId,
-      label: d ? (lang === "ml" && d.nameMl ? d.nameMl : d.name) : deptId,
-      href: d ? `/gov/departments/${d.slug}` : undefined,
-      groups,
+      deptLabel: d ? (lang === "ml" && d.nameMl ? d.nameMl : d.name) : deptId,
+      deptHref: d ? `/gov/departments/${d.slug}` : undefined,
+      offices,
     });
   }
-  return maps;
+  return blocks;
 }
 
 export default define.page<typeof handler>(function OrdersPage(
@@ -122,7 +117,7 @@ export default define.page<typeof handler>(function OrdersPage(
 ) {
   const lang = state.lang;
   const { cabinet, orders, appointments, depts } = data;
-  const tenureMaps = buildTenureMaps(appointments, depts, lang);
+  const successionBlocks = buildSuccessionBlocks(appointments, depts, lang);
   const total = orders.length + cabinet.length + appointments.length;
 
   const deptOptions = depts.map((d) => ({
@@ -296,7 +291,7 @@ export default define.page<typeof handler>(function OrdersPage(
               : (
                 <>
                   {/* Tenure succession maps (only where an office changed hands) */}
-                  {tenureMaps.length > 0 && (
+                  {successionBlocks.length > 0 && (
                     <section class="mb-10">
                       <h2 class="font-display text-xl font-semibold mb-1">
                         {t(lang, "Who succeeded whom", "ആരുടെ പിൻഗാമി ആര്")}
@@ -308,25 +303,10 @@ export default define.page<typeof handler>(function OrdersPage(
                           "കൈമാറിയ പദവികൾ — ഓരോ ഉദ്യോഗസ്ഥനും ചുമതലയേറ്റ തീയതി സഹിതം.",
                         )}
                       </p>
-                      <div class="flex flex-col gap-6">
-                        {tenureMaps.map((m) => (
-                          <div
-                            key={m.id}
-                            class="rounded-box border border-base-300 p-3"
-                          >
-                            <EgoNetwork
-                              center={{ label: m.label, href: m.href }}
-                              groups={m.groups}
-                              lang={lang}
-                              ariaLabel={t(
-                                lang,
-                                "Office succession map",
-                                "പദവി പിന്തുടർച്ച ഭൂപടം",
-                              )}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                      <SuccessionTimeline
+                        blocks={successionBlocks}
+                        lang={lang}
+                      />
                     </section>
                   )}
 

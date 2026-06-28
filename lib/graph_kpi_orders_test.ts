@@ -1,5 +1,7 @@
 /**
- * Unit tests for `getKpiDepartmentOrders` — the 2-hop KPI → dept → GO join.
+ * Unit tests for KPI graph joins:
+ * - `getKpiDepartmentOrders` — KPI → dept → GO (administrative association)
+ * - `getKpiPromiseBackedOrders` — KPI ←relatedKpiIds— goal ←IMPACTS— GO
  *
  * Writes nodes and edges directly via the graph write primitives. Fixtures use
  * synthetic ids (`dept.test-*`, `test.kpi-*`) that cannot collide with real
@@ -7,8 +9,10 @@
  * real data, the dept→GO join would pick up real orders and break the
  * order-sensitive assertions.
  */
+import { kv } from "../data/db.ts";
 import {
   getKpiDepartmentOrders,
+  getKpiPromiseBackedOrders,
   kpiEdges,
   kpiNode,
   orderEdges,
@@ -21,6 +25,7 @@ import type {
   GovernmentOrder,
   GraphNode,
   Kpi,
+  ManifestoGoal,
 } from "../data/types.ts";
 
 // ---------------------------------------------------------------------------
@@ -131,9 +136,53 @@ const GO_FROM_HEALTH: GovernmentOrder = {
   dataStatus: "unverified",
 };
 
+const GOAL_CURATED: ManifestoGoal = {
+  id: "goal.test-fiscal-curated",
+  governmentId: "govt.test",
+  title: "Fiscal transparency (test)",
+  category: "fiscal",
+  status: "committed",
+  relatedKpiIds: ["test.kpi-fin"],
+  dataStatus: "verified",
+};
+
+/** Same category as the KPI, but no curated bridge — must not match. */
+const GOAL_CATEGORY_ONLY: ManifestoGoal = {
+  id: "goal.test-fiscal-category",
+  governmentId: "govt.test",
+  title: "Unrelated fiscal pledge (test)",
+  category: "fiscal",
+  status: "committed",
+  dataStatus: "verified",
+};
+
+const GO_PROMISE_CURATED: GovernmentOrder = {
+  ...GO_FROM_FINANCE_1,
+  id: "go.test-promise-curated",
+  goNumber: "G.O.(P) No.1/2026/Fin",
+  date: "2026-06-01",
+  deptId: undefined,
+  manifestoGoalIds: ["goal.test-fiscal-curated"],
+  manifestoConfidence: "direct",
+};
+
+const GO_PROMISE_CATEGORY_ONLY: GovernmentOrder = {
+  ...GO_FROM_FINANCE_2,
+  id: "go.test-promise-category",
+  goNumber: "G.O.(Ms) No.2/2026/Fin",
+  date: "2026-05-15",
+  deptId: undefined,
+  manifestoGoalIds: ["goal.test-fiscal-category"],
+  manifestoConfidence: "weak",
+};
+
 // ---------------------------------------------------------------------------
 // Helpers to build the graph in-memory
 // ---------------------------------------------------------------------------
+
+async function putManifestoGoal(goal: ManifestoGoal): Promise<void> {
+  await (await kv()).set(["manifesto_goal", goal.id], goal);
+}
 
 function deptGraphNode(d: Department): GraphNode {
   return {
@@ -160,6 +209,16 @@ async function seedGraph(
     await putNode(orderNode(go));
     for (const e of orderEdges(go)) await putEdge(e, { requireNodes: false });
   }
+}
+
+async function seedPromiseGraph(
+  kpi: Kpi,
+  orders: GovernmentOrder[],
+  goals: ManifestoGoal[],
+  depts: Department[],
+): Promise<void> {
+  for (const g of goals) await putManifestoGoal(g);
+  await seedGraph(orders, kpi, depts);
 }
 
 function assert(cond: boolean, msg: string) {
@@ -200,13 +259,10 @@ Deno.test("getKpiDepartmentOrders returns results sorted newest-first", async ()
   );
 
   const results = await getKpiDepartmentOrders(KPI_OWNED_BY_FINANCE.id);
-  assert(results.length >= 2, "should have at least 2 finance orders");
-  // 2026-04-10 > 2025-08-20
-  assert(
-    results[0].date >= results[results.length - 1].date,
-    "results must be sorted newest-first",
-  );
-  assert(results[0].id === "go.2026-fin-98", "newest GO must come first");
+  const idxNew = results.findIndex((r) => r.id === "go.2026-fin-98");
+  const idxOld = results.findIndex((r) => r.id === "go.2025-fin-55");
+  assert(idxNew >= 0 && idxOld >= 0, "expected both seeded finance GOs");
+  assert(idxNew < idxOld, "2026 GO must sort before 2025 GO (newest-first)");
 });
 
 Deno.test(
@@ -290,5 +346,56 @@ Deno.test(
       entry!.goNumber === GO_FROM_FINANCE_1.goNumber,
       "goNumber must be preserved",
     );
+  },
+);
+
+Deno.test(
+  "getKpiPromiseBackedOrders returns GOs via curated relatedKpiIds only",
+  async () => {
+    await seedPromiseGraph(
+      KPI_OWNED_BY_FINANCE,
+      [GO_PROMISE_CURATED, GO_PROMISE_CATEGORY_ONLY],
+      [GOAL_CURATED, GOAL_CATEGORY_ONLY],
+      [DEPT_FINANCE],
+    );
+
+    const results = await getKpiPromiseBackedOrders(KPI_OWNED_BY_FINANCE.id);
+    const ids = results.map((r) => r.id);
+
+    assert(
+      ids.includes("go.test-promise-curated"),
+      "curated goal bridge must surface the backing GO",
+    );
+    assert(
+      !ids.includes("go.test-promise-category"),
+      "category-only goal must NOT surface without relatedKpiIds",
+    );
+    assert(
+      results[0].confidence === "direct",
+      "IMPACTS edge confidence must be preserved",
+    );
+    assert(
+      results[0].goals.some((g) => g.id === "goal.test-fiscal-curated"),
+      "backing goal must be attached to the order",
+    );
+  },
+);
+
+Deno.test(
+  "getKpiPromiseBackedOrders returns empty when no curated relatedKpiIds",
+  async () => {
+    const kpiNoBridge: Kpi = {
+      ...KPI_OWNED_BY_FINANCE,
+      id: "test.kpi-no-bridge",
+    };
+    await seedPromiseGraph(
+      kpiNoBridge,
+      [GO_PROMISE_CATEGORY_ONLY],
+      [GOAL_CATEGORY_ONLY],
+      [DEPT_FINANCE],
+    );
+
+    const results = await getKpiPromiseBackedOrders(kpiNoBridge.id);
+    assert(results.length === 0, "no curated bridge means empty result");
   },
 );

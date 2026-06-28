@@ -143,25 +143,94 @@ export interface KpiLineage {
   ownerDept?: GraphNode;
   /** Minister currently holding the owning department's portfolio. */
   activeMinister?: GraphNode;
-  /** Government orders directly impacting this KPI, newest first. */
-  impactingOrders: { order: GraphNode; edge: GraphEdge }[];
+  /** GOs backing manifesto promises related to this KPI, newest first. */
+  promiseBackedOrders: KpiPromiseBackedOrder[];
+}
+
+/** A GO linked to this KPI via a related manifesto promise (GO -IMPACTS→ goal). */
+export interface KpiPromiseBackedOrder {
+  id: string;
+  goNumber: string;
+  subject: string;
+  subjectMl?: string;
+  date: string;
+  sourceUrl: string;
+  confidence?: string;
+  goals: { id: string; title: string; titleMl?: string }[];
+}
+
+/** True when a manifesto goal is curated to a KPI via `relatedKpiIds` only. */
+function goalRelatesToKpi(goal: ManifestoGoal, kpiId: string): boolean {
+  return goal.relatedKpiIds?.includes(kpiId) ?? false;
 }
 
 /**
- * Traverse from a KPI to its immediate causal context: the owning department,
- * the minister currently holding that portfolio, and any GOs that impact the
- * KPI directly. Returns a single payload for the KPI-detail lineage view.
+ * GOs that back manifesto promises related to this KPI — traverses
+ * GO -IMPACTS→ ManifestoGoal where the goal maps to the KPI.
+ */
+export async function getKpiPromiseBackedOrders(
+  kpiId: string,
+): Promise<KpiPromiseBackedOrder[]> {
+  const k = await kv();
+  const kpiRes = await k.get<GraphNode>(["nodes", kpiId]);
+  if (!kpiRes.value) return [];
+
+  const goals = await listByPrefix<ManifestoGoal>(["manifesto_goal"]);
+  const relatedGoals = goals.filter((g) => goalRelatesToKpi(g, kpiId));
+  if (relatedGoals.length === 0) return [];
+
+  const byOrder = new Map<string, KpiPromiseBackedOrder>();
+
+  for (const goal of relatedGoals) {
+    for (const edge of await getNeighborsByType(goal.id, "IMPACTS", "in")) {
+      const orderRes = await k.get<GraphNode>(["nodes", edge.sourceId]);
+      if (!orderRes.value || orderRes.value.type !== "government_order") {
+        continue;
+      }
+
+      const goalEntry = {
+        id: goal.id,
+        title: goal.title,
+        titleMl: goal.titleMl,
+      };
+      const existing = byOrder.get(edge.sourceId);
+      if (existing) {
+        if (!existing.goals.some((g) => g.id === goal.id)) {
+          existing.goals.push(goalEntry);
+        }
+        continue;
+      }
+
+      byOrder.set(edge.sourceId, {
+        id: orderRes.value.id,
+        goNumber: String(orderRes.value.properties?.goNumber ?? ""),
+        subject: orderRes.value.label,
+        subjectMl: orderRes.value.labelMl,
+        date: String(
+          orderRes.value.properties?.date ?? edge.properties?.date ?? "",
+        ),
+        sourceUrl: String(orderRes.value.properties?.sourceUrl ?? ""),
+        confidence: edge.properties?.confidence
+          ? String(edge.properties.confidence)
+          : undefined,
+        goals: [goalEntry],
+      });
+    }
+  }
+
+  return [...byOrder.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
+ * Traverse from a KPI to its accountability context and promise-backed orders.
+ * Returns a single payload for the KPI-detail page.
  */
 export async function getKpiLineage(kpiId: string): Promise<KpiLineage> {
   const k = await kv();
   const kpiRes = await k.get<GraphNode>(["nodes", kpiId]);
   if (!kpiRes.value) throw new Error(`KPI node not found: ${kpiId}`);
 
-  const impactingOrders: { order: GraphNode; edge: GraphEdge }[] = [];
-  for (const edge of await getNeighborsByType(kpiId, "IMPACTS", "in")) {
-    const orderRes = await k.get<GraphNode>(["nodes", edge.sourceId]);
-    if (orderRes.value) impactingOrders.push({ order: orderRes.value, edge });
-  }
+  const promiseBackedOrders = await getKpiPromiseBackedOrders(kpiId);
 
   let ownerDept: GraphNode | undefined;
   let activeMinister: GraphNode | undefined;
@@ -184,11 +253,7 @@ export async function getKpiLineage(kpiId: string): Promise<KpiLineage> {
     kpiNode: kpiRes.value,
     ownerDept,
     activeMinister,
-    impactingOrders: impactingOrders.sort((a, b) =>
-      (b.edge.properties?.date ?? "").localeCompare(
-        a.edge.properties?.date ?? "",
-      )
-    ),
+    promiseBackedOrders,
   };
 }
 
@@ -317,6 +382,7 @@ export function goalNode(g: ManifestoGoal): GraphNode {
       category: g.category,
       status: g.status,
       governmentId: g.governmentId,
+      relatedKpiIds: g.relatedKpiIds,
     },
   };
 }

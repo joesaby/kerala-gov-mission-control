@@ -9,8 +9,11 @@ import {
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
-import { EgoNetwork } from "../../../components/EgoNetwork.tsx";
-import type { EgoGroup } from "../../../lib/ego-layout.ts";
+import { AutoLinkDisclaimer } from "../../../components/AutoLinkDisclaimer.tsx";
+import {
+  type ConnectionGroup,
+  ConnectionGroups,
+} from "../../../components/ConnectionGroups.tsx";
 import type {
   Department,
   GoReference,
@@ -56,20 +59,12 @@ export const handler = define.handlers<Data>({
   },
 });
 
-/** Relationship verb labels for linked-order rows and graph leaves. */
+/** Relationship verb labels for linked-order rows. */
 const RELATION_LABEL: Record<GoRelation, { en: string; ml: string }> = {
   amends: { en: "Amends", ml: "ഭേദഗതി ചെയ്യുന്നു" },
   supersedes: { en: "Supersedes", ml: "റദ്ദാക്കുന്നു" },
   references: { en: "References", ml: "പരാമർശിക്കുന്നു" },
   implements: { en: "Implements", ml: "നടപ്പാക്കുന്നു" },
-};
-
-/** Map a relation to a status tone so the graph leaf carries a colour cue. */
-const RELATION_TONE: Record<GoRelation, string | undefined> = {
-  supersedes: "off-track",
-  amends: "slipping",
-  implements: "improving",
-  references: undefined,
 };
 
 const ORDER_TYPE_LABEL: Record<
@@ -113,53 +108,60 @@ export default define.page<typeof handler>(function OrderDetail(
         : l.order.subject)
       : l.ref.goNumber;
 
-  // One ego-network centred on this order: department, manifesto goals, and the
-  // orders it links to (outbound citations + inbound "cited by").
-  const egoGroups: EgoGroup[] = [];
+  const connectionGroups: ConnectionGroup[] = [];
   if (dept && deptName) {
-    egoGroups.push({
-      id: "cat.dept",
-      label: t(lang, "Department", "വകുപ്പ്"),
+    connectionGroups.push({
+      id: "dept",
+      label: "Issuing department",
+      labelMl: "പുറപ്പെടുവിച്ച വകുപ്പ്",
       href: `/gov/departments/${dept.slug}`,
-      leaves: [{
+      items: [{
         id: dept.id,
         label: deptName,
         href: `/gov/departments/${dept.slug}`,
+        confidence: order.deptConfidence,
       }],
     });
   }
   if (goals.length > 0) {
-    egoGroups.push({
-      id: "cat.goals",
-      label: t(lang, "Manifesto goals", "പ്രകടനപത്രിക ലക്ഷ്യങ്ങൾ"),
+    connectionGroups.push({
+      id: "goals",
+      label: "Manifesto promises",
+      labelMl: "പ്രകടനപത്രിക വാഗ്ദാനങ്ങൾ",
       href: "/gov/manifesto",
-      leaves: goals.map((g) => ({
+      items: goals.map((g) => ({
         id: g.id,
         label: lang === "ml" && g.titleMl ? g.titleMl : g.title,
         href: "/gov/manifesto",
+        confidence: order.manifestoConfidence,
       })),
     });
   }
   if (linked.length > 0) {
-    egoGroups.push({
-      id: "cat.linked",
-      label: t(lang, "Linked orders", "ബന്ധപ്പെട്ട ഉത്തരവുകൾ"),
-      leaves: linked.map((l) => ({
+    connectionGroups.push({
+      id: "linked",
+      label: "This order cites",
+      labelMl: "ഈ ഉത്തരവ് പരാമർശിക്കുന്നത്",
+      items: linked.map((l) => ({
         id: l.ref.goId ?? l.ref.goNumber,
         label: linkedLabel(l),
         href: l.order ? `/gov/orders/${l.order.id}` : undefined,
-        tone: RELATION_TONE[l.ref.relation],
+        badge: RELATION_LABEL[l.ref.relation],
+        meta: (lang === "ml" && l.ref.noteMl ? l.ref.noteMl : l.ref.note) ??
+          (!l.order ? t(lang, "not yet ingested", "ഇതുവരെ ലഭ്യമല്ല") : undefined),
       })),
     });
   }
   if (citedBy.length > 0) {
-    egoGroups.push({
-      id: "cat.citedby",
-      label: t(lang, "Cited by", "ഇതിനെ പരാമർശിച്ചവ"),
-      leaves: citedBy.map((o) => ({
+    connectionGroups.push({
+      id: "citedby",
+      label: "Cited by",
+      labelMl: "ഇതിനെ പരാമർശിച്ചവ",
+      items: citedBy.map((o) => ({
         id: o.id,
         label: lang === "ml" && o.subjectMl ? o.subjectMl : o.subject,
         href: `/gov/orders/${o.id}`,
+        badge: { en: "Cited by", ml: "പരാമർശിച്ചത്" },
       })),
     });
   }
@@ -240,89 +242,18 @@ export default define.page<typeof handler>(function OrderDetail(
           ))}
         </div>
 
-        {/* ── Relationship graph: how this order connects ── */}
-        {egoGroups.length > 0 && (
+        {/* ── Connections: how this order relates to other records ── */}
+        {connectionGroups.some((g) => g.items.length > 0) && (
           <section class="mt-8">
             <h2 class="eyebrow mb-3">
-              {t(lang, "How this order connects", "ഈ ഉത്തരവിന്റെ ബന്ധങ്ങൾ")}
+              {t(lang, "Connections", "ബന്ധങ്ങൾ")}
             </h2>
             <div class="surface-card p-4 md:p-5">
-              <EgoNetwork
-                center={{ label: order.goNumber }}
-                groups={egoGroups}
-                lang={lang}
-                ariaLabel={t(
-                  lang,
-                  "Relationship map for this government order",
-                  "ഈ ഉത്തരവിന്റെ ബന്ധ ശൃംഖല",
-                )}
-              />
+              <ConnectionGroups groups={connectionGroups} lang={lang} />
+              <div class="mt-4">
+                <AutoLinkDisclaimer lang={lang} />
+              </div>
             </div>
-
-            {
-              /* Linked-order detail: relation verb + note carry context the
-                graph can't show. */
-            }
-            {(linked.length > 0 || citedBy.length > 0) && (
-              <ul class="mt-4 flex flex-col gap-2">
-                {linked.map((l) => (
-                  <li class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-                    <span class="badge badge-sm badge-outline shrink-0">
-                      {lang === "ml"
-                        ? RELATION_LABEL[l.ref.relation].ml
-                        : RELATION_LABEL[l.ref.relation].en}
-                    </span>
-                    {l.order
-                      ? (
-                        <a
-                          href={`/gov/orders/${l.order.id}`}
-                          class="link link-primary"
-                        >
-                          {linkedLabel(l)}
-                        </a>
-                      )
-                      : (
-                        <span class="font-mono tabular-nums text-base-content/70">
-                          {l.ref.goNumber}
-                        </span>
-                      )}
-                    {(l.ref.note || l.ref.noteMl) && (
-                      <span
-                        class={`text-base-content/55 ${
-                          lang === "ml" && l.ref.noteMl ? "ml" : ""
-                        }`}
-                      >
-                        — {lang === "ml" && l.ref.noteMl
-                          ? l.ref.noteMl
-                          : l.ref.note}
-                      </span>
-                    )}
-                    {!l.order && (
-                      <span class="badge badge-xs badge-ghost text-base-content/40">
-                        {t(lang, "not yet ingested", "ഇതുവരെ ലഭ്യമല്ല")}
-                      </span>
-                    )}
-                  </li>
-                ))}
-                {citedBy.map((o) => (
-                  <li class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-                    <span class="badge badge-sm badge-outline shrink-0">
-                      {t(lang, "Cited by", "പരാമർശിച്ചത്")}
-                    </span>
-                    <a href={`/gov/orders/${o.id}`} class="link link-primary">
-                      {lang === "ml" && o.subjectMl ? o.subjectMl : o.subject}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p class="mt-3 text-xs text-base-content/50">
-              {t(
-                lang,
-                "Links between orders are auto-detected during ingest by reading each PDF; they may be incomplete and await review.",
-                "ഉത്തരവുകൾ തമ്മിലുള്ള ബന്ധങ്ങൾ ഇൻജസ്റ്റ് സമയത്ത് പി.ഡി.എഫ് വായിച്ച് സ്വയമേവ കണ്ടെത്തുന്നതാണ്; അവ പൂർണ്ണമായിരിക്കില്ല, പരിശോധന വേണ്ടവയാണ്.",
-              )}
-            </p>
           </section>
         )}
 
