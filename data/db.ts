@@ -105,7 +105,8 @@ let _seedPromise: Promise<void> | null = null;
 
 export async function kv(): Promise<Deno.Kv> {
   if (_kv) return _kv;
-  _kv = await Deno.openKv();
+  const path = Deno.env.get("KV_PATH");
+  _kv = path ? await Deno.openKv(path) : await Deno.openKv();
   return _kv;
 }
 

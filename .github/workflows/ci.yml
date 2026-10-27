@@ -1,7 +1,7 @@
 name: CI
 
-# Deno Deploy handles the actual deploy via its GitHub App / Git Integration.
-# This workflow only verifies the code: fmt, lint, type-check, and a build.
+# PR/push verification only. Production deploy is `.github/workflows/deploy.yml`
+# (GCP VM over SSH) — see docs/specs/hosting-and-ops.md.
 
 on:
   push:

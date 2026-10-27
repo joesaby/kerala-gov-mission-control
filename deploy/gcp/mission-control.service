@@ -1,0 +1,17 @@
+[Unit]
+Description=Kerala Mission Control (Deno Fresh)
+After=network.target
+
+[Service]
+User=mission-control
+WorkingDirectory=/opt/mission-control
+EnvironmentFile=/etc/mission-control/env
+Environment=DENO_DIR=/var/lib/mission-control/.deno
+ExecStart=/usr/local/bin/deno serve -A --unstable-kv --unstable-cron --port 8000 _fresh/server.js
+Restart=always
+RestartSec=3
+# e2-micro has 1 GB RAM
+MemoryMax=700M
+
+[Install]
+WantedBy=multi-user.target

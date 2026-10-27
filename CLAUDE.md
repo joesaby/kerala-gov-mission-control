@@ -266,9 +266,10 @@ glyph corruption in `data/` fixtures. Full rules:
 
 ## Deployment
 
-Deno Deploy (Git Integration) watches the repo, runs `deno task build`, and
-serves `_fresh/server.js`. `.github/workflows/ci.yml` runs `check` + `build` on
-every PR/push to `main` — it does not deploy. No manual deploy step.
+Production is GCP (`docs/specs/hosting-and-ops.md`). Push to `main` →
+`.github/workflows/deploy.yml` (SSH to the VM). Manual:
+`DEPLOY_HOST=mission-control.us-central1-a.scenic-lane-184013 deno task deploy`.
+`.github/workflows/ci.yml` verifies only.
 
 ## Not yet implemented
 

@@ -165,19 +165,25 @@ deno task ingest-gos --limit 5 --dry-run   # preview without writing
 deno task ingest-gos --source orders,circulars --since 2026-05-18
 ```
 
-## Deploying to Deno Deploy
+## Deploying (GCP)
 
-Deploys are handled by the **Deno Deploy GitHub App** (Git Integration). The app
-watches the repo, auto-detects Fresh, runs `deno task build`, and serves
-`_fresh/server.js`. No deploy step in CI.
+Production is an e2-micro VM on Google Cloud. Push to `main` runs GitHub Actions
+(`.github/workflows/deploy.yml`): checks, then SSH deploy of the build to the
+VM. Details: `docs/specs/hosting-and-ops.md`.
 
-The live URL is set on the project in the
-[Deno Deploy dashboard](https://dash.deno.com/). Set `GEMINI_API_KEY` in the
-project's environment variables so the daily ingest cron can run.
+Temporary URL: `https://mission-control.35.222.232.148.sslip.io`
 
-`.github/workflows/ci.yml` is for verification only — it runs `deno fmt`,
-`deno lint`, `deno check`, and `deno task build` on every PR and push to `main`.
-It does not deploy.
+Manual deploy:
+
+```bash
+gcloud compute config-ssh
+DEPLOY_HOST=mission-control.us-central1-a.scenic-lane-184013 deno task deploy
+```
+
+Secrets (`GEMINI_API_KEY`, `ADMIN_PASSWORD`, …) live in
+`/etc/mission-control/env` on the VM — not in Deno Deploy.
+
+`.github/workflows/ci.yml` verifies PRs/pushes; it does not deploy.
 
 ## KPI taxonomy
 

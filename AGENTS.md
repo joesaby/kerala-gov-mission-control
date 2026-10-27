@@ -20,14 +20,14 @@ internal tool — it is read by journalists, citizens, and elected officials.
 
 ## Tech stack at a glance
 
-| Layer         | Technology                                         |
-| ------------- | -------------------------------------------------- |
-| Runtime       | Deno ≥ 2                                           |
-| Framework     | Fresh 2 (`jsr:@fresh/core`)                        |
-| UI components | Preact (server) + Preact Signals (islands)         |
-| Styling       | Tailwind CSS 4 + daisyUI 5                         |
-| Data          | Typed TypeScript fixtures in `data/`               |
-| Deploy        | Deno Deploy (Git Integration, auto-builds on push) |
+| Layer         | Technology                                            |
+| ------------- | ----------------------------------------------------- |
+| Runtime       | Deno ≥ 2                                              |
+| Framework     | Fresh 2 (`jsr:@fresh/core`)                           |
+| UI components | Preact (server) + Preact Signals (islands)            |
+| Styling       | Tailwind CSS 4 + daisyUI 5                            |
+| Data          | Typed TypeScript fixtures in `data/`                  |
+| Deploy        | GCP e2-micro VM + GitHub Actions SSH deploy on `main` |
 
 ---
 
@@ -115,10 +115,11 @@ deno task review       # Headless advisory code review of the staged diff
 deno task translate    # Run Malayalam translation helper
 ```
 
-**CI gate:** `.github/workflows/ci.yml` runs `deno task check`,
-`deno task test`, `deno task check:ml`, and `deno task build` on every PR and
-push to `main`. All must pass. Deploys are handled automatically by Deno Deploy
-— there is no manual deploy step.
+**CI gate:** `.github/workflows/ci.yml` runs fmt/lint/check/test/ml-glyphs/build
+on every PR and push to `main`. **Production deploy:** push to `main` runs
+`.github/workflows/deploy.yml` → GCP VM over SSH. Manual:
+`DEPLOY_HOST=mission-control.us-central1-a.scenic-lane-184013 deno task deploy`.
+See `docs/specs/hosting-and-ops.md`.
 
 ---
 
