@@ -8,11 +8,16 @@ import {
   listDepartments,
   listGovernmentOrders,
   listKpis,
+  listMinistersByPerson,
 } from "../../../data/db.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
 import { MinisterAvatar } from "../../../components/MinisterAvatar.tsx";
+import {
+  type SuccessionBlock,
+  SuccessionTimeline,
+} from "../../../components/SuccessionTimeline.tsx";
 import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import type {
   Department,
@@ -22,6 +27,16 @@ import type {
   Minister,
 } from "../../../data/types.ts";
 
+/** One cabinet tenure of the underlying person, for the service-record timeline. */
+interface TenureRow {
+  slug: string;
+  rank: Minister["rank"];
+  govtShortName: string;
+  govtShortNameMl: string | null;
+  termStart: string;
+  current: boolean;
+}
+
 interface Data {
   minister: Minister;
   govt: Government | null;
@@ -29,6 +44,8 @@ interface Data {
   kpis: Kpi[];
   /** Slug of the underlying Person, for the full-profile hub link. */
   personSlug: string | null;
+  /** This person's cabinet tenures across governments, oldest first. */
+  tenures: TenureRow[];
   orders: GovernmentOrder[];
   allDepts: Department[];
 }
@@ -37,15 +54,17 @@ export const handler = define.handlers<Data>({
   async GET(ctx) {
     const minister = await getMinisterBySlug(ctx.params.slug);
     if (!minister) throw new HttpError(404, "Minister not found");
-    const [allDepts, allKpis, govt, person, allOrders] = await Promise.all([
-      listDepartments(),
-      listKpis(),
-      minister.governmentId
-        ? getGovernment(minister.governmentId)
-        : Promise.resolve(null),
-      getPerson(minister.personId),
-      listGovernmentOrders(),
-    ]);
+    const [allDepts, allKpis, govt, person, allOrders, personTenures] =
+      await Promise.all([
+        listDepartments(),
+        listKpis(),
+        minister.governmentId
+          ? getGovernment(minister.governmentId)
+          : Promise.resolve(null),
+        getPerson(minister.personId),
+        listGovernmentOrders(),
+        listMinistersByPerson(minister.personId),
+      ]);
     const depts = allDepts.filter((d) => minister.departmentIds.includes(d.id));
     const deptIdSet = new Set(minister.departmentIds);
     const kpis = allKpis.filter((k) =>
@@ -55,12 +74,38 @@ export const handler = define.handlers<Data>({
     const orders = allOrders.filter(
       (o) => o.deptId && deptIdSet.has(o.deptId),
     );
+
+    // Service record across governments. Resolve each tenure's government name
+    // once, drop tenures without a start date (can't place on a timeline).
+    const dated = personTenures.filter((m) => m.termStart);
+    const govtIds = [
+      ...new Set(dated.map((m) => m.governmentId).filter(Boolean) as string[]),
+    ];
+    const govtList = await Promise.all(govtIds.map((id) => getGovernment(id)));
+    const govtById = new Map(
+      govtList.filter(Boolean).map((g) => [g!.id, g!]),
+    );
+    const tenures: TenureRow[] = dated
+      .map((m) => {
+        const g = m.governmentId ? govtById.get(m.governmentId) : undefined;
+        return {
+          slug: m.slug,
+          rank: m.rank,
+          govtShortName: g?.shortName ?? "",
+          govtShortNameMl: g?.shortNameMl ?? null,
+          termStart: m.termStart!,
+          current: !m.termEnd,
+        };
+      })
+      .sort((a, b) => a.termStart.localeCompare(b.termStart));
+
     return page({
       minister,
       govt,
       depts,
       kpis,
       personSlug: person?.slug ?? null,
+      tenures,
       orders,
       allDepts,
     });
@@ -71,8 +116,48 @@ export default define.page<typeof handler>(function MinisterPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { minister, govt, depts, kpis, personSlug, orders, allDepts } = data;
+  const { minister, govt, depts, kpis, personSlug, tenures, orders, allDepts } =
+    data;
   const deptById = new Map(depts.map((d) => [d.id, d]));
+
+  // Service record — group this person's cabinet tenures by rank and render as
+  // a timeline. Only worth showing once there's more than the current stint.
+  function rankLabel(rank: Minister["rank"]): string {
+    if (rank === "CM") return t(lang, "Chief Minister", "മുഖ്യമന്ത്രി");
+    if (rank === "Deputy CM") {
+      return t(lang, "Deputy Chief Minister", "ഉപമുഖ്യമന്ത്രി");
+    }
+    return t(lang, "Minister", "മന്ത്രി");
+  }
+  const tenuresByRank = new Map<string, typeof tenures>();
+  for (const row of tenures) {
+    const key = rankLabel(row.rank);
+    const list = tenuresByRank.get(key);
+    if (list) list.push(row);
+    else tenuresByRank.set(key, [row]);
+  }
+  const serviceBlocks: SuccessionBlock[] = tenures.length >= 2
+    ? [{
+      id: minister.personId,
+      deptLabel: lang === "ml" && minister.nameMl
+        ? minister.nameMl
+        : minister.name,
+      offices: [...tenuresByRank.entries()].map(([office, rows]) => ({
+        id: office,
+        office,
+        holders: rows.map((row) => ({
+          id: row.slug,
+          label: lang === "ml" && row.govtShortNameMl
+            ? row.govtShortNameMl
+            : (row.govtShortName ||
+              t(lang, "Government", "സർക്കാർ")),
+          href: `/gov/ministers/${row.slug}`,
+          termStart: row.termStart,
+          current: row.current,
+        })),
+      })),
+    }]
+    : [];
 
   return (
     <>
@@ -160,6 +245,22 @@ export default define.page<typeof handler>(function MinisterPage(
             </div>
           </div>
         </header>
+
+        {serviceBlocks.length > 0 && (
+          <section class="mt-8">
+            <h2 class="font-display text-xl font-semibold mb-1">
+              {t(lang, "Service record", "സേവന ചരിത്രം")}
+            </h2>
+            <p class="text-sm text-base-content/60 mb-4">
+              {t(
+                lang,
+                "Cabinet tenures held across governments, oldest first.",
+                "വിവിധ സർക്കാരുകളിലെ മന്ത്രിസഭാ കാലയളവുകൾ — പഴയത് ആദ്യം.",
+              )}
+            </p>
+            <SuccessionTimeline blocks={serviceBlocks} lang={lang} />
+          </section>
+        )}
 
         <section class="mt-8">
           <h2 class="font-display text-xl font-semibold mb-3">

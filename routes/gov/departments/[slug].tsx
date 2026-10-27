@@ -9,10 +9,18 @@ import {
   listGovernmentOrdersByDept,
   listKpisByDept,
 } from "../../../data/db.ts";
-import { getDeptHeadlineHolders } from "../../../lib/graph.ts";
+import {
+  getDeptHeadlineHolders,
+  getDeptOfficeSuccession,
+} from "../../../lib/graph.ts";
 import { Header } from "../../../components/Header.tsx";
 import { Footer } from "../../../components/Footer.tsx";
 import { KpiCard } from "../../../components/KpiCard.tsx";
+import { AutoLinkDisclaimer } from "../../../components/AutoLinkDisclaimer.tsx";
+import {
+  type SuccessionBlock,
+  SuccessionTimeline,
+} from "../../../components/SuccessionTimeline.tsx";
 import OrdersBrowser from "../../../islands/OrdersBrowser.tsx";
 import type {
   Department,
@@ -20,12 +28,16 @@ import type {
   Kpi,
   Minister,
 } from "../../../data/types.ts";
-import type { DeptHolderRow } from "../../../lib/graph.ts";
+import type {
+  DeptHolderRow,
+  DeptOfficeSuccession,
+} from "../../../lib/graph.ts";
 
 interface Data {
   dept: Department;
   minister: Minister | null;
   bureaucrats: DeptHolderRow[];
+  succession: DeptOfficeSuccession[];
   kpis: Kpi[];
   orders: GovernmentOrder[];
   allDepts: Department[];
@@ -35,14 +47,24 @@ export const handler = define.handlers<Data>({
   async GET(ctx) {
     const dept = await getDepartmentBySlug(ctx.params.slug);
     if (!dept) throw new HttpError(404, "Department not found");
-    const [minister, bureaucrats, kpis, orders, allDepts] = await Promise.all([
-      dept.ministerId ? getMinister(dept.ministerId) : Promise.resolve(null),
-      getDeptHeadlineHolders(dept.id),
-      listKpisByDept(dept.id),
-      listGovernmentOrdersByDept(dept.id),
-      listDepartments(),
-    ]);
-    return page({ dept, minister, bureaucrats, kpis, orders, allDepts });
+    const [minister, bureaucrats, succession, kpis, orders, allDepts] =
+      await Promise.all([
+        dept.ministerId ? getMinister(dept.ministerId) : Promise.resolve(null),
+        getDeptHeadlineHolders(dept.id),
+        getDeptOfficeSuccession(dept.id),
+        listKpisByDept(dept.id),
+        listGovernmentOrdersByDept(dept.id),
+        listDepartments(),
+      ]);
+    return page({
+      dept,
+      minister,
+      bureaucrats,
+      succession,
+      kpis,
+      orders,
+      allDepts,
+    });
   },
 });
 
@@ -50,7 +72,37 @@ export default define.page<typeof handler>(function DeptPage(
   { data, state },
 ) {
   const lang = state.lang;
-  const { dept, minister, bureaucrats, kpis, orders, allDepts } = data;
+  const { dept, minister, bureaucrats, succession, kpis, orders, allDepts } =
+    data;
+
+  // Office succession — only surface offices with history (a past + a present
+  // holder); a lone current holder already shows under "Who runs this".
+  const successionOffices = succession
+    .map((o) => ({
+      id: o.officeId,
+      office: lang === "ml" && o.officeTitleMl
+        ? o.officeTitleMl
+        : o.officeTitle,
+      holders: o.holders.map((h) => ({
+        id: h.personId + h.termStart,
+        label: lang === "ml" && h.personNameMl ? h.personNameMl : h.personName,
+        href: h.personSlug
+          ? `/gov/people/${h.personSlug}`
+          : o.officeSlug
+          ? `/gov/offices/${o.officeSlug}`
+          : "#",
+        termStart: h.termStart,
+        current: h.current,
+      })),
+    }))
+    .filter((o) => o.holders.length >= 2);
+  const successionBlocks: SuccessionBlock[] = successionOffices.length > 0
+    ? [{
+      id: dept.id,
+      deptLabel: lang === "ml" && dept.nameMl ? dept.nameMl : dept.name,
+      offices: successionOffices,
+    }]
+    : [];
 
   function fmtDate(iso: string): string {
     return new Date(iso).toLocaleDateString(lang === "ml" ? "ml-IN" : "en-IN", {
@@ -166,6 +218,25 @@ export default define.page<typeof handler>(function DeptPage(
             </InfoCard>
           </div>
         </section>
+
+        {successionBlocks.length > 0 && (
+          <section class="mt-10">
+            <h2 class="font-display text-xl font-semibold mb-1">
+              {t(lang, "Office succession", "പദവികളുടെ പിന്തുടർച്ച")}
+            </h2>
+            <p class="text-sm text-base-content/60 mb-4">
+              {t(
+                lang,
+                "Who has held this department's headline posts over time, oldest first.",
+                "ഈ വകുപ്പിന്റെ പ്രധാന പദവികൾ വഹിച്ചവർ — പഴയത് ആദ്യം.",
+              )}
+            </p>
+            <SuccessionTimeline blocks={successionBlocks} lang={lang} />
+            <div class="mt-4">
+              <AutoLinkDisclaimer lang={lang} />
+            </div>
+          </section>
+        )}
 
         <section class="mt-10">
           <h2 class="font-display text-xl font-semibold mb-4">

@@ -440,6 +440,50 @@ export async function getOfficeSuccession(
   return out.sort((a, b) => a.termStart.localeCompare(b.termStart));
 }
 
+/** One headline office of a department with its full holder succession. */
+export interface DeptOfficeSuccession {
+  officeId: string;
+  officeSlug?: string;
+  officeTitle: string;
+  officeTitleMl?: string;
+  holders: OfficeHolder[];
+}
+
+/**
+ * Full holder succession for each headline-tier office of a department
+ * (BELONGS_TO → office, HOLDS → person). Unlike getDeptHeadlineHolders this
+ * keeps past holders too, so the department page can show office history rather
+ * than only the current incumbent. Offices with no holders are dropped.
+ */
+export async function getDeptOfficeSuccession(
+  deptId: string,
+): Promise<DeptOfficeSuccession[]> {
+  const k = await kv();
+  const belongs = await getNeighborsByType(deptId, "BELONGS_TO", "in");
+  const out: DeptOfficeSuccession[] = [];
+
+  for (const edge of belongs) {
+    const office = (await k.get<GraphNode>(["nodes", edge.sourceId])).value;
+    if (!office || office.type !== "office") continue;
+    if (office.properties?.tier !== "headline") continue;
+
+    const holders = await getOfficeSuccession(office.id);
+    if (holders.length === 0) continue;
+
+    out.push({
+      officeId: office.id,
+      officeSlug: office.properties?.slug
+        ? String(office.properties.slug)
+        : undefined,
+      officeTitle: office.label,
+      officeTitleMl: office.labelMl,
+      holders,
+    });
+  }
+
+  return out.sort((a, b) => a.officeTitle.localeCompare(b.officeTitle));
+}
+
 // ----- Node builders (entity record -> GraphNode) -------------------------
 //
 // Pure projections — exported so the derivation can be unit-tested without KV.
