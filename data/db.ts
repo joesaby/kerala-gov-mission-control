@@ -105,7 +105,13 @@ let _seedPromise: Promise<void> | null = null;
 
 export async function kv(): Promise<Deno.Kv> {
   if (_kv) return _kv;
-  const path = Deno.env.get("KV_PATH");
+  // Production sets KV_PATH; tests often run without --allow-env.
+  let path: string | undefined;
+  try {
+    path = Deno.env.get("KV_PATH") || undefined;
+  } catch {
+    // NotCapable — use Deno's default KV location.
+  }
   _kv = path ? await Deno.openKv(path) : await Deno.openKv();
   return _kv;
 }
